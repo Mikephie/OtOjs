@@ -1,13 +1,7 @@
 OtOjs/
+├── core/         # 插件 & 解密框架
+├── cli/          # Node.js CLI 入口
+├── web/          # 浏览器端解密页面
 ├── package.json
 ├── README.md
-├── src/
-│   ├── main.js
-│   └── plugin/
-│       ├── aaencode.js
-│       ├── jsfuck.js
-│       ├── runtime-eval.js
-│       └── ...（其他插件）
-└── test/
-    ├── input.js
-    └── output.js
+└── test/         # 示例测试 input.js
