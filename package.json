@@ -7,10 +7,8 @@
     "deob": "node src/main.js -t obfuscator",
     "deso": "node src/main.js -t sojson",
     "desov7": "node src/main.js -t sojsonv7",
-
     "prepass:v7": "node tools/v7_prepass.mjs -i input.js -o input.pre.js",
     "decode:ci": "node src/main.js -i input.pre.js -o output.js",
-
     "lint": "eslint --ext .js --fix src"
   },
   "dependencies": {
