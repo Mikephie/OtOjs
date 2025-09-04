@@ -83,7 +83,7 @@
       // 如果你不确定名称，进 fork 的 Actions 页看工作流文件名；默认分支要能看到 Run workflow 按钮。:contentReference[oaicite:5]{index=5}
       await dispatchWorkflow({
         ownerRepo, token,
-        workflowFile: "main.yml",   // ★ 如名称不同改这里（例如 decode.yml）
+        workflowFile: "decode.yml",   // ★ 如名称不同改这里（例如 decode.yml）
         ref: branch
       });
 
