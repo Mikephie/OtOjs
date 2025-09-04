@@ -7,7 +7,7 @@
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto;max-width:960px;margin:40px auto;padding:0 16px}
     textarea{width:100%;height:260px}
-    input,button{padding:8px;margin:4px 0}
+    input,button{padding:8px;margin:4px 0;width:100%}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
     pre{background:#0b1020;color:#b8ffb8;padding:12px;overflow:auto;border-radius:8px}
     small{color:#666}
@@ -16,36 +16,42 @@
   </style>
 </head>
 <body>
-  <h1>decode_action 网页端</h1>
-  <p>本页会把你的脚本写入目标仓库的 <code>input.js</code>，触发 <code>decode.yml</code> 工作流，随后拉取 <code>output.js</code> 展示。</p>
+  <h1>Decode Web UI</h1>
+  <p>将脚本写入 <code>input.js</code>（或自定义），触发 <code>decode.yml</code>，然后读取 <code>output.js</code>。</p>
 
   <div class="grid">
     <div>
-      <label>GitHub Token（PAT）</label><br/>
-      <input id="token" type="password" placeholder="粘贴 classic repo 或 fine-grained token" />
-      <small>用于浏览器直连 GitHub API。不会存库。</small>
+      <label>GitHub Token (PAT)</label>
+      <input id="token" type="password" placeholder="粘贴 classic repo+workflow token" />
     </div>
     <div>
-      <label>仓库（owner/repo）</label><br/>
+      <label>仓库 (owner/repo)</label>
       <input id="repo" value="Mikephie/OtOjs" />
     </div>
     <div>
-      <label>分支</label><br/>
+      <label>分支</label>
       <input id="branch" value="main" />
+    </div>
+    <div>
+      <label>输入文件名</label>
+      <input id="infile" value="input.js" />
+    </div>
+    <div>
+      <label>输出文件名</label>
+      <input id="outfile" value="output.js" />
     </div>
   </div>
 
-  <label>待解密脚本（写入 input.js）</label>
-  <textarea id="code" placeholder="// 在这里粘贴代码…"></textarea>
+  <label>待解密脚本</label>
+  <textarea id="code" placeholder="// 粘贴代码"></textarea>
 
   <div class="grid">
     <button id="btnSubmit">提交解密</button>
-    <button id="btnCheck">手动刷新结果</button>
+    <button id="btnCheck">刷新结果</button>
   </div>
 
   <p id="status"></p>
-
-  <h2>输出（output.js）</h2>
+  <h2>输出结果</h2>
   <pre id="out">// 等待结果…</pre>
 
   <script src="./app.js"></script>
