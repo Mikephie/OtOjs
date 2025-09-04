@@ -1,65 +1,36 @@
 name: Decode JavaScript File
 
 on:
-  workflow_dispatch:
-    inputs:
-      input_path:
-        description: "Path to input JS"
-        required: false
-        default: "input.js"
-      output_path:
-        description: "Path to output JS"
-        required: false
-        default: "output.js"
   push:
-    branches: [ main ]
-    paths:
-      - 'input.js'
-
+    branches:
+      - main
 jobs:
   decode:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: Show chosen paths
-        run: |
-          echo "INPUT : ${{ github.event.inputs.input_path || 'input.js' }}"
-          echo "OUTPUT: ${{ github.event.inputs.output_path || 'output.js' }}"
+    - name: Execute Python script for decoding
+      run: |
+        python src/decode.py
 
-      # --- 可选：如果你的项目用到了 Python 解码脚本 ---
-      - name: Execute Python script for decoding (optional)
-        if: ${{ hashFiles('src/decode.py') != '' }}
-        run: |
-          python3 src/decode.py || echo "no python pre-step"
-
-      - name: Install Node dependencies
-        run: |
-          npm ci || npm i
-
-      # --- v7 预处理：把字符串映射先替换掉 ---
-      - name: v7 prepass
-        run: |
-          node tools/v7_prepass.mjs -i "${{ github.event.inputs.input_path || 'input.js' }}" -o "input.pre.js"
-
-      # --- 主解混淆：用你的主程序跑（读 input.pre.js，产出到指定 output）---
-      - name: Run decode
-        run: |
-          node src/main.js -i "input.pre.js" -o "${{ github.event.inputs.output_path || 'output.js' }}"
-
-      - name: Configure Git author
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "action"
-
-      - name: Save decoded output to repository
-        run: |
-          git status
-          ls -lah
-          git add "${{ github.event.inputs.output_path || 'output.js' }}" || true
-          git commit -m "Add decoded output file" || echo "no changes"
-          git push
+    - name: Install dependencies and run decode
+      run: |
+        npm install
+        npm run decode -- [-i input.js] [-o output.js]
+    - name: Configure Git author
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "action"
+    - name: Save decoded output to repository
+      run: |
+        git status
+        ls
+        git add output.js
+        git add output.py
+        git commit -m "Add decoded output file"
+        git push
+        
