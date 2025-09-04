@@ -21,23 +21,35 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Show chosen paths
         run: |
-          echo "INPUT:  ${{ github.event.inputs.input_path || 'input.js' }}"
+          echo "INPUT : ${{ github.event.inputs.input_path || 'input.js' }}"
           echo "OUTPUT: ${{ github.event.inputs.output_path || 'output.js' }}"
 
-      - name: Execute Python script for decoding
+      # --- 可选：如果你的项目用到了 Python 解码脚本 ---
+      - name: Execute Python script for decoding (optional)
+        if: ${{ hashFiles('src/decode.py') != '' }}
         run: |
-          python src/decode.py
+          python3 src/decode.py || echo "no python pre-step"
 
-      - name: Install dependencies and run decode
+      - name: Install Node dependencies
         run: |
           npm ci || npm i
-          npm run decode -- -i "${{ github.event.inputs.input_path || 'input.js' }}" -o "${{ github.event.inputs.output_path || 'output.js' }}"
+
+      # --- v7 预处理：把字符串映射先替换掉 ---
+      - name: v7 prepass
+        run: |
+          node tools/v7_prepass.mjs -i "${{ github.event.inputs.input_path || 'input.js' }}" -o "input.pre.js"
+
+      # --- 主解混淆：用你的主程序跑（读 input.pre.js，产出到指定 output）---
+      - name: Run decode
+        run: |
+          node src/main.js -i "input.pre.js" -o "${{ github.event.inputs.output_path || 'output.js' }}"
 
       - name: Configure Git author
         run: |
