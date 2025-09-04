@@ -57,4 +57,58 @@
     else if(head.status!==404){ const t=await head.text().catch(()=>head.statusText); throw new Error(`读取 ${path} 失败：${head.status} ${t}`); }
 
     const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${p}`;
-    const body = { message: message||`chore: update ${path} from web ui`, content: b64(content), branch, ...(sha?{sha}:{}
+    const body = { message: message||`chore: update ${path} from web ui`, content: b64(content), branch, ...(sha?{sha}:{}) };
+    const res = await ghFetch(putUrl, token, { method:"PUT", body: JSON.stringify(body) });
+    return res.json();
+  }
+
+  async function dispatchWorkflow({ownerRepo, token, workflowFile, ref, inputs}){
+    const [owner, repo] = ownerRepo.split("/");
+    const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`;
+    await ghFetch(url, token, { method:"POST", body: JSON.stringify({ ref, inputs: inputs||{} }) });
+  }
+
+  async function readRaw({ownerRepo, branch, path}){
+    const url = `https://raw.githubusercontent.com/${ownerRepo}/${branch}/${path}`;
+    const r = await fetch(url, { cache:"no-store" });
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.text();
+  }
+
+  // ---- UI events ----
+  $("btnSubmit").onclick = async ()=>{
+    const token = $("token").value.trim();
+    const ownerRepo = $("repo").value.trim();
+    const branch = $("branch").value.trim() || "main";
+    let code = $("code").value;
+
+    if(!token || !ownerRepo){ setStatus("Token 与 仓库 必填", false); return; }
+
+    code = decodeEntities(code);
+
+    try{
+      setStatus("写入 input.js …", true);
+      await upsertFile({ ownerRepo, branch, token, path:"input.js", content:code, message:"update input.js from web ui" });
+
+      setStatus("触发工作流 decode.yml …", true);
+      await dispatchWorkflow({ ownerRepo, token, workflowFile:"decode.yml", ref:branch });
+
+      setStatus("已触发，约 60 秒后点「手动刷新结果」查看。", true);
+    }catch(e){
+      setStatus("提交失败：" + e.message, false);
+    }
+  };
+
+  $("btnCheck").onclick = async ()=>{
+    const ownerRepo = $("repo").value.trim();
+    const branch = $("branch").value.trim() || "main";
+    try{
+      setStatus("拉取 output.js …", true);
+      const text = await readRaw({ ownerRepo, branch, path:"output.js" });
+      logOut(text);
+      setStatus("已更新输出。", true);
+    }catch(e){
+      setStatus("还没产出或读取失败：" + e.message, false);
+    }
+  };
+})();
