@@ -3,55 +3,91 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Decode Web UI</title>
+  <title>JS 解密 · 网页端</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto;max-width:960px;margin:40px auto;padding:0 16px}
-    textarea{width:100%;height:260px}
-    input,button{padding:8px;margin:4px 0;width:100%}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-    pre{background:#0b1020;color:#b8ffb8;padding:12px;overflow:auto;border-radius:8px}
-    small{color:#666}.ok{color:#0a0}.err{color:#c00}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto;max-width:900px;margin:36px auto;padding:0 16px}
+    label{display:block;margin-top:12px;font-weight:600}
+    input,button,textarea{width:100%;padding:10px;margin-top:6px}
+    textarea{height:280px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .row3{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    .ok{color:#0a0}.err{color:#c00}
+    pre{background:#111;color:#bfffbf;padding:12px;border-radius:8px;overflow:auto;min-height:180px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap}
+    .actions button{flex:1}
+    small{color:#666}
   </style>
 </head>
 <body>
-  <h1>Decode Web UI</h1>
-  <p>将脚本写入 <code>input.js</code>（提交即触发 Actions），稍后刷新读取 <code>output.js</code>。</p>
+  <h1>JS 解密 · 网页端（保持仓库结构不变）</h1>
+  <p>把加密脚本写入仓库 <code>input.js</code>，Actions 自动解密输出 <code>output.js</code>。</p>
 
-  <div class="grid">
+  <label>GitHub Token（PAT，勾 <code>repo</code> 权限）</label>
+  <input id="token" type="password" placeholder="你的 GitHub PAT" />
+
+  <div class="row">
     <div>
-      <label>GitHub Token (PAT)</label>
-      <input id="token" type="password" placeholder="classic PAT: repo(+workflow 可留)" />
-      <small>浏览器直连 GitHub API，不会存库。</small>
-    </div>
-    <div>
-      <label>仓库 (owner/repo)</label>
-      <input id="repo" value="Mikephie/OtOjs" />
+      <label>仓库（owner/repo）</label>
+      <input id="repo" placeholder="例如：Mikephie/OtOjs" />
     </div>
     <div>
       <label>分支</label>
       <input id="branch" value="main" />
     </div>
+  </div>
+
+  <div class="row">
     <div>
       <label>输入文件名</label>
       <input id="infile" value="input.js" />
+      <small>写入到仓库的文件路径（保持默认即可）。</small>
     </div>
     <div>
       <label>输出文件名</label>
       <input id="outfile" value="output.js" />
+      <small>从仓库读取的输出文件路径（保持默认即可）。</small>
     </div>
   </div>
 
-  <label>待解密脚本</label>
-  <textarea id="code" placeholder="// 粘贴代码"></textarea>
+  <hr>
 
-  <div class="grid">
-    <button id="btnSubmit">提交（写入并触发）</button>
-    <button id="btnCheck">刷新结果</button>
+  <h2>选择输入方式</h2>
+
+  <label>方式 A：直接粘贴加密脚本</label>
+  <textarea id="code" placeholder="// 在此粘贴"></textarea>
+
+  <div class="row3">
+    <div>
+      <label>方式 B：远端链接（支持 raw GitHub、你自己的服务器等）</label>
+      <input id="srcUrl" placeholder="例如：https://raw.githubusercontent.com/user/repo/branch/file.js" />
+    </div>
+    <div style="align-self:end">
+      <button id="btnLoadUrl">从链接拉取 → 填入上方文本框</button>
+    </div>
+  </div>
+
+  <div class="row3">
+    <div>
+      <label>方式 C：本地文件</label>
+      <input id="srcFile" type="file" accept=".js,.txt,.json,*/*" />
+    </div>
+    <div style="align-self:end">
+      <button id="btnLoadFile">读取所选文件 → 填入上方文本框</button>
+    </div>
+  </div>
+
+  <div class="actions" style="margin-top:12px">
+    <button id="btnSubmit">提交到仓库（写入 input.js 并触发 Actions）</button>
+    <button id="btnRead">读取 output.js</button>
   </div>
 
   <p id="status"></p>
-  <h2>输出结果</h2>
-  <pre id="out">// 等待结果…</pre>
+
+  <h2 style="display:flex;align-items:center;gap:12px">
+    output.js
+    <button id="btnCopyOut" style="width:auto;padding:6px 12px">一键复制输出</button>
+  </h2>
+  <pre id="out">// 这里会显示输出内容</pre>
 
   <script src="./app.js"></script>
 </body>
