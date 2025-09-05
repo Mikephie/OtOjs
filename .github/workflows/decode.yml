@@ -6,7 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'input.js'
-  # 手动触发（不会上传源码，只复用仓库里的文件）
+  # 手动触发
   workflow_dispatch:
     inputs:
       input_path:
@@ -61,17 +61,13 @@ jobs:
           }
 
       - name: Setup Node
-  uses: actions/setup-node@v4
-  with:
-    node-version: '20'
-
-- name: Install Node dependencies
-  run: npm install
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install Node dependencies
-        run: npm ci || npm i
+        run: npm install
 
-      # v7 预处理（尽力而为，失败则透传原始文件）
       - name: v7 prepass (best-effort)
         env:
           PREPASS_DEBUG: ${{ github.event.inputs.debug_prepass == 'true' && '1' || '' }}
