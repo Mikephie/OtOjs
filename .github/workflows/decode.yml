@@ -2,37 +2,35 @@ name: Decode JavaScript File
 
 on:
   push:
-    branches: [ main ]
-    paths:
-      - 'input.js'   # 只有 input.js 改动才触发
-
-  workflow_dispatch: {}  # 可手动触发（会用当前仓库的 input.js）
-
+    branches:
+      - main
 jobs:
   decode:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+    - name: Execute Python script for decoding
+      run: |
+        python src/decode.py
 
-      - name: Install deps
-        run: npm install
-
-      - name: Run decode
-        run: node src/main.js -i input.js -o output.js
-
-      - name: Commit decoded output
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name  "action"
-          git add output.js || true
-          git diff --cached --quiet && echo "no changes" || git commit -m "Add decoded output"
-          git push || true
+    - name: Install dependencies and run decode
+      run: |
+        npm install
+        npm run decode -- [-i input.js] [-o output.js]
+    - name: Configure Git author
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "action"
+    - name: Save decoded output to repository
+      run: |
+        git status
+        ls
+        git add output.js
+        git add output.py
+        git commit -m "Add decoded output file"
+        git push
+        
