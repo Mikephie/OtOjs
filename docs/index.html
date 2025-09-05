@@ -9,11 +9,13 @@
     label{display:block;margin-top:12px;font-weight:600}
     input,button,textarea{width:100%;padding:10px;margin-top:6px}
     textarea{height:280px}
-    .row{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    .row2{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
     .ok{color:#0a0}.err{color:#c00}
     pre{background:#111;color:#bfffbf;padding:12px;border-radius:8px;overflow:auto;min-height:180px}
     .actions{display:flex;gap:12px;flex-wrap:wrap}
     .actions button{flex:1}
+    small{color:#666}
   </style>
 </head>
 <body>
@@ -24,26 +26,31 @@
   <input id="token" type="password" placeholder="你的 GitHub PAT" />
 
   <h2>输入加密脚本</h2>
-  <label>方式 A：直接粘贴</label>
-  <textarea id="code" placeholder="// 在此粘贴或由下方文件/链接填充"></textarea>
 
-  <div class="row">
-    <input id="srcUrl" placeholder="方式 B：远端链接 https://raw.githubusercontent.com/..." />
-    <button id="btnLoadUrl">拉取并填入输入框</button>
+  <div class="row2">
+    <div>
+      <label>方式 A：远端链接（自动拉取，无需按钮）</label>
+      <input id="srcUrl" placeholder="https://raw.githubusercontent.com/..." />
+      <small>输入/粘贴链接后，回车 或 结束输入（0.8 秒无操作）会自动拉取并填入下方输入框。</small>
+    </div>
+    <div>
+      <label>方式 B：本地文件（选择后自动读取）</label>
+      <input id="srcFile" type="file" accept=".js,.txt,.json,*/*" />
+      <small>选择文件后会自动读取并填入下方输入框。</small>
+    </div>
   </div>
 
-  <div class="row">
-    <input id="srcFile" type="file" accept=".js,.txt,.json,*/*" />
-    <button id="btnLoadFile">读取本地文件 → 填入输入框</button>
-  </div>
+  <label>方式 C：直接粘贴 /（上方链接与本地文件也会自动填充到这里）</label>
+  <textarea id="code" placeholder="// 在此粘贴或由上方链接/文件自动填充"></textarea>
 
   <div class="actions" style="margin-top:12px">
+    <button id="btnClear">清空输入</button>
     <button id="btnSubmit">提交 input.js 并触发 Actions</button>
     <button id="btnRead">读取 output.js</button>
   </div>
 
-  <p id="status"></p>
   <p id="wfStatus"></p>
+  <p id="status"></p>
 
   <h2 style="display:flex;align-items:center;gap:12px">
     output.js
