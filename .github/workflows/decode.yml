@@ -16,6 +16,7 @@ permissions:
 jobs:
   decode:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,10 +38,18 @@ jobs:
           name: deobf-output
           path: output/
 
-      - name: Commit output back to repo
-  run: |
-    git config user.name "github-actions[bot]"
-    git config user.email "github-actions[bot]@users.noreply.github.com"
-    git add output/
-    git commit -m "chore: always update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "nothing to commit"
-    git push
+      - name: Commit output back to repo (always)
+        shell: bash
+        run: |
+          set -e
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          # 如果没有改动也不算失败
+          git add output/ || true
+          git diff --staged --quiet && echo "nothing to commit" || git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+
+          # 避免非快进错误
+          git pull --rebase || true
+          git push || true
