@@ -7,6 +7,7 @@ import aaencode from "./plugins/aaencode.js";
 import jsfuck from "./plugins/jsfuck.js";
 import jsjiamiV7 from "./plugins/jsjiami_v7.js";
 import { prettyFormat } from "./utils/format.js";
+import { cleanupToDotAccess } from "./utils/cleanup.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,7 @@ async function processOne(filePath) {
 
   try {
     code = await prettyFormat(code);
+    code = cleanupToDotAccess(code);   // ← 新增这行
   } catch (e) {
     console.warn("[format] failed, return raw");
   }
