@@ -1,114 +1,151 @@
-// decode.js —— 严格模式：任一步失败就不写入；并打印阶段日志
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+#!/usr/bin/env node
+/* eslint-disable */
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+const glob = require("glob");
+const parser = require("@babel/parser");
+const traverse = require("@babel/traverse").default;
+const generate = require("@babel/generator").default;
+const t = require("@babel/types");
+const prettier = require("prettier");
 
-import aaencode from "./plugins/aaencode.js";
-import jsfuck from "./plugins/jsfuck.js";
-import jsjiamiV7 from "./plugins/jsjiami_v7.js";
-import { prettyFormatStrict } from "./utils/format.js";
-import { cleanupToDotAccess } from "./utils/cleanup.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const INPUT_DIR = path.join(__dirname, "input");
-const OUTPUT_DIR = path.join(__dirname, "output");
+const INPUT_DIR = "input";
+const OUTPUT_DIR = "output";
 
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-function log(...a) {
-  try { console.log("[decode]", ...a); } catch {}
+function read(file) { return fs.readFileSync(file, "utf8"); }
+function write(file, s) { fs.writeFileSync(file, s); }
+function fmt(code) { try { return prettier.format(code, { parser: "babel" }); } catch { return code; } }
+
+function pick(regex, src) {
+  const m = src.match(regex);
+  return m ? m[0] : null;
 }
 
-function detect(content) {
-  const s = content.slice(0, 200000);
-  return {
-    isAA: /(\(\(ﾟДﾟ\)\)\[\]|\(ﾟДﾟ\)\[ﾟoﾟ\])/m.test(s),
-    isJSFuck:
-      /(?:(?:\+|\!|\[|\]|\(|\)){10,})/.test(s) && /Function|return|this/.test(s) === false,
-    isJsjiamiV7:
-      /jsjiami\.com\.v7|encode_version\s*=\s*['"]jsjiami\.com\.v7['"]/i.test(s),
-  };
-}
+/** 尝试从源码里抽出 jsjiami 的“字符串表函数”和“解码函数”并在 VM 中调用 */
+function buildJsjiamiDecoder(src) {
+  // 常见：var _0xodH='jsjiami.com.v7' 或 v6
+  const marker = src.includes("jsjiami.com.v") ? "jsjiami" : null;
+  if (!marker) return null;
 
-async function processOne(filePath) {
-  log("process:", path.basename(filePath));
-  const raw = fs.readFileSync(filePath, "utf8");
-  const tag = detect(raw);
+  // 取“返回数组”的函数（装字典的）
+  const arrFun = pick(/function\s+_0x[a-f0-9]+\s*\(\)\s*\{[\s\S]+?\}\s*;?/i, src);
+  if (!arrFun) return null;
 
-  let code = raw;
+  // 取“RC4/base64 解码器”的函数
+  const decFun = pick(/function\s+_0x[a-f0-9]+\s*\([\s\S]+?\)\s*\{[\s\S]+?\}\s*;?/i, src);
+  if (!decFun) return null;
 
-  if (tag.isAA) {
-    code = await aaencode(code);
-    if (typeof code !== "string" || !code.length) throw new Error("AAEncode 解码失败");
-    log("AAEncode ok");
-  }
+  // 找到解码器的函数名（如 _0x1e61 / _0x3cea）
+  const decName = (decFun.match(/function\s+(_0x[a-f0-9]+)/i) || [])[1];
+  if (!decName) return null;
 
-  if (tag.isJSFuck) {
-    const out = await jsfuck(code);
-    if (!out) throw new Error("JSFuck 解码失败");
-    code = out;
-    log("JSFuck ok");
-  }
+  // 一些脚本会有 var _0xodH='jsjiami.com.v7'，尽量把它也带上
+  const banner = pick(/var\s+_0xodH\s*=\s*['"]jsjiami\.com\.v\d['"]\s*;?/i, src) || "";
 
-  if (tag.isJsjiamiV7) {
-    const out = await jsjiamiV7(code);
-    if (!out) throw new Error("jsjiami v7 解码失败");
-    code = out;
-    log("v7 ok");
-  }
+  const bootstrap = `
+    ${banner}
+    ${arrFun}
+    ${decFun}
+    module.exports = function(i, k){
+      try { return ${decName}(i, k); } catch(e) { return null; }
+    };
+  `;
 
-  code = await prettyFormatStrict(code);
-  log("format ok");
-
-  const cleaned = cleanupToDotAccess(code);
-  if (typeof cleaned !== "string" || !cleaned.length) throw new Error("清理失败");
-  code = cleaned;
-  log("cleanup ok");
-
-  if (/\b_0x1e61\s*\(|\b_0xc3dd0a\s*\(|\.call\s*\(|\.apply\s*\(/.test(code)) {
-    console.log("Notice:  残留解码调用（可能有遗漏别名/调用点）");
-  }
-
-  return { code };
-}
-
-async function main() {
-  log("scan input/", fs.existsSync(INPUT_DIR) ? fs.readdirSync(INPUT_DIR) : []);
-  const files = fs.existsSync(INPUT_DIR)
-    ? fs.readdirSync(INPUT_DIR).filter((f) => f.toLowerCase().endsWith(".js"))
-    : [];
-  log("target files:", files);
-
-  if (files.length === 0) {
-    console.log("input/ 里没有 .js 文件");
-    return;
-  }
-
-  let success = 0;
-  let failed = 0;
-
-  for (const f of files) {
-    const inPath = path.join(INPUT_DIR, f);
-    try {
-      const { code } = await processOne(inPath);
-      const outPath = path.join(OUTPUT_DIR, f.replace(/\.js$/i, ".deobf.js"));
-      fs.writeFileSync(outPath, code, "utf8");
-      console.log("✅ Done:", f, "→", path.basename(outPath));
-      success++;
-    } catch (err) {
-      console.error("❌ Failed:", f, "-", err?.message || err);
-      failed++;
+  const mod = { exports: null };
+  const ctx = { module: mod, exports: mod.exports, console };
+  vm.createContext(ctx);
+  try {
+    vm.runInContext(bootstrap, ctx, { timeout: 500 });
+    if (typeof ctx.module.exports === "function") {
+      return { decode: ctx.module.exports, decName };
     }
+  } catch (e) {
+    return null;
   }
-
-  console.log(`Summary: ${success} succeeded, ${failed} failed.`);
-  // 若希望只要有失败就让 CI fail，取消下面的注释：
-  // if (failed > 0) process.exit(1);
+  return null;
 }
 
-main().catch((e) => {
-  console.error("Unexpected error:", e);
-  // process.exit(1);
-});
+/** 对 AST 中的 decoder(i, 'key') 进行计算并替换为字面量字符串 */
+function replaceDecodeCalls(ast, decoderName, decodeFn) {
+  let replaced = 0;
+  traverse(ast, {
+    CallExpression(path) {
+      const callee = path.node.callee;
+      if (!t.isIdentifier(callee) || callee.name !== decoderName) return;
+
+      const args = path.node.arguments;
+      if (args.length >= 2 && t.isNumericLiteral(args[0]) && t.isStringLiteral(args[1])) {
+        const idx = args[0].value;
+        const key = args[1].value;
+        const val = decodeFn(idx, key);
+        if (typeof val === "string") {
+          path.replaceWith(t.stringLiteral(val));
+          replaced++;
+        }
+      }
+    },
+  });
+  return replaced;
+}
+
+function deobfOne(file) {
+  const src = read(file);
+  const baseName = path.basename(file, ".js");
+  const out = path.join(OUTPUT_DIR, `${baseName}.deobf.js`);
+
+  // 仅处理包含 jsjiami 标记的脚本；否则直接跳过（也可按需直接美化）
+  if (!/jsjiami\.com\.v\d/.test(src)) {
+    return { ok: false, reason: "no-jsjiami-marker" };
+  }
+
+  // 解析 AST
+  let ast;
+  try {
+    ast = parser.parse(src, { sourceType: "script", allowReturnOutsideFunction: true });
+  } catch (e) {
+    return { ok: false, reason: "parse-failed: " + e.message };
+  }
+
+  // 构建解码器
+  const dec = buildJsjiamiDecoder(src);
+  if (!dec) return { ok: false, reason: "decoder-not-found" };
+
+  const replaced = replaceDecodeCalls(ast, dec.decName, dec.decode);
+  if (replaced === 0) {
+    return { ok: false, reason: "no-calls-replaced" };
+  }
+
+  // 生成可读代码并格式化
+  let code = generate(ast, { comments: false, compact: false }).code;
+  code = fmt(code);
+
+  write(out, code);
+  return { ok: true, out, replaced };
+}
+
+function main() {
+  const files = glob.sync(`${INPUT_DIR}/*.js`);
+  if (files.length === 0) {
+    console.log("No input/*.js found, skip.");
+    process.exit(0);
+  }
+
+  let ok = 0, fail = 0;
+  files.forEach(f => {
+    const res = deobfOne(f);
+    if (res.ok) {
+      ok++;
+      console.log(`✅ Done: ${path.basename(f)} → ${path.basename(res.out)} (replaced: ${res.replaced})`);
+    } else {
+      fail++;
+      console.log(`❌ Skip: ${path.basename(f)} - ${res.reason}`);
+    }
+  });
+
+  console.log(`Summary: ${ok} succeeded, ${fail} failed.`);
+}
+
+main();
