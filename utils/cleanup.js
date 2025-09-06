@@ -1,8 +1,12 @@
 // utils/cleanup.js
 import { parse } from "@babel/parser";
-import traverse from "@babel/traverse";
+import traverseModule from "@babel/traverse";
 import * as t from "@babel/types";
-import generate from "@babel/generator";
+import generateModule from "@babel/generator";
+
+const traverse = (traverseModule.default || traverseModule);
+const generate = (generateModule.default || generateModule);
+
 
 const IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
