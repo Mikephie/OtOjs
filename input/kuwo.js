@@ -1,7 +1,7 @@
 /***********************************
 
 // ==UserScript==
-// @ScriptName        酷我音乐[VIP+净化]
+// @ScriptName        酷我音乐[VIP+净化]888
 // @Author            @ddgksf2013
 // @TgChannel         https://t.me/ddgksf2021
 // @Contribute        https://t.me/ddgksf2013_bot
