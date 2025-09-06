@@ -1,0 +1,50 @@
+name: Decrypt JS to Plaintext
+
+on:
+  push:
+    paths:
+      - "input/**"
+      - "plugins/**"
+      - "decode.js"
+      - "utils/**"
+      - "package.json"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run decoder
+        run: npm run decode
+
+      - name: Upload outputs (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deobf-output
+          path: output/
+
+      - name: Commit output back to repo
+        run: |
+          if [ -n "$(git status --porcelain output/)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add output/
+            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git push
+          else
+            echo "No changes in output/"
+          fi
