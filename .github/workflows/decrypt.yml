@@ -1,0 +1,47 @@
+name: Decrypt JavaScript Files
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'encrypted/**'
+
+jobs:
+  decrypt-and-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Find and decrypt files
+        run: |
+          mkdir -p decrypted
+          for file in encrypted/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "Processing $filename..."
+              # Run your Node.js script with input and output files
+              node src/main.js -i "$file" -o "decrypted/$filename"
+            fi
+          done
+
+      - name: Commit decrypted files
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add decrypted
+          git commit -m "Auto-decrypt files from 'encrypted' folder" || true
+          git push
