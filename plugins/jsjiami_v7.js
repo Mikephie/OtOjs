@@ -1,6 +1,7 @@
 // plugins/jsjiami_v7.js
-// jsjiami v7：运行期解表 + 执行“数组洗牌 IIFE” + AST 文字化替换（含别名）
-// 关键修复：必须在沙箱中执行那段自执行 IIFE，否则字符串表顺序不对，解出来是乱码。
+// jsjiami v7：运行期解表 + 自动执行“数组洗牌”引导段 + AST 批量替换（含别名）
+// 关键点：不再用脆弱的正则去抠 IIFE，而是把“文件开头到业务起点”的引导代码整体丢进沙箱执行，确保字符串表顺序正确。
+
 import ivm from "isolated-vm";
 import { parse } from "@babel/parser";
 import traverseModule from "@babel/traverse";
@@ -13,53 +14,67 @@ const generate = generateModule.default || generateModule;
 const MAX_SRC_LEN = 2_000_000;
 
 export default async function jsjiamiV7(input) {
+  // 仅处理 v7 样本
   if (!/jsjiami\.com\.v7|encode_version\s*=\s*['"]jsjiami\.com\.v7['"]/i.test(input)) {
     return null;
   }
-  const src = input.length > MAX_SRC_LEN ? input.slice(0, MAX_SRC_LEN) : String(input);
+  const src = String(input).slice(0, MAX_SRC_LEN);
 
+  // 必须包含字符串表与解码器
   if (!/function\s+_0x1715\s*\(\)/.test(src) || !/function\s+_0x1e61\s*\(/.test(src)) {
     return stripShellKeepMarker(input);
   }
 
   try {
-    const f1715 = extractFunc(src, "_0x1715");
-    const f1e61 = extractFunc(src, "_0x1e61");
-    const iife = extractShuffleIIFE(src); // ★ 新增：提取“数组洗牌 IIFE”
-    if (!f1715 || !f1e61 || !iife) return stripShellKeepMarker(input);
+    // —— 1) 提取“引导前缀”：文件开头 → 业务起点（不含业务起点） —— //
+    // 常见业务起点是 const opName = ...；可按项目需要调整标记
+    const boot = extractBootstrapPrefix(src, /(?:^|\n)\s*(?:const|var|let)\s+opName\b/);
+    if (!boot) return stripShellKeepMarker(input);
 
-    // —— 在 isolated-vm 里只执行解码相关 —— //
+    // —— 2) 在 isolated-vm 中仅执行引导段，完成表初始化/数组洗牌 —— //
     const isolate = new ivm.Isolate({ memoryLimit: 64 });
     const context = await isolate.createContext();
     const jail = context.global;
     await jail.set("global", jail.derefInto());
 
-    // 只注入必须的全局，避免触发业务逻辑
+    // 避免引导段意外访问宿主环境：提供最小桩
+    const polyfills = `
+      var $request = {};
+      var $response = {};
+      var $done = function(){};
+      var console = { log(){}, warn(){}, error(){} };
+    `;
+
     const bootstrap = `
-      var _0xodH = "jsjiami.com.v7";
-      ${f1715}
-      ${f1e61}
-      // 有些样本会用别名指向 _0x1e61，这里给出等价别名，解码时不一定需要，但无害
-      try { const _0xc3dd0a = _0x1e61; } catch (e) {}
-      // ★ 执行“数组洗牌 IIFE”，修正字符串表顺序
-      (function(){ ${iife} })();
-      // 提供统一的解码桥
+      ${polyfills}
+      ${boot}
+      // 无害化别名
+      try { const _0xc3dd0a = _0x1e61; } catch(e){}
+      // 统一的解码桥
       global.__dec = function(a, b) {
         try { return _0x1e61(a, b); } catch (e) { return null; }
       };
     `;
     const script = await isolate.compileScript(bootstrap, { filename: "jjiami-bootstrap.js" });
-    await script.run(context, { timeout: 800 });
+    await script.run(context, { timeout: 1000 });
 
-    // 解析整份源
-    const ast = parse(input, {
+    // —— 3) 解析整份源代码，收集所有对解码器（含别名）的调用 —— //
+    const ast = parse(src, {
       sourceType: "unambiguous",
       allowReturnOutsideFunction: true,
       allowAwaitOutsideFunction: true,
-      plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
+      plugins: [
+        "jsx",
+        "classProperties",
+        "optionalChaining",
+        "dynamicImport",
+        "classStaticBlock",
+        "topLevelAwait",
+        "typescript" // 遇到少量 TS 语法也能过（不会输出 d.ts，纯解析）
+      ],
     });
 
-    // 收集 _0x1e61 的别名
+    // 收集 _0x1e61 的别名：const alias = _0x1e61; 以及 alias = _0x1e61;
     const decoderNames = new Set(["_0x1e61"]);
     traverse(ast, {
       VariableDeclarator(p) {
@@ -78,31 +93,43 @@ export default async function jsjiamiV7(input) {
     const jobs = [];
     traverse(ast, {
       CallExpression(p) {
-        const callee = p.node.callee;
+        const { callee, arguments: args } = p.node;
         if (t.isIdentifier(callee) && decoderNames.has(callee.name)) {
-          const args = p.node.arguments;
           if (
             args.length === 2 &&
             t.isNumericLiteral(args[0]) &&
             (t.isStringLiteral(args[1]) || isStaticString(args[1]))
           ) {
-            const idx = args[0].value;
-            const key = evalStaticString(args[1]);
-            jobs.push({ path: p, idx, key });
+            jobs.push({
+              path: p,
+              idx: args[0].value,
+              key: evalStaticString(args[1]),
+            });
           }
         }
       },
     });
 
-    // 解码并替换
-    for (const job of jobs) {
-      const val = await context.eval(`__dec(${job.idx}, ${JSON.stringify(job.key)})`, { timeout: 120 });
+    // —— 4) 调用沙箱内 __dec 批量解码并替换为明文字面量 —— //
+    let replaced = 0;
+    for (const j of jobs) {
+      const val = await context.eval(`__dec(${j.idx}, ${JSON.stringify(j.key)})`, { timeout: 200 });
       if (typeof val === "string") {
-        job.path.replaceWith(t.stringLiteral(val));
+        j.path.replaceWith(t.stringLiteral(val));
+        replaced++;
       }
     }
 
-    // 移除无用定义
+    // 释放沙箱
+    await context.release();
+    isolate.dispose();
+
+    // 若完全没有替换，说明引导可能仍不完整，避免产生“看似成功”的假结果
+    if (replaced === 0) {
+      return stripShellKeepMarker(input);
+    }
+
+    // —— 5) 清理无用定义：去掉 _0x1715/_0x1e61/标识变量 —— //
     const toRemove = new Set(["_0x1715", "_0x1e61"]);
     traverse(ast, {
       FunctionDeclaration(p) {
@@ -115,55 +142,32 @@ export default async function jsjiamiV7(input) {
       },
     });
 
-    const out = generate(ast, { retainLines: false, compact: false }).code;
-    await context.release();
-    isolate.dispose();
-    return out;
+    // 输出
+    return generate(ast, { retainLines: false, compact: false }).code;
   } catch (e) {
-    // console.warn("[jsjiami_v7] fail:", e?.message);
+    // console.warn("[jsjiami_v7] failed:", e?.message);
     return stripShellKeepMarker(input);
   }
 }
 
-/* ====== 辅助：提取函数 & IIFE ====== */
-// 提取 function 名称的源码块
-function extractFunc(code, name) {
-  const start = code.indexOf(`function ${name}`);
-  if (start < 0) return null;
-  const sub = code.slice(start);
-  const openIdx = sub.indexOf("{");
-  if (openIdx < 0) return null;
-  let depth = 0;
-  for (let i = openIdx; i < sub.length; i++) {
-    const ch = sub[i];
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) return sub.slice(0, i + 1);
-    }
+/* ===================== 工具函数 ===================== */
+
+/**
+ * 从“文件开头”一直截到“业务起点标记”行（不含该行），得到完整引导段。
+ * 默认业务起点标记：出现 opName 的变量定义（可按项目改为更靠后的标记）。
+ */
+function extractBootstrapPrefix(code, markerRegex) {
+  const m = code.match(markerRegex);
+  if (!m) return null;
+  const end = m.index;                 // 截到标记行开始
+  const prefix = code.slice(0, end);
+  // 防御：确保引导段内包含 _0x1715/_0x1e61，避免误截太短
+  if (!/function\s+_0x1715\s*\(\)/.test(prefix) || !/function\s+_0x1e61\s*\(/.test(prefix)) {
+    return null;
   }
-  return null;
+  return prefix;
 }
 
-// ★ 提取并还原“数组洗牌 IIFE”源码，返回可直接执行的一段代码
-function extractShuffleIIFE(code) {
-  // 典型样式：if ((function(...) { ... })(0x3340, 0xc4ab3, _0x1715, 0xcf), _0x1715) { }
-  // 我们需要拿到 "(function(...) { ... })(0x..., 0x..., _0x1715, ...);" 这一段去执行
-  const m = code.match(/if\s*\(\s*\(\s*function\s*\([\s\S]*?\)\s*\{[\s\S]*?\}\s*\)\s*\([\s\S]*?\)\s*,\s*_0x1715\)\s*\)\s*\{/);
-  if (!m) {
-    // 有些变体前后略不同，退一步再找
-    const m2 = code.match(/\(\s*function\s*\([\s\S]*?\)\s*\{[\s\S]*?\}\s*\)\s*\([\s\S]*?\)\s*,\s*_0x1715\)/);
-    if (!m2) return null;
-    return m2[0].replace(/\)\s*,\s*_0x1715\)\s*$/, ");"); // 去掉逗号后的部分，留下纯 IIFE 调用
-  }
-  // 从 if( (function(...) {...})(args), _0x1715) { 截出 IIFE 调用
-  const chunk = m[0];
-  const callMatch = chunk.match(/\(\s*function\s*\([\s\S]*?\)\s*\{[\s\S]*?\}\s*\)\s*\([\s\S]*?\)/);
-  if (!callMatch) return null;
-  return callMatch[0] + ";";
-}
-
-/* ====== 其它工具 ====== */
 function isStaticString(node) {
   return t.isStringLiteral(node) || (t.isTemplateLiteral(node) && node.expressions.length === 0);
 }
@@ -177,6 +181,7 @@ function evalStaticString(node) {
 
 function stripShellKeepMarker(input) {
   let code = String(input);
+  // 保留版本标识但清理自检/死代码包装，便于后续人工/其它 pass 处理
   code = code.replace(/;?\s*var\s+encode_version\s*=\s*['"]jsjiami\.com\.v7['"];?/i, (m) => m);
   code = code.replace(/try\s*\{[\s\S]{0,800}?\}\s*catch\s*\([^)]+\)\s*\{\s*\};?/g, "/* [strip:try-catch-self-check] */");
   code = code.replace(/if\s*\(\!?\s*function\s*\([\w, ]*\)\s*\{[\s\S]{0,2000}?\}\s*\(\)\)\s*;?/g, "/* [strip:dead-wrapper] */");
