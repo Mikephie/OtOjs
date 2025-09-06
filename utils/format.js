@@ -3,19 +3,19 @@ import prettier from "prettier";
 import { parse } from "@babel/parser";
 import generate from "@babel/generator";
 
-export function prettyFormat(src) {
-  // 先试 Prettier
+export async function prettyFormat(src) {
+  // 先试 Prettier（v3 是 async，要 await）
   try {
-    return prettier.format(src, { parser: "babel" });
+    return await prettier.format(src, { parser: "babel" });
   } catch {}
 
-  // 再用 Babel AST 重排
+  // 再用 Babel AST 重排（同步）
   try {
     const ast = parse(src, {
       sourceType: "unambiguous",
       allowReturnOutsideFunction: true,
       allowAwaitOutsideFunction: true,
-      plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"]
+      plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
     });
     return generate(ast, { retainLines: false, compact: false }).code;
   } catch {}
