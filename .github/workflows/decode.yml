@@ -46,10 +46,15 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-          # 如果没有改动也不算失败
+          # stage changes (even if none)
           git add output/ || true
-          git diff --staged --quiet && echo "nothing to commit" || git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
 
-          # 避免非快进错误
-          git pull --rebase || true
-          git push || true
+          # commit only when there are staged diffs
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            # avoid non-fast-forward errors on busy repos
+            git pull --rebase || true
+            git push || true
+          else
+            echo "nothing to commit"
+          fi
