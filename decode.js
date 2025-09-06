@@ -1,4 +1,4 @@
-// decode.js
+// decode.js —— 严格模式：任一步出错则不写 output
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import aaencode from "./plugins/aaencode.js";
 import jsfuck from "./plugins/jsfuck.js";
 import jsjiamiV7 from "./plugins/jsjiami_v7.js";
-import { prettyFormat } from "./utils/format.js";
+import { prettyFormatStrict } from "./utils/format.js";
 import { cleanupToDotAccess } from "./utils/cleanup.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,63 +32,69 @@ function detect(content) {
 async function processOne(filePath) {
   const raw = fs.readFileSync(filePath, "utf8");
   const tag = detect(raw);
-
   let code = raw;
 
-  try {
-    if (tag.isAA) code = await aaencode(code);
-  } catch (e) {
-    console.warn("[AAEncode] failed:", e?.message);
+  if (tag.isAA) {
+    code = await aaencode(code);
+    if (typeof code !== "string" || !code.length) throw new Error("AAEncode 解码失败");
   }
 
-  try {
-    if (tag.isJSFuck) {
-      const out = await jsfuck(code);
-      if (out) code = out;
-    }
-  } catch (e) {
-    console.warn("[JSFuck] failed:", e?.message);
+  if (tag.isJSFuck) {
+    const out = await jsfuck(code);
+    if (!out) throw new Error("JSFuck 解码失败");
+    code = out;
   }
 
-  try {
-    if (tag.isJsjiamiV7) {
-      const out = await jsjiamiV7(code);
-      if (out) code = out;
-    }
-  } catch (e) {
-    console.warn("[jsjiami v7] failed:", e?.message);
+  if (tag.isJsjiamiV7) {
+    const out = await jsjiamiV7(code);
+    if (!out) throw new Error("jsjiami v7 解码失败");
+    code = out;
   }
 
-  try {
-    code = await prettyFormat(code);
-    code = cleanupToDotAccess(code);   // ← 新增这行
-  } catch (e) {
-    console.warn("[format] failed, return raw");
+  // 严格：美化必须成功，否则抛错
+  code = await prettyFormatStrict(code);
+
+  // 清理成点访问；失败也视为错误（不写出）
+  const cleaned = cleanupToDotAccess(code);
+  if (typeof cleaned !== "string" || !cleaned.length) throw new Error("清理失败");
+  code = cleaned;
+
+  // 简单自检
+  if (/\b_0x1e61\s*\(|\b_0xc3dd0a\s*\(/.test(code)) {
+    console.warn("[notice] 残留解码调用（可能有遗漏别名/调用点）");
   }
 
-  return { code }; // 确保这里返回的就是字符串
+  return { code };
 }
 
 async function main() {
-  const files = fs
-    .readdirSync(INPUT_DIR)
-    .filter((f) => f.toLowerCase().endsWith(".js"));
-
+  const files = fs.readdirSync(INPUT_DIR).filter((f) => f.toLowerCase().endsWith(".js"));
   if (files.length === 0) {
     console.log("input/ 里没有 .js 文件");
-    process.exit(0);
+    return;
   }
 
+  let success = 0, failed = 0;
   for (const f of files) {
     const inPath = path.join(INPUT_DIR, f);
-    const { code } = await processOne(inPath); // ← 必须 await
-    const outPath = path.join(OUTPUT_DIR, f.replace(/\.js$/i, ".deobf.js"));
-    fs.writeFileSync(outPath, code, "utf8");
-    console.log("✅ Done:", f, "→", path.basename(outPath));
+    try {
+      const { code } = await processOne(inPath);
+      const outPath = path.join(OUTPUT_DIR, f.replace(/\.js$/i, ".deobf.js"));
+      fs.writeFileSync(outPath, code, "utf8");
+      console.log("✅ Done:", f, "→", path.basename(outPath));
+      success++;
+    } catch (err) {
+      console.error("❌ Failed:", f, "-", err?.message || err);
+      failed++;
+    }
   }
+
+  console.log(`Summary: ${success} succeeded, ${failed} failed.`);
+  // 若要失败时让 CI 直接失败：去掉下一行注释
+  // if (failed > 0) process.exit(1);
 }
 
 main().catch((e) => {
-  console.error(e);
-  process.exit(1);
+  console.error("Unexpected error:", e);
+  // process.exit(1);
 });
