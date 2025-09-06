@@ -59,12 +59,12 @@ async function processOne(filePath) {
   }
 
   try {
-    code = prettyFormat(code);
+    code = prettyFormat(code); // 同步函数，返回字符串
   } catch (e) {
     console.warn("[format] failed, return raw");
   }
 
-  return { code };
+  return { code }; // 确保这里返回的就是字符串
 }
 
 async function main() {
@@ -79,7 +79,7 @@ async function main() {
 
   for (const f of files) {
     const inPath = path.join(INPUT_DIR, f);
-    const { code } = await processOne(inPath);
+    const { code } = await processOne(inPath); // ← 必须 await
     const outPath = path.join(OUTPUT_DIR, f.replace(/\.js$/i, ".deobf.js"));
     fs.writeFileSync(outPath, code, "utf8");
     console.log("✅ Done:", f, "→", path.basename(outPath));
