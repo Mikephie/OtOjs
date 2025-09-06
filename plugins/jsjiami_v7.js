@@ -1,14 +1,12 @@
 // plugins/jsjiami_v7.js
-// 作用：针对 jsjiami v7 样本（带 _0x1715 字符串表 + _0x1e61 解密函数）
-// 做“运行期解表 + AST 文字化替换”，产出接近明文的代码。
-// 失败则返回 null，让上游继续走兜底格式化。
+// jsjiami v7 运行期解表 + AST 文字化替换（含别名识别：const alias = _0x1e61）
 import ivm from "isolated-vm";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
 import generate from "@babel/generator";
 
-const MAX_SRC_LEN = 2_000_000; // 防止过大脚本拖慢 CI
+const MAX_SRC_LEN = 2_000_000;
 
 export default async function jsjiamiV7(input) {
   if (
@@ -19,52 +17,43 @@ export default async function jsjiamiV7(input) {
     return null;
   }
 
-  // 只处理前 MAX_SRC_LEN，避免超大文件
   const src =
     input.length > MAX_SRC_LEN ? input.slice(0, MAX_SRC_LEN) : String(input);
 
-  // 先粗检关键函数是否存在
+  // 要求存在典型结构：_0x1715 字符串表 + _0x1e61 解码
   if (!/function\s+_0x1715\s*\(\)/.test(src) || !/function\s+_0x1e61\s*\(/.test(src)) {
-    // 如果命名被变种改了，就保守清壳（沿用你旧逻辑）
     return stripShellKeepMarker(input);
   }
 
   try {
-    // 1) 提取 _0x1715 与 _0x1e61 的源码（简单正则块提取，足够应对该类样本）
     const f1715 = extractFunc(src, "_0x1715");
     const f1e61 = extractFunc(src, "_0x1e61");
-    if (!f1715 || !f1e61) {
-      return stripShellKeepMarker(input);
-    }
+    if (!f1715 || !f1e61) return stripShellKeepMarker(input);
 
-    // 2) 在 isolated-vm 沙箱内只加载这两段函数与必要变量，构造一个安全的解密方法
+    // 只加载必要函数到沙箱
     const isolate = new ivm.Isolate({ memoryLimit: 64 });
     const context = await isolate.createContext();
     const jail = context.global;
     await jail.set("global", jail.derefInto());
 
     const bootstrap =
-      [
-        // 需要的前置变量（样本中 _0x1715 依赖 _0xodH）
-        `var _0xodH = "jsjiami.com.v7";`,
-        // 字符串表函数
-        f1715,
-        // 解密函数
-        f1e61,
-        // 暴露一个安全的解密桥
-        `
-        global.__dec = function(a, b) {
-          try { return _0x1e61(a, b); } catch (e) { return null; }
-        };
-        `,
-      ].join("\n");
-
+      `
+      var _0xodH = "jsjiami.com.v7";
+      ` +
+      f1715 +
+      "\n" +
+      f1e61 +
+      `
+      global.__dec = function(a, b) {
+        try { return _0x1e61(a, b); } catch (e) { return null; }
+      };
+      `;
     const script = await isolate.compileScript(bootstrap, {
       filename: "jjiami-bootstrap.js",
     });
     await script.run(context, { timeout: 500 });
 
-    // 3) 解析整份脚本，找到所有 _0x1e61(数字, "密钥") 调用并替换为字面量
+    // 解析整份源代码
     const ast = parse(input, {
       sourceType: "unambiguous",
       allowReturnOutsideFunction: true,
@@ -72,7 +61,25 @@ export default async function jsjiamiV7(input) {
       plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
     });
 
-    const toRemove = new Set(["_0x1715", "_0x1e61"]);
+    // === 新增：收集所有指向 _0x1e61 的“别名” ===
+    const decoderNames = new Set(["_0x1e61"]);
+    traverse(ast, {
+      VariableDeclarator(path) {
+        const id = path.node.id;
+        const init = path.node.init;
+        if (t.isIdentifier(id) && t.isIdentifier(init, { name: "_0x1e61" })) {
+          decoderNames.add(id.name); // 如 const _0xc3dd0a = _0x1e61;
+        }
+      },
+      AssignmentExpression(path) {
+        const { left, right, operator } = path.node;
+        if (operator === "=" && t.isIdentifier(right, { name: "_0x1e61" })) {
+          if (t.isIdentifier(left)) decoderNames.add(left.name); // 如 alias = _0x1e61
+        }
+      },
+    });
+
+    // 工具：异步调用沙箱里的 __dec
     const decoder = async (idx, key) => {
       try {
         const res = await context.eval(`__dec(${idx}, ${JSON.stringify(key)})`, {
@@ -84,12 +91,12 @@ export default async function jsjiamiV7(input) {
       }
     };
 
-    // 收集需异步替换的节点（避免在 traverse 中 await）
+    // 先收集所有待替换点（避免 traverse 里 await）
     const jobs = [];
     traverse(ast, {
       CallExpression(path) {
         const callee = path.node.callee;
-        if (t.isIdentifier(callee, { name: "_0x1e61" })) {
+        if (t.isIdentifier(callee) && decoderNames.has(callee.name)) {
           const args = path.node.arguments;
           if (
             args.length === 2 &&
@@ -97,14 +104,14 @@ export default async function jsjiamiV7(input) {
             (t.isStringLiteral(args[1]) || isStaticString(args[1]))
           ) {
             const idx = args[0].value;
-            const key = evalStaticString(args[1]); // 取字面量
+            const key = evalStaticString(args[1]);
             jobs.push({ path, idx, key });
           }
         }
       },
     });
 
-    // 执行解密并替换
+    // 执行解密并替换为字面量
     for (const job of jobs) {
       const val = await decoder(job.idx, job.key);
       if (typeof val === "string") {
@@ -112,18 +119,19 @@ export default async function jsjiamiV7(input) {
       }
     }
 
-    // 4) 移除 _0x1715 / _0x1e61 的定义（已文字化，不再需要）
+    // 移除 _0x1715 / _0x1e61 定义与标识保留变量
+    const toRemove = new Set(["_0x1715", "_0x1e61"]);
     traverse(ast, {
       FunctionDeclaration(path) {
         const name = path.node.id?.name;
-        if (name && toRemove.has(name)) {
-          path.remove();
-        }
+        if (name && toRemove.has(name)) path.remove();
       },
       VariableDeclarator(path) {
-        // 清理 version_ / encode_version 等无用标识变量（保守）
         const id = path.node.id;
-        if (t.isIdentifier(id) && /^(version_|encode_version|_0xodH)$/.test(id.name)) {
+        if (
+          t.isIdentifier(id) &&
+          /^(version_|encode_version|_0xodH)$/.test(id.name)
+        ) {
           path.remove();
         }
       },
@@ -134,19 +142,15 @@ export default async function jsjiamiV7(input) {
     isolate.dispose();
 
     return out;
-  } catch (e) {
-    // 任何异常回落到保守清壳，确保不中断流水线
+  } catch {
     return stripShellKeepMarker(input);
   }
 }
 
-/* ========= 工具函数 ========= */
-
+/* ===== 工具函数 ===== */
 function extractFunc(code, name) {
-  // 粗略方式：从 "function name(" 开始，匹配到首个独立的右花括号闭合
   const start = code.indexOf(`function ${name}`);
   if (start < 0) return null;
-  // 截取后半段并做简单括号计数
   const sub = code.slice(start);
   const openIdx = sub.indexOf("{");
   if (openIdx < 0) return null;
@@ -156,16 +160,13 @@ function extractFunc(code, name) {
     if (ch === "{") depth++;
     else if (ch === "}") {
       depth--;
-      if (depth === 0) {
-        return sub.slice(0, i + 1);
-      }
+      if (depth === 0) return sub.slice(0, i + 1);
     }
   }
   return null;
 }
 
 function isStaticString(node) {
-  // 兼容模板字面量
   return (
     t.isStringLiteral(node) ||
     (t.isTemplateLiteral(node) && node.expressions.length === 0)
@@ -180,7 +181,6 @@ function evalStaticString(node) {
 }
 
 function stripShellKeepMarker(input) {
-  // 保留 encode_version 行，去除常见自检 try-catch 与死壳（你的旧逻辑+注释）
   let code = String(input);
   code = code.replace(
     /;?\s*var\s+encode_version\s*=\s*['"]jsjiami\.com\.v7['"];?/i,
