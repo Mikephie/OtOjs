@@ -3,11 +3,15 @@ name: Decode JS
 on:
   push:
     paths:
-      - "input/*.js"
+      - "input/**.js"
       - "decode.js"
       - "package.json"
       - "package-lock.json"
-  workflow_dispatch: {}
+  workflow_dispatch:
+
+# 让后面的 git push 有权限
+permissions:
+  contents: write
 
 jobs:
   decode:
@@ -21,22 +25,34 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
-      - name: Install deps
-        run: npm ci
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm i
+          fi
 
-      - name: Decode
-        run: npm run decode
+      - name: Ensure output dir
+        run: mkdir -p output
+
+      # 允许 decode 失败但不让整个 Job 失败
+      - name: Decode (non-blocking)
+        id: decode
+        run: |
+          set -o pipefail
+          npm run decode || echo "::warning::decode returned non-zero exit code"
+        continue-on-error: true
 
       - name: Show git status (output/)
         run: git status --porcelain output/ || true
 
       - name: Commit deobf outputs if changed
-        if: ${{ !cancelled() }}
         run: |
           set -e
-          CHANGES="$(git status --porcelain output/ || true)"
-          if [ -n "$CHANGES" ]; then
+          if [ -n "$(git status --porcelain output/)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add output/
@@ -52,4 +68,4 @@ jobs:
         with:
           name: deobf-output
           path: output/
-          if-no-files-found: warn
+          if-no-files-found: ignore
