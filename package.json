@@ -4,3 +4,15 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "decode": "node decode.js"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.25.6",
+    "@babel/parser": "^7.25.6",
+    "@babel/traverse": "^7.25.6",
+    "@babel/types": "^7.25.6",
+    "esprima": "^4.0.1",
+    "prettier": "^3.3.3",
+    "isolated-vm": "^5.0.3"
+  }
+}
