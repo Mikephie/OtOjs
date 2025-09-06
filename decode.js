@@ -1,4 +1,4 @@
-// decode.js —— 严格模式：任一步出错则不写 output，并打印阶段日志
+// decode.js —— 严格模式：任一步失败就不写入；并打印阶段日志
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
