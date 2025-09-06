@@ -2,9 +2,14 @@
 // jsjiami v7 运行期解表 + AST 文字化替换（含别名识别：const alias = _0x1e61）
 import ivm from "isolated-vm";
 import { parse } from "@babel/parser";
-import traverse from "@babel/traverse";
+import traverseModule from "@babel/traverse";
 import * as t from "@babel/types";
-import generate from "@babel/generator";
+import generateModule from "@babel/generator";
+
+// 兼容 ESM/CJS 的默认导出差异
+const traverse = (traverseModule.default || traverseModule);
+const generate = (generateModule.default || generateModule);
+
 
 const MAX_SRC_LEN = 2_000_000;
 
