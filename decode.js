@@ -1,14 +1,38 @@
 #!/usr/bin/env node
 /* eslint-disable */
-const fs = require("fs");
-const path = require("path");
-const vm = require("vm");
-const glob = require("glob");
-const parser = require("@babel/parser");
-const traverse = require("@babel/traverse").default;
-const generate = require("@babel/generator").default;
-const t = require("@babel/types");
-const prettier = require("prettier");
+
+// ---- ESM helpers: allow require & __dirname in "type":"module" projects
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path, { dirname } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
+// ---- end helpers
+
+// CommonJS-style requires (now safe inside ESM via createRequire)
+const fs       = require('fs');
+// 注意：上面已用 ESM 导入了 path，这里不要再 require('path')
+const vm       = require('vm');
+const glob     = require('glob');
+const parser   = require('@babel/parser');
+
+// 兼容不同打包产物的 default 导出
+const traverseMod  = require('@babel/traverse');
+const traverse     = traverseMod.default || traverseMod;
+
+const generateMod  = require('@babel/generator');
+const generate     = generateMod.default || generateMod;
+
+const t         = require('@babel/types');
+
+// Prettier 既可能是对象也可能挂在 default 上，这里做个兜底
+const prettierMod = require('prettier');
+const prettier    = prettierMod.format ? prettierMod : (prettierMod.default || prettierMod);
+
+// 你原来的脚本从这里继续……
+
 
 const INPUT_DIR = "input";
 const OUTPUT_DIR = "output";
