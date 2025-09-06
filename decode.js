@@ -59,7 +59,7 @@ async function processOne(filePath) {
   }
 
   try {
-    code = prettyFormat(code); // 同步函数，返回字符串
+    code = await prettyFormat(code);
   } catch (e) {
     console.warn("[format] failed, return raw");
   }
