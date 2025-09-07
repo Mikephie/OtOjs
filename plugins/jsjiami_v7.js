@@ -1,20 +1,23 @@
 // plugins/jsjiami_v7.js
-// 自适应 jsjiami v7：自动寻找“f(数字, 字符串)”解密器，运行期解码并文字化替换。
-// 失败则返回 null 让上游继续兜底格式化。
+// 更稳的 jsjiami v7 解码：支持别名、两种函数声明形式；仅执行解码器和字符串表；
+// 成功把 f(数字, "key") 文字化，移除解码器/字符串表；失败返回 null 让上游兜底。
 import ivm from "isolated-vm";
 import { parse } from "@babel/parser";
-import traverse from "@babel/traverse";
+import _traverse from "@babel/traverse";
+const traverse = _traverse.default || _traverse;
 import * as t from "@babel/types";
-import generate from "@babel/generator";
+import gen from "@babel/generator";
+const generate = (ast, opts) => (gen.default || gen)(ast, opts);
 
 const MAX_SRC_LEN = 2_000_000;
 
 export default async function jsjiamiV7(input) {
   const text = String(input);
   if (!/jsjiami\.com\.v7|encode_version\s*=\s*['"]jsjiami\.com\.v7['"]/i.test(text)) {
-    return null; // 非 v7，交给别的插件
+    return null;
   }
 
+  // 限长解析
   let ast;
   try {
     ast = parse(text.length > MAX_SRC_LEN ? text.slice(0, MAX_SRC_LEN) : text, {
@@ -24,99 +27,75 @@ export default async function jsjiamiV7(input) {
       plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
     });
   } catch {
-    // 解析失败，退回清壳
     return stripShellKeepMarker(text);
   }
 
-  // 1) 找“f(数字, 字符串)”模式出现频率最高的函数名（候选解密器）
-  const freq = new Map();
+  // 1) 收集所有 "callee( 数字 , 字符串 )" 的调用点，统计频率最高者为候选解码器
   const callSites = [];
+  const freq = new Map();
   traverse(ast, {
     CallExpression(path) {
-      const callee = path.node.callee;
-      const args = path.node.arguments;
+      const { callee, arguments: args } = path.node;
       if (
         t.isIdentifier(callee) &&
         args.length === 2 &&
         t.isNumericLiteral(args[0]) &&
-        (isStaticString(args[1]))
+        isStaticString(args[1])
       ) {
         const name = callee.name;
-        callSites.push({ path, name, idx: args[0], keyNode: args[1] });
+        callSites.push({ path, name, idxNode: args[0], keyNode: args[1] });
         freq.set(name, (freq.get(name) || 0) + 1);
       }
     },
   });
-  if (callSites.length === 0) {
-    // 没有任何此类调用，回退清壳
-    return stripShellKeepMarker(text);
-  }
+  if (callSites.length === 0) return stripShellKeepMarker(text);
+  let candidate = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
 
-  const candidate = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  // 2) 解析别名链（如 const _0xc3dd0a = _0x1e61;）
+  const aliasTarget = resolveAliasTarget(ast, candidate);
+  const decoderName = aliasTarget || candidate;
 
-  // 2) 收集候选解密器及其依赖（表函数/辅助函数/变量）
-  const neededNames = new Set([candidate, "_0xodH"]); // _0xodH 常见依赖
-  const declMap = new Map(); // name -> node
-  traverse(ast, {
-    FunctionDeclaration(path) {
-      const id = path.node.id?.name;
-      if (id) declMap.set(id, path.node);
-    },
-    VariableDeclarator(path) {
-      const id = path.node.id;
-      if (t.isIdentifier(id)) {
-        declMap.set(id.name, path.findParent((p) => p.isVariableDeclaration())?.node || path.node);
-      }
-    },
-  });
-
-  // 递归向内查找依赖（仅顶层 Identifier 的引用）
-  const visited = new Set();
-  function collectDeps(name) {
-    if (visited.has(name)) return;
-    visited.add(name);
-    const node = declMap.get(name);
-    if (!node) return;
-    t.traverseFast(node, (n) => {
-      if (t.isIdentifier(n)) {
-        const dep = n.name;
-        if (declMap.has(dep)) neededNames.add(dep);
-      }
-    });
-  }
-  // 从候选函数开始收集
-  neededNames.forEach((n) => collectDeps(n));
-  // 再跑一轮确保依赖的依赖也被收集
-  for (const n of Array.from(neededNames)) collectDeps(n);
-
-  // 3) 构造沙箱启动代码：仅注入必要声明 + 解密桥
-  const bootNodes = [];
-  for (const name of neededNames) {
-    const node = declMap.get(name);
-    if (node) bootNodes.push(node);
-  }
-  if (bootNodes.length === 0) {
-    return stripShellKeepMarker(text);
-  }
+  // 3) 尝试在源码中抓取：
+  //    - 解码器（function dec(...) 或 dec = function(...)）
+  //    - 常见字符串表函数（_0x1715 或形如 function _0x[0-9a-f]{3,}\(\) 返回数组的）
+  const bootParts = [];
   const preface = [
     `var _0xodH = "jsjiami.com.v7";`,
-    // 部分环境兼容
     `var window = {}; var self = {}; var globalThis = global;`,
   ].join("\n");
-  const bootCode = preface + "\n" + bootNodes.map((n) => generate.default(n).code).join("\n") + `
-    global.__dec = function(i, k) {
-      try { return ${candidate}(i, k); } catch (e) { return null; }
-    };
-  `;
+  bootParts.push(preface);
 
-  // 4) 启动 isolated-vm
+  // 字符串表：优先 _0x1715；否则找第一个 "function _0x????()" 体内有 "return [" 的函数
+  const tableName = findStringTableName(text) || "_0x1715";
+  const tableSrc = extractFuncAny(text, tableName);
+  if (tableSrc) bootParts.push(tableSrc);
+
+  // 解码器
+  const decoderSrc = extractFuncAny(text, decoderName);
+  if (!decoderSrc) return null; // 让外层把它当作 decoder-not-found
+  bootParts.push(decoderSrc);
+
+  // 如果候选名是别名，补上别名赋值（确保 __dec 调用候选名也可用）
+  if (candidate !== decoderName) {
+    bootParts.push(`var ${candidate} = ${decoderName};`);
+  }
+
+  // 暴露解码桥
+  bootParts.push(`
+    global.__dec = function(i, k) {
+      try { return ${decoderName}(i, k); } catch (e) { return null; }
+    };
+  `);
+
+  const bootCode = bootParts.join("\n");
+
+  // 4) 启动沙箱
   let isolate, context;
   try {
     isolate = new ivm.Isolate({ memoryLimit: 64 });
     context = await isolate.createContext();
     const jail = context.global;
     await jail.set("global", jail.derefInto());
-
     const script = await isolate.compileScript(bootCode, { filename: "jjv7-boot.js" });
     await script.run(context, { timeout: 500 });
   } catch {
@@ -125,7 +104,7 @@ export default async function jsjiamiV7(input) {
     return stripShellKeepMarker(text);
   }
 
-  // 5) 只替换候选函数的调用；其余保持不动
+  // 5) 在完整 AST 中把 candidate(数,"key") 调用替换成字面量
   const fullAst = parse(text, {
     sourceType: "unambiguous",
     allowReturnOutsideFunction: true,
@@ -133,70 +112,67 @@ export default async function jsjiamiV7(input) {
     plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
   });
 
-  // 收集需要替换的节点（避免在遍历里 await）
   const jobs = [];
   traverse(fullAst, {
     CallExpression(path) {
-      const callee = path.node.callee;
-      const args = path.node.arguments;
+      const { callee, arguments: args } = path.node;
       if (
-        t.isIdentifier(callee, { name: candidate }) &&
+        t.isIdentifier(callee) &&
+        (callee.name === candidate || callee.name === decoderName) &&
         args.length === 2 &&
         t.isNumericLiteral(args[0]) &&
         isStaticString(args[1])
       ) {
-        const idx = args[0].value;
-        const key = evalStaticString(args[1]);
-        jobs.push({ path, idx, key });
+        jobs.push({
+          path,
+          i: args[0].value,
+          k: evalStaticString(args[1]),
+        });
       }
     },
   });
 
   let replaced = 0;
-  for (const job of jobs) {
+  for (const j of jobs) {
     try {
-      const val = await context.eval(`__dec(${job.idx}, ${JSON.stringify(job.key)})`, { timeout: 100 });
+      const val = await context.eval(`__dec(${j.i}, ${JSON.stringify(j.k)})`, { timeout: 120 });
       if (typeof val === "string") {
-        job.path.replaceWith(t.stringLiteral(val));
+        j.path.replaceWith(t.stringLiteral(val));
         replaced++;
       }
     } catch {
-      // 忽略单点失败
+      // 忽略个别失败
     }
   }
 
-  // 清理：移除候选解密器及它的表函数（仅顶层定义）
+  // 6) 清理：去掉解码器/字符串表（两种声明形态都处理）
   traverse(fullAst, {
     FunctionDeclaration(path) {
-      const id = path.node.id?.name;
-      if (id && neededNames.has(id)) path.remove();
+      const n = path.node.id?.name;
+      if (n === decoderName || n === tableName) path.remove();
     },
     VariableDeclarator(path) {
       const id = path.node.id;
-      if (t.isIdentifier(id) && neededNames.has(id.name)) {
+      if (!t.isIdentifier(id)) return;
+      const n = id.name;
+      if (n === decoderName || n === candidate || n === tableName || /^encode_version$|^_0xodH$/.test(n)) {
         const decl = path.findParent((p) => p.isVariableDeclaration());
-        if (decl && decl.node.declarations.length === 1) {
-          decl.remove();
-        } else {
-          path.remove();
-        }
+        if (decl && decl.node.declarations.length === 1) decl.remove();
+        else path.remove();
       }
     },
   });
 
-  const out = generate.default(fullAst, { retainLines: false, compact: false }).code;
+  const out = generate(fullAst, { retainLines: false, compact: false }).code;
 
   await context.release();
   isolate.dispose();
 
-  // 若没有任何替换成功，也视为失败，回退清壳（避免“看起来成功但没变化”）
-  if (replaced === 0) {
-    return stripShellKeepMarker(text);
-  }
+  if (replaced === 0) return stripShellKeepMarker(text);
   return out;
 }
 
-/* ====== 工具函数 ====== */
+/* ===== 工具函数 ===== */
 function isStaticString(node) {
   return (
     t.isStringLiteral(node) ||
@@ -210,6 +186,66 @@ function evalStaticString(node) {
   }
   return "";
 }
+
+function resolveAliasTarget(ast, name) {
+  let target = null;
+  traverse(ast, {
+    VariableDeclarator(p) {
+      const id = p.node.id;
+      if (t.isIdentifier(id) && id.name === name) {
+        const init = p.node.init;
+        if (t.isIdentifier(init)) {
+          target = init.name;
+        }
+      }
+    },
+  });
+  return target;
+}
+
+// 同时支持两种声明：function NAME(...) 与 NAME = function(...)
+function extractFuncAny(code, name) {
+  const byDecl = extractByBalancedBraces(code, new RegExp(`\\bfunction\\s+${escapeReg(name)}\\s*\\(`, "m"));
+  if (byDecl) return byDecl;
+  const byAssign = extractByBalancedBraces(code, new RegExp(`\\b${escapeReg(name)}\\s*=\\s*function\\s*\\(`, "m"));
+  return byAssign;
+}
+
+function findStringTableName(code) {
+  // 优先常见 _0x1715；否则找 function _0x????() 且函数体中包含 'return [' 或 '.concat('
+  if (/function\s+_0x1715\s*\(/.test(code)) return "_0x1715";
+  const m = code.match(/function\s+(_0x[0-9a-fA-F]{3,})\s*\(/);
+  if (!m) return null;
+  const name = m[1];
+  const body = extractFuncAny(code, name) || "";
+  if (/return\s*\[/.test(body) || /\.concat\s*\(/.test(body)) return name;
+  return null;
+}
+
+function extractByBalancedBraces(code, startRe) {
+  const m = code.match(startRe);
+  if (!m) return null;
+  const start = m.index;
+  // 找到第一个 '{'
+  const braceStart = code.indexOf("{", start);
+  if (braceStart < 0) return null;
+  let depth = 0;
+  for (let i = braceStart; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        return code.slice(start, i + 1);
+      }
+    }
+  }
+  return null;
+}
+function escapeReg(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function stripShellKeepMarker(input) {
   let code = String(input);
   code = code.replace(
