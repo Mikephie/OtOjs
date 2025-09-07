@@ -1,318 +1,228 @@
 // plugins/jsjiami_v7.js
-// jsjiami v7：自动探测“引导段”并在沙箱执行（完成数组洗牌/表初始化）
-// + AST 批量替换（支持变量别名、对象属性别名、括号/逗号脱 this、call/apply、计算属性）
-// + 轻量常量折叠（"A" + "B"）
-// 说明：不依赖固定业务标记，更适配多样化加密写法
-
+// 自适应 jsjiami v7：自动寻找“f(数字, 字符串)”解密器，运行期解码并文字化替换。
+// 失败则返回 null 让上游继续兜底格式化。
 import ivm from "isolated-vm";
 import { parse } from "@babel/parser";
-import traverseModule from "@babel/traverse";
+import traverse from "@babel/traverse";
 import * as t from "@babel/types";
-import generateModule from "@babel/generator";
-
-const traverse = traverseModule.default || traverseModule;
-const generate = generateModule.default || generateModule;
+import generate from "@babel/generator";
 
 const MAX_SRC_LEN = 2_000_000;
 
-/* ========== 自动探测：找到足以让 _0x1e61 可用的前缀，引导初始化 ========== */
-async function probeUsableDecoder(prefix) {
-  const isolate = new ivm.Isolate({ memoryLimit: 32 });
-  const context = await isolate.createContext();
-  const jail = context.global;
-  await jail.set("global", jail.derefInto());
-
-  const polyfills = `
-    var $request = {};
-    var $response = {};
-    var $done = function(){};
-    var console = { log(){}, warn(){}, error(){} };
-  `;
-
-  const boot = `
-    ${polyfills}
-    ${prefix}
-    try { global.__probe_ok = (typeof _0x1e61 === 'function'); } catch(e){ global.__probe_ok = false; }
-  `;
-  try {
-    const script = await isolate.compileScript(boot, { filename: "probe.js" });
-    await script.run(context, { timeout: 600 });
-    const ok = await context.eval("global.__probe_ok === true", { timeout: 100 });
-    try { await context.release(); } catch {}
-    isolate.dispose();
-    return !!ok;
-  } catch {
-    try { await context.release(); } catch {}
-    isolate.dispose();
-    return false;
-  }
-}
-
-async function extractBootstrapPrefix(code) {
-  const i1715 = code.indexOf("function _0x1715");
-  const i1e61 = code.indexOf("function _0x1e61");
-  if (i1715 < 0 || i1e61 < 0) return null;
-
-  const lines = code.split(/\r?\n/);
-  const base = Math.max(
-    Math.max(0, code.slice(0, i1715).split(/\r?\n/).length - 1),
-    Math.max(0, code.slice(0, i1e61).split(/\r?\n/).length - 1)
-  );
-
-  let end = Math.min(lines.length, base + 30);
-  const maxEnd = Math.min(lines.length, base + 900);
-
-  while (end <= maxEnd) {
-    const prefix = lines.slice(0, end).join("\n");
-    if (/function\s+_0x1715\s*\(/.test(prefix) && /function\s+_0x1e61\s*\(/.test(prefix)) {
-      const ok = await probeUsableDecoder(prefix);
-      if (ok) return prefix;
-    }
-    end += 10;
-  }
-  return null;
-}
-
-/* ========== 主导出：解码 v7 ========== */
 export default async function jsjiamiV7(input) {
-  if (!/jsjiami\.com\.v7|encode_version\s*=\s*['"]jsjiami\.com\.v7['"]/i.test(input)) {
-    return null;
-  }
-  const src = String(input).slice(0, MAX_SRC_LEN);
-
-  if (!/function\s+_0x1715\s*\(\)/.test(src) || !/function\s+_0x1e61\s*\(/.test(src)) {
-    return stripShellKeepMarker(input);
+  const text = String(input);
+  if (!/jsjiami\.com\.v7|encode_version\s*=\s*['"]jsjiami\.com\.v7['"]/i.test(text)) {
+    return null; // 非 v7，交给别的插件
   }
 
+  let ast;
   try {
-    // 1) 自动探测引导段并执行
-    const boot = await extractBootstrapPrefix(src);
-    if (!boot) return stripShellKeepMarker(input);
-
-    const isolate = new ivm.Isolate({ memoryLimit: 64 });
-    const context = await isolate.createContext();
-    const jail = context.global;
-    await jail.set("global", jail.derefInto());
-
-    const polyfills = `
-      var $request = {};
-      var $response = {};
-      var $done = function(){};
-      var console = { log(){}, warn(){}, error(){} };
-    `;
-
-    const bootstrap = `
-      ${polyfills}
-      ${boot}
-      try { const _0xc3dd0a = _0x1e61; } catch(e){}
-      global.__dec = function(a, b) {
-        try { return _0x1e61(a, b); } catch (e) { return null; }
-      };
-    `;
-    const script = await isolate.compileScript(bootstrap, { filename: "jjiami-bootstrap.js" });
-    await script.run(context, { timeout: 1200 });
-
-    // 2) 解析整源
-    const ast = parse(src, {
+    ast = parse(text.length > MAX_SRC_LEN ? text.slice(0, MAX_SRC_LEN) : text, {
       sourceType: "unambiguous",
       allowReturnOutsideFunction: true,
       allowAwaitOutsideFunction: true,
-      plugins: [
-        "jsx",
-        "classProperties",
-        "optionalChaining",
-        "dynamicImport",
-        "classStaticBlock",
-        "topLevelAwait",
-        "typescript",
-      ],
+      plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
     });
+  } catch {
+    // 解析失败，退回清壳
+    return stripShellKeepMarker(text);
+  }
 
-    // 3) 收集别名（变量 & 对象属性）
-    const decoderNames = new Set(["_0x1e61"]);
-    const decoderPropBinds = new Set(); // "obj#prop"
+  // 1) 找“f(数字, 字符串)”模式出现频率最高的函数名（候选解密器）
+  const freq = new Map();
+  const callSites = [];
+  traverse(ast, {
+    CallExpression(path) {
+      const callee = path.node.callee;
+      const args = path.node.arguments;
+      if (
+        t.isIdentifier(callee) &&
+        args.length === 2 &&
+        t.isNumericLiteral(args[0]) &&
+        (isStaticString(args[1]))
+      ) {
+        const name = callee.name;
+        callSites.push({ path, name, idx: args[0], keyNode: args[1] });
+        freq.set(name, (freq.get(name) || 0) + 1);
+      }
+    },
+  });
+  if (callSites.length === 0) {
+    // 没有任何此类调用，回退清壳
+    return stripShellKeepMarker(text);
+  }
 
-    traverse(ast, {
-      VariableDeclarator(p) {
-        const { id, init } = p.node;
-        if (t.isIdentifier(id) && t.isIdentifier(init, { name: "_0x1e61" })) {
-          decoderNames.add(id.name);
-        }
-      },
-      AssignmentExpression(p) {
-        const { left, right, operator } = p.node;
-        if (operator !== "=") return;
+  const candidate = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
 
-        if (t.isIdentifier(right, { name: "_0x1e61" }) && t.isIdentifier(left)) {
-          decoderNames.add(left.name);
-          return;
-        }
-        if (
-          t.isIdentifier(right, { name: "_0x1e61" }) &&
-          t.isMemberExpression(left) &&
-          t.isIdentifier(left.object)
-        ) {
-          if (!left.computed && t.isIdentifier(left.property)) {
-            decoderPropBinds.add(`${left.object.name}#${left.property.name}`);
-          } else if (left.computed && isStaticString(left.property)) {
-            decoderPropBinds.add(`${left.object.name}#${evalStaticString(left.property)}`);
-          }
-        }
-      },
+  // 2) 收集候选解密器及其依赖（表函数/辅助函数/变量）
+  const neededNames = new Set([candidate, "_0xodH"]); // _0xodH 常见依赖
+  const declMap = new Map(); // name -> node
+  traverse(ast, {
+    FunctionDeclaration(path) {
+      const id = path.node.id?.name;
+      if (id) declMap.set(id, path.node);
+    },
+    VariableDeclarator(path) {
+      const id = path.node.id;
+      if (t.isIdentifier(id)) {
+        declMap.set(id.name, path.findParent((p) => p.isVariableDeclaration())?.node || path.node);
+      }
+    },
+  });
+
+  // 递归向内查找依赖（仅顶层 Identifier 的引用）
+  const visited = new Set();
+  function collectDeps(name) {
+    if (visited.has(name)) return;
+    visited.add(name);
+    const node = declMap.get(name);
+    if (!node) return;
+    t.traverseFast(node, (n) => {
+      if (t.isIdentifier(n)) {
+        const dep = n.name;
+        if (declMap.has(dep)) neededNames.add(dep);
+      }
     });
+  }
+  // 从候选函数开始收集
+  neededNames.forEach((n) => collectDeps(n));
+  // 再跑一轮确保依赖的依赖也被收集
+  for (const n of Array.from(neededNames)) collectDeps(n);
 
-    // 4) 收集待替换调用（五类）
-    const jobs = [];
+  // 3) 构造沙箱启动代码：仅注入必要声明 + 解密桥
+  const bootNodes = [];
+  for (const name of neededNames) {
+    const node = declMap.get(name);
+    if (node) bootNodes.push(node);
+  }
+  if (bootNodes.length === 0) {
+    return stripShellKeepMarker(text);
+  }
+  const preface = [
+    `var _0xodH = "jsjiami.com.v7";`,
+    // 部分环境兼容
+    `var window = {}; var self = {}; var globalThis = global;`,
+  ].join("\n");
+  const bootCode = preface + "\n" + bootNodes.map((n) => generate.default(n).code).join("\n") + `
+    global.__dec = function(i, k) {
+      try { return ${candidate}(i, k); } catch (e) { return null; }
+    };
+  `;
 
-    function isStaticString(node) {
-      if (t.isStringLiteral(node)) return true;
-      if (t.isTemplateLiteral(node) && node.expressions.length === 0) return true;
-      if (t.isBinaryExpression(node, { operator: "+" })) {
-        return isStaticString(node.left) && isStaticString(node.right);
+  // 4) 启动 isolated-vm
+  let isolate, context;
+  try {
+    isolate = new ivm.Isolate({ memoryLimit: 64 });
+    context = await isolate.createContext();
+    const jail = context.global;
+    await jail.set("global", jail.derefInto());
+
+    const script = await isolate.compileScript(bootCode, { filename: "jjv7-boot.js" });
+    await script.run(context, { timeout: 500 });
+  } catch {
+    if (context) await context.release();
+    if (isolate) isolate.dispose();
+    return stripShellKeepMarker(text);
+  }
+
+  // 5) 只替换候选函数的调用；其余保持不动
+  const fullAst = parse(text, {
+    sourceType: "unambiguous",
+    allowReturnOutsideFunction: true,
+    allowAwaitOutsideFunction: true,
+    plugins: ["jsx", "classProperties", "optionalChaining", "dynamicImport"],
+  });
+
+  // 收集需要替换的节点（避免在遍历里 await）
+  const jobs = [];
+  traverse(fullAst, {
+    CallExpression(path) {
+      const callee = path.node.callee;
+      const args = path.node.arguments;
+      if (
+        t.isIdentifier(callee, { name: candidate }) &&
+        args.length === 2 &&
+        t.isNumericLiteral(args[0]) &&
+        isStaticString(args[1])
+      ) {
+        const idx = args[0].value;
+        const key = evalStaticString(args[1]);
+        jobs.push({ path, idx, key });
       }
-      return false;
-    }
-    function evalStaticString(node) {
-      if (t.isStringLiteral(node)) return node.value;
-      if (t.isTemplateLiteral(node) && node.expressions.length === 0) {
-        return node.quasis.map(q => q.value.cooked ?? q.value.raw).join("");
-      }
-      if (t.isBinaryExpression(node, { operator: "+" })) {
-        return evalStaticString(node.left) + evalStaticString(node.right);
-      }
-      return "";
-    }
-    function extractCalleeIdent(node) {
-      while (node && node.type === "ParenthesizedExpression") node = node.expression;
-      if (node && node.type === "SequenceExpression" && node.expressions?.length) {
-        return extractCalleeIdent(node.expressions[node.expressions.length - 1]);
-      }
-      if (node && node.type === "Identifier") return node.name;
-      return null;
-    }
-    function extractCallApplyArgs(memberExpr, args) {
-      const prop = memberExpr.property;
-      if (prop && prop.type === "Identifier" && prop.name === "call") {
-        if (args.length >= 3) return { idx: args[1], key: args[2] };
-        return null;
-      }
-      if (prop && prop.type === "Identifier" && prop.name === "apply") {
-        if (args.length >= 2 && args[1] && args[1].type === "ArrayExpression") {
-          const arr = args[1].elements || [];
-          if (arr.length >= 2) return { idx: arr[0], key: arr[1] };
-        }
-        return null;
-      }
-      return null;
-    }
+    },
+  });
 
-    traverse(ast, {
-      CallExpression(p) {
-        const call = p.node;
-        const { callee, arguments: args } = call;
-
-        // 1) alias(idx, key) / (0,alias)(...)
-        const name = extractCalleeIdent(callee);
-        if (name && decoderNames.has(name)) {
-          if (args.length === 2 && t.isNumericLiteral(args[0]) && isStaticString(args[1])) {
-            jobs.push({ path: p, idx: args[0].value, key: evalStaticString(args[1]) });
-          }
-          return;
-        }
-
-        if (t.isMemberExpression(callee)) {
-          // 2) alias.call/apply(...)
-          let obj = callee.object;
-          while (t.isParenthesizedExpression(obj)) obj = obj.expression;
-          const baseName = extractCalleeIdent(obj);
-
-          if (
-            baseName && decoderNames.has(baseName) &&
-            t.isIdentifier(callee.property) &&
-            (callee.property.name === "call" || callee.property.name === "apply")
-          ) {
-            const extracted = extractCallApplyArgs(callee, args);
-            if (
-              extracted &&
-              t.isNumericLiteral(extracted.idx) &&
-              isStaticString(extracted.key)
-            ) {
-              jobs.push({
-                path: p,
-                idx: extracted.idx.value,
-                key: evalStaticString(extracted.key),
-              });
-            }
-            return;
-          }
-
-          // 3) 对象属性直调：obj.dec(idx,key) / obj['dec'](...)
-          let objName = null;
-          if (t.isIdentifier(callee.object)) objName = callee.object.name;
-          if (!objName) return;
-
-          let propName = null;
-          if (!callee.computed && t.isIdentifier(callee.property)) {
-            propName = callee.property.name;
-          } else if (callee.computed && isStaticString(callee.property)) {
-            propName = evalStaticString(callee.property);
-          }
-          if (!propName) return;
-
-          if (decoderPropBinds.has(`${objName}#${propName}`)) {
-            if (args.length === 2 && t.isNumericLiteral(args[0]) && isStaticString(args[1])) {
-              jobs.push({ path: p, idx: args[0].value, key: evalStaticString(args[1]) });
-            }
-          }
-        }
-      },
-    });
-
-    console.log("[v7] jobs collected:", jobs.length);
-
-    // 5) 解码并替换
-    let replaced = 0;
-    for (const j of jobs) {
-      const val = await context.eval(`__dec(${j.idx}, ${JSON.stringify(j.key)})`, { timeout: 250 });
+  let replaced = 0;
+  for (const job of jobs) {
+    try {
+      const val = await context.eval(`__dec(${job.idx}, ${JSON.stringify(job.key)})`, { timeout: 100 });
       if (typeof val === "string") {
-        j.path.replaceWith(t.stringLiteral(val));
+        job.path.replaceWith(t.stringLiteral(val));
         replaced++;
       }
+    } catch {
+      // 忽略单点失败
     }
-    console.log("[v7] replaced:", replaced);
-
-    try { await context.release(); } catch {}
-    isolate.dispose();
-
-    if (replaced === 0) {
-      return stripShellKeepMarker(input);
-    }
-
-    // 6) 清理无用定义
-    const toRemove = new Set(["_0x1715", "_0x1e61"]);
-    traverse(ast, {
-      FunctionDeclaration(p) {
-        const name = p.node.id?.name;
-        if (name && toRemove.has(name)) p.remove();
-      },
-      VariableDeclarator(p) {
-        const id = p.node.id;
-        if (t.isIdentifier(id) && /^(version_|encode_version|_0xodH)$/.test(id.name)) p.remove();
-      },
-    });
-
-    return generate(ast, { retainLines: false, compact: false }).code;
-  } catch (e) {
-    // console.warn("[jsjiami_v7] failed:", e?.message);
-    return stripShellKeepMarker(input);
   }
+
+  // 清理：移除候选解密器及它的表函数（仅顶层定义）
+  traverse(fullAst, {
+    FunctionDeclaration(path) {
+      const id = path.node.id?.name;
+      if (id && neededNames.has(id)) path.remove();
+    },
+    VariableDeclarator(path) {
+      const id = path.node.id;
+      if (t.isIdentifier(id) && neededNames.has(id.name)) {
+        const decl = path.findParent((p) => p.isVariableDeclaration());
+        if (decl && decl.node.declarations.length === 1) {
+          decl.remove();
+        } else {
+          path.remove();
+        }
+      }
+    },
+  });
+
+  const out = generate.default(fullAst, { retainLines: false, compact: false }).code;
+
+  await context.release();
+  isolate.dispose();
+
+  // 若没有任何替换成功，也视为失败，回退清壳（避免“看起来成功但没变化”）
+  if (replaced === 0) {
+    return stripShellKeepMarker(text);
+  }
+  return out;
 }
 
-/* ========== 清理包装但保留版本标识 ========== */
+/* ====== 工具函数 ====== */
+function isStaticString(node) {
+  return (
+    t.isStringLiteral(node) ||
+    (t.isTemplateLiteral(node) && node.expressions.length === 0)
+  );
+}
+function evalStaticString(node) {
+  if (t.isStringLiteral(node)) return node.value;
+  if (t.isTemplateLiteral(node)) {
+    return node.quasis.map((q) => q.value.cooked ?? q.value.raw).join("");
+  }
+  return "";
+}
 function stripShellKeepMarker(input) {
   let code = String(input);
-  code = code.replace(/;?\s*var\s+encode_version\s*=\s*['"]jsjiami\.com\.v7['"];?/i, (m) => m);
-  code = code.replace(/try\s*\{[\s\S]{0,800}?\}\s*catch\s*\([^)]+\)\s*\{\s*\};?/g, "/* [strip:self-check] */");
-  code = code.replace(/if\s*\(\!?\s*function\s*\([\w, ]*\)\s*\{[\s\S]{0,2000}?\}\s*\(\)\)\s*;?/g, "/* [strip:dead-wrapper] */");
+  code = code.replace(
+    /;?\s*var\s+encode_version\s*=\s*['"]jsjiami\.com\.v7['"];?/i,
+    (m) => m
+  );
+  code = code.replace(
+    /try\s*\{[\s\S]{0,800}?\}\s*catch\s*\([^)]+\)\s*\{\s*\};?/g,
+    "/* [strip:try-catch-self-check] */"
+  );
+  code = code.replace(
+    /if\s*\(\!?\s*function\s*\([\w, ]*\)\s*\{[\s\S]{0,2000}?\}\s*\(\)\)\s*;?/g,
+    "/* [strip:dead-wrapper] */"
+  );
   return code;
 }
