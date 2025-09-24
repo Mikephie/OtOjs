@@ -131,6 +131,11 @@
             <button class="btn warn" onclick="genCurl('GET')">生成 curl (GET)</button>
             <button class="btn" onclick="copyFrom('#curlOut', this)">复制</button>
           </div>
+          <div class="row" style="margin:8px 0">
+            <input id="apiToken" type="password" placeholder="ghp_xxx 个人访问令牌 (repo contents: read & write)" />
+            <button class="btn ok" onclick="apiPut()">直接上传 (PUT)</button>
+            <button class="btn" onclick="apiGet()">读取 (GET)</button>
+          </div>
           <div id="curlOut" class="code"></div>
         </div>
       </section>
@@ -178,6 +183,7 @@
         <div class="section">
           <div class="row">
             <button class="btn" onclick="loadOutput()">拉取最新输出</button>
+            <button class="btn" onclick="downloadOutput()">下载 output.js</button>
             <button class="btn" onclick="copyFrom('#outputView', this)">复制</button>
             <small style="color:var(--muted)">如为私库请登录 GitHub 或改用 API + Token。</small>
           </div>
@@ -223,7 +229,17 @@
     function genRaw(){ const rel = $('#relPath').value.trim().replace(/^\/+/, ''); const raw = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/${rel}`; const api = `https://api.github.com/repos/${st.repo}/contents/${rel}?ref=${encodeURIComponent(st.branch)}`; $('#rawOut').textContent = [`# 公共直链 (Raw)\n${raw}`, `\n# 私库 / 需 token 的 API 读取\n${api}`].join('\n'); }
 
     // --- GitHub API curl helper ---
-    async function genCurl(method){ const filePath = $('#apiPath').value.trim().replace(/^\/+/, ''); const msg = $('#apiMsg').value.trim(); const api = `https://api.github.com/repos/${st.repo}/contents/${filePath}`; if(method==='GET'){ $('#curlOut').textContent = `curl -H "Authorization: Bearer YOUR_TOKEN" \n  -H "Accept: application/vnd.github+json" \n  \"${api}?ref=${st.branch}\"`; return; } try{ let sha=''; const res = await fetch(`${api}?ref=${st.branch}`); if(res.ok){ const j = await res.json(); sha = j.sha || ''; } const contentSource = ($('#codeIn') && $('#codeIn').value.trim()) ? $('#codeIn').value : '/* replace with your JS */'; const payload = { message: msg, content: btoa(unescape(encodeURIComponent(contentSource))), branch: st.branch, sha: sha || undefined }; const pretty = JSON.stringify(payload, null, 2); const curl = [`curl -X PUT \\`, `  -H "Authorization: Bearer YOUR_TOKEN" \\`, `  -H "Accept: application/vnd.github+json" \\`, `  ${JSON.stringify(api)} \\`, `  -d ${JSON.stringify(pretty)}`].join('\n'); $('#curlOut').textContent = curl; }catch(e){ $('#curlOut').textContent = '# 生成失败：' + e.message; } }
+    async function genCurl(method){ const filePath = $('#apiPath').value.trim().replace(/^\/+/, ''); const msg = $('#apiMsg').value.trim(); const api = `https://api.github.com/repos/${st.repo}/contents/${filePath}`; if(method==='GET'){ $('#curlOut').textContent = `curl -H \"Authorization: Bearer YOUR_TOKEN\" \n  -H \"Accept: application/vnd.github+json\" \n  \"${api}?ref=${st.branch}\"`; return; } try{ let sha=''; const res = await fetch(`${api}?ref=${st.branch}`); if(res.ok){ const j = await res.json(); sha = j.sha || ''; } const contentSource = ($('#codeIn') && $('#codeIn').value.trim()) ? $('#codeIn').value : '/* replace with your JS */'; const payload = { message: msg, content: btoa(unescape(encodeURIComponent(contentSource))), branch: st.branch, sha: sha || undefined }; const pretty = JSON.stringify(payload, null, 2); const curl = [`curl -X PUT \\\`, `  -H \"Authorization: Bearer YOUR_TOKEN\" \\\`, `  -H \"Accept: application/vnd.github+json\" \\\`, `  ${JSON.stringify(api)} \\\`, `  -d ${JSON.stringify(pretty)}`].join('\n'); $('#curlOut').textContent = curl; }catch(e){ $('#curlOut').textContent = '# 生成失败：' + e.message; } }
+
+    // --- Direct GitHub API via Token ---
+    function ghHeaders(){ const t = $('#apiToken').value.trim(); return { 'Authorization': `Bearer ${t}`, 'Accept': 'application/vnd.github+json' } }
+    async function apiGet(){ const path = $('#apiPath').value.trim().replace(/^\/+/, ''); const api = `https://api.github.com/repos/${st.repo}/contents/${path}?ref=${st.branch}`; try{ const res = await fetch(api,{headers:ghHeaders()}); if(!res.ok) throw new Error(res.status+' '+res.statusText); const j = await res.json(); const content = j.content ? decodeURIComponent(escape(atob(j.content))) : ''; $('#codeOut').textContent = content; toast('已读取：'+path); }catch(e){ toast('读取失败：'+e.message) } }
+    async function apiPut(){ const path = $('#apiPath').value.trim().replace(/^\/+/, ''); const msg = $('#apiMsg').value.trim() || 'update via UI'; const api = `https://api.github.com/repos/${st.repo}/contents/${path}`; const code = ($('#codeIn') && $('#codeIn').value.trim()) ? $('#codeIn').value : ($('#codeOut').textContent||''); try{ let sha=''; const check = await fetch(`${api}?ref=${st.branch}`,{headers:ghHeaders()}); if(check.ok){ const j = await check.json(); sha = j.sha || ''; }
+      const body = { message: msg, content: btoa(unescape(encodeURIComponent(code))), branch: st.branch, sha: sha || undefined };
+      const res = await fetch(api,{ method:'PUT', headers: { 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body) });
+      if(!res.ok) throw new Error(res.status+' '+res.statusText);
+      toast('上传成功 (PUT)');
+    }catch(e){ toast('上传失败：'+e.message) } }/contents/${filePath}`; if(method==='GET'){ $('#curlOut').textContent = `curl -H "Authorization: Bearer YOUR_TOKEN" \n  -H "Accept: application/vnd.github+json" \n  \"${api}?ref=${st.branch}\"`; return; } try{ let sha=''; const res = await fetch(`${api}?ref=${st.branch}`); if(res.ok){ const j = await res.json(); sha = j.sha || ''; } const contentSource = ($('#codeIn') && $('#codeIn').value.trim()) ? $('#codeIn').value : '/* replace with your JS */'; const payload = { message: msg, content: btoa(unescape(encodeURIComponent(contentSource))), branch: st.branch, sha: sha || undefined }; const pretty = JSON.stringify(payload, null, 2); const curl = [`curl -X PUT \\`, `  -H "Authorization: Bearer YOUR_TOKEN" \\`, `  -H "Accept: application/vnd.github+json" \\`, `  ${JSON.stringify(api)} \\`, `  -d ${JSON.stringify(pretty)}`].join('\n'); $('#curlOut').textContent = curl; }catch(e){ $('#curlOut').textContent = '# 生成失败：' + e.message; } }
 
     // --- Decoder I/O helpers ---
     const drop = ()=> $('#drop');
@@ -236,19 +252,43 @@
     function clearInput(){ $('#codeIn').value=''; toast('已清空输入'); }
 
     // --- Decoder actions (占位实现，可替换为真实解密逻辑) ---
-    function startDecode(){ const src = $('#codeIn').value || ''; if(!src){ toast('无输入'); return } // 占位：直接回显
-      $('#codeOut').textContent = src; toast('已开始（示例：直接回显）'); }
-    function getResult(){ if(!$('#codeOut').textContent){ toast('暂无输出'); return } toast('已获取结果'); }
+    function startDecode(){ const src = $('#codeIn').value || ''; if(!src){ toast('无输入'); return } $('#codeOut').textContent = src; toast('已开始（示例：直接回显）'); }
+    function getResult(){ if(!$('#codeOut').textContent){ toast('暂无输出'); return } toast('已获取结果'); } toast('已获取结果'); }
 
     // --- Simple beautifier (轻量占位) ---
-    function beautify(){ let s = $('#codeIn').value || $('#codeOut').textContent || ''; if(!s){ toast('无待美化内容'); return } s = s.replace(/;(?=\S)/g,';\n').replace(/\{(?=\S)/g,'{\n').replace(/\}(?=\S)/g,'}\n').replace(/\n{3,}/g,'\n\n'); $('#codeOut').textContent = s; toast('已尝试美化'); }
+    async function beautify(){
+      let s = $('#codeIn').value || $('#codeOut').textContent || '';
+      if(!s){ toast('无待美化内容'); return }
+      try{
+        await ensurePrettier();
+        const formatted = prettier.format(s, { parser: 'babel', plugins: [prettierPlugins.babel] });
+        $('#codeOut').textContent = formatted;
+        toast('已使用 Prettier 美化');
+      }catch(e){
+        toast('Prettier 失败：'+e.message);
+      }
+    } s = s.replace(/;(?=\S)/g,';\n').replace(/\{(?=\S)/g,'{\n').replace(/\}(?=\S)/g,'}\n').replace(/\n{3,}/g,'\n\n'); $('#codeOut').textContent = s; toast('已尝试美化'); }
     function clearAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; toast('已清除'); }
 
     // --- Output preview ---
     async function loadOutput(){ const url = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/output.js`; try{ const res = await fetch(url); if(!res.ok) throw new Error(res.status + ' ' + res.statusText); const txt = await res.text(); $('#outputView').textContent = txt.slice(0, 200000); toast('已拉取最新 output.js'); }catch(e){ $('#outputView').textContent = '# 拉取失败：' + e.message + '\n' + url; } }
+    function downloadOutput(){
+      const txt = $('#outputView').textContent;
+      const blob = new Blob([txt || ''], {type:'text/javascript;charset=utf-8'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'output.js';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('已下载 output.js');
+    }
 
     // --- Copy helper w/ button feedback ---
     async function copyFrom(sel, btn){ try{ const el = typeof sel === 'string' ? document.querySelector(sel) : sel; const txt = el ? (el.value ?? el.textContent ?? '') : ''; await navigator.clipboard.writeText(txt); if(btn){ const old = btn.textContent; btn.disabled = true; btn.textContent = '✅ 已复制'; setTimeout(()=>{ btn.textContent = old; btn.disabled = false; }, 1500);} toast('已复制到剪贴板'); }catch(e){ toast('复制失败：'+e.message) } }
+
+    // --- Prettier loader ---
+    function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load failed: '+src)); document.head.appendChild(s); }); }
+    async function ensurePrettier(){ if(window.prettier && window.prettierPlugins && window.prettierPlugins.babel) return; await loadScript('https://unpkg.com/prettier@3.2.5/standalone.js'); await loadScript('https://unpkg.com/prettier@3.2.5/plugins/babel.js'); }
 
     // --- tiny toast ---
     function toast(msg){ const el = document.createElement('div'); el.textContent = msg; el.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 14px;border-radius:12px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(6px);box-shadow:${getComputedStyle(document.documentElement).getPropertyValue('--shadow')};z-index:9999;font-size:13px`; document.body.appendChild(el); setTimeout(()=>{ el.remove() }, 1600); }
