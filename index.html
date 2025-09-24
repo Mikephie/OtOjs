@@ -91,8 +91,8 @@
       </section>
 
       <section class="card">
-        <h2>🧪 科技解码器</h2>
-        <div class="sub">文件/远程/粘贴 → 解密/美化/复制/清空</div>
+        <h2>🧪 解密流程（固定：提交 input.js → 等待 ~60s → 查看 output.js）</h2>
+        <div class="sub">请把待解密脚本放入 <code>input.js</code>，等待自动流程产出 <code>output.js</code>。本页已做一键提交与轮询结果。</div>
         <div class="section">
           <div id="drop" class="drop">点击选择文件或拖入（.js .txt .json）</div>
           <div class="row" style="margin-top:8px">
@@ -105,16 +105,17 @@
           </div>
         </div>
         <div class="section">
-          <textarea id="codeIn" placeholder="请粘贴需要处理的 JavaScript 代码..."></textarea>
+          <textarea id="codeIn" placeholder="把待解密的 JavaScript 贴在这里，或者用上面的文件/远程/粘贴导入"></textarea>
         </div>
         <div class="section">
           <div class="row">
-            <button class="btn ok" id="btnStart">开始解密</button>
-            <button class="btn" id="btnGet">获取结果</button>
-            <button class="btn" id="btnCopyOut">复制</button>
-            <button class="btn" id="btnBeautify">代码美化 (Prettier)</button>
-            <button class="btn err" id="btnClearAll">清除</button>
+            <button class="btn ok" id="btnSubmitInput">① 提交到 input.js (PUT)</button>
+            <button class="btn warn" id="btnWaitPoll">② 开始等待并轮询 (60s)</button>
+            <button class="btn" id="btnBeautify">（可选）结果代码美化</button>
+            <button class="btn" id="btnCopyOut">复制结果</button>
+            <button class="btn err" id="btnClearAll">清空输入与结果</button>
           </div>
+          <div id="status" class="sub" style="margin-top:6px"></div>
           <pre id="codeOut" class="code" style="margin-top:8px;min-height:160px"></pre>
         </div>
       </section>
@@ -152,17 +153,55 @@
 
     async function apiGet(){ const path=$('#apiPath').value.trim().replace(/^\/+/,''); const api=`https://api.github.com/repos/${st.repo}/contents/${path}?ref=${st.branch}`; try{ const res=await fetch(api,{headers:headers()}); if(!res.ok) throw new Error(res.status+' '+res.statusText); const j=await res.json(); const s=j.content?decodeURIComponent(escape(atob(j.content))):''; $('#codeOut').textContent=s; toast('已读取 '+path); }catch(e){ toast('读取失败：'+e.message); } }
 
-    async function apiPut(){ const path=$('#apiPath').value.trim().replace(/^\/+/,''); const msg=$('#apiMsg').value.trim()||'update via UI'; const api=`https://api.github.com/repos/${st.repo}/contents/${path}`; const src=$('#codeIn').value.trim()||$('#codeOut').textContent||''; if(!src){ toast('没有可上传的内容'); return } try{ let sha=''; const chk=await fetch(`${api}?ref=${st.branch}`,{headers:headers()}); if(chk.ok){ const j=await chk.json(); sha=j.sha||''; } const body={message:msg,content:btoa(unescape(encodeURIComponent(src))),branch:st.branch,sha:sha||undefined}; const res=await fetch(api,{method:'PUT',headers:{'Content-Type':'application/json',...headers()},body:JSON.stringify(body)}); if(!res.ok) throw new Error(res.status+' '+res.statusText); toast('上传成功'); }catch(e){ toast('上传失败：'+e.message); }
+    async async function apiPut(){ const path=$('#apiPath').value.trim().replace(/^\/+/, ''); const msg=$('#apiMsg').value.trim()||'update via UI'; const api=`https://api.github.com/repos/${st.repo}/contents/${path}`; const src=$('#codeIn').value.trim()||$('#codeOut').textContent||''; if(!src){ toast('没有可上传的内容'); return } try{ let sha=''; const chk=await fetch(`${api}?ref=${st.branch}`,{headers:headers()}); if(chk.ok){ const j=await chk.json(); sha=j.sha||''; } const body={message:msg,content:btoa(unescape(encodeURIComponent(src))),branch:st.branch,sha:sha||undefined}; const res=await fetch(api,{method:'PUT',headers:{'Content-Type':'application/json',...headers()},body:JSON.stringify(body)}); if(!res.ok) throw new Error(res.status+' '+res.statusText); toast('上传成功'); }catch(e){ toast('上传失败：'+e.message); } }/contents/${path}`; const src=$('#codeIn').value.trim()||$('#codeOut').textContent||''; if(!src){ toast('没有可上传的内容'); return } try{ let sha=''; const chk=await fetch(`${api}?ref=${st.branch}`,{headers:headers()}); if(chk.ok){ const j=await chk.json(); sha=j.sha||''; } const body={message:msg,content:btoa(unescape(encodeURIComponent(src))),branch:st.branch,sha:sha||undefined}; const res=await fetch(api,{method:'PUT',headers:{'Content-Type':'application/json',...headers()},body:JSON.stringify(body)}); if(!res.ok) throw new Error(res.status+' '+res.statusText); toast('上传成功'); }catch(e){ toast('上传失败：'+e.message); }
     }
 
     // 解码器 I/O
     function pickFile(){ $('#file').click(); }
     function readFile(f){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsText(f,'utf-8'); }); }
     function attachDnd(){ const box=$('#drop'); box.addEventListener('dragover',e=>{e.preventDefault(); box.classList.add('drag')}); box.addEventListener('dragleave',()=>box.classList.remove('drag')); box.addEventListener('drop',async e=>{e.preventDefault(); box.classList.remove('drag'); const f=e.dataTransfer.files?.[0]; if(f){ $('#codeIn').value=await readFile(f); toast('已载入：'+f.name); }}); }
-
     async function loadRemote(){ const u=$('#remoteUrl').value.trim(); if(!u){ toast('请输入 URL'); return } try{ const r=await fetch(u); const t=await r.text(); $('#codeIn').value=t; toast('已加载远程脚本'); }catch(e){ toast('加载失败：'+e.message); } }
     async function pasteClipboard(){ try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; toast('已粘贴'); }catch(e){ toast('读取剪贴板失败：'+e.message); } }
     function clearInput(){ $('#codeIn').value=''; toast('已清空输入'); }
+
+    // 固定流程：提交 input.js + 轮询 output.js
+    async function submitToInputJs(){
+      // 强制路径为 input.js
+      $('#apiPath').value = 'input.js';
+      $('#apiMsg').value = 'update: input.js via OtOjs UI';
+      await apiPut();
+      $('#status').textContent = '已提交到 input.js，下一步：点击“② 开始等待并轮询 (60s)”';
+    }
+
+    async function waitAndPollOutput(seconds=60){
+      const token = $('#apiToken').value.trim();
+      if(!token){ toast('请先填写 Token'); return }
+      $('#status').textContent = `已开始等待，预计 ${seconds}s；期间每5s轮询 output.js ...`;
+      const api = `https://api.github.com/repos/${st.repo}/contents/output.js?ref=${st.branch}`;
+      const t0 = Date.now();
+      let found = false;
+      while((Date.now()-t0)/1000 < seconds){
+        try{
+          const res = await fetch(api,{headers:headers()});
+          if(res.ok){
+            const j = await res.json();
+            if(j && j.content){
+              const txt = decodeURIComponent(escape(atob(j.content)));
+              if(txt && txt.trim().length){ $('#codeOut').textContent = txt; found = true; break; }
+            }
+          }
+        }catch(e){ /* 忽略，继续轮询 */ }
+        await new Promise(r=>setTimeout(r,5000));
+        $('#status').textContent = `等待中… 已过 ${(Math.floor((Date.now()-t0)/1000))}s / ${seconds}s`;
+      }
+      if(found){
+        $('#status').textContent = '✅ 已在 output.js 获取到结果（已填入下方结果区）';
+        toast('已获取 output.js');
+      }else{
+        $('#status').textContent = '⌛ 未在设定时长内获取到 output.js，可再等一会儿或手动点击“拉取最新输出”。';
+        toast('暂未获取到结果');
+      }
+    }
 
     function startDecode(){ const s=$('#codeIn').value||''; if(!s){ toast('无输入'); return } $('#codeOut').textContent=s; toast('已开始（示例：回显）'); }
     function getResult(){ if(!$('#codeOut').textContent){ toast('暂无输出'); return } toast('已获取结果'); }
@@ -180,30 +219,33 @@
     // 绑定
     function bind(){
       $('#repo').value=st.repo; $('#branch').value=st.branch; initLinks(); genRaw(); attachDnd();
+      // ① 仓库 & Raw
       $('#btnSaveRepo').addEventListener('click',()=>{ st.repo=$('#repo').value.trim(); st.branch=$('#branch').value.trim(); initLinks(); genRaw(); toast('已保存'); });
       $('#btnGenRaw').addEventListener('click',genRaw);
       $('#btnCopyRaw').addEventListener('click',()=>copy('#rawOut','#btnCopyRaw'));
+      // ② GitHub API
       $('#btnCurlPut').addEventListener('click',()=>genCurl('PUT'));
       $('#btnCurlGet').addEventListener('click',()=>genCurl('GET'));
       $('#btnCurlCopy').addEventListener('click',()=>copy('#curlOut','#btnCurlCopy'));
       $('#btnApiPut').addEventListener('click',apiPut);
       $('#btnApiGet').addEventListener('click',apiGet);
+      // 输入导入
       $('#btnPick').addEventListener('click',pickFile);
       $('#file').addEventListener('change',async e=>{ const f=e.target.files?.[0]; if(f){ $('#codeIn').value=await readFile(f); toast('已载入：'+f.name); }});
       $('#btnRemote').addEventListener('click',loadRemote);
       $('#btnPaste').addEventListener('click',pasteClipboard);
       $('#btnClearInput').addEventListener('click',clearInput);
-      $('#btnStart').addEventListener('click',startDecode);
-      $('#btnGet').addEventListener('click',getResult);
-      $('#btnCopyOut').addEventListener('click',()=>copy('#codeOut','#btnCopyOut'));
+      // 固定流程
+      $('#btnSubmitInput').addEventListener('click',submitToInputJs);
+      $('#btnWaitPoll').addEventListener('click',()=>waitAndPollOutput(60));
       $('#btnBeautify').addEventListener('click',beautify);
-      $('#btnClearAll').addEventListener('click',()=>{ $('#codeIn').value=''; $('#codeOut').textContent=''; toast('已清除'); });
+      $('#btnCopyOut').addEventListener('click',()=>copy('#codeOut','#btnCopyOut'));
+      $('#btnClearAll').addEventListener('click',()=>{ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#status').textContent=''; toast('已清除'); });
+      // ③ 预览
       $('#btnLoadOutput').addEventListener('click',loadOutput);
       $('#btnCopyOutput').addEventListener('click',()=>copy('#outputView','#btnCopyOutput'));
       $('#btnDownloadOutput').addEventListener('click',downloadOutput);
     }
-
-    async function copy(sel, btnSel){ try{ const el=$(sel); const txt=el ? (el.value ?? el.textContent ?? '') : ''; await navigator.clipboard.writeText(txt); const b=$(btnSel); if(b){ const o=b.textContent; b.textContent='✅ 已复制'; b.disabled=true; setTimeout(()=>{b.textContent=o; b.disabled=false},1200); } toast('已复制'); }catch(e){ toast('复制失败：'+e.message); } }
 
     window.addEventListener('error', e=> toast('脚本错误: '+(e?.message||'')) );
     window.addEventListener('unhandledrejection', e=> toast('未处理异常: '+(e?.reason?.message||e?.reason||'')) );
