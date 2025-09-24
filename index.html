@@ -61,7 +61,19 @@
     :root[data-theme="light"]{--bg: radial-gradient(1200px 800px at 10% 0%, #22d3ee33 0%, transparent 50%), radial-gradient(900px 700px at 90% 20%, #a78bfa2e 0%, transparent 60%), linear-gradient(180deg,#f7fafc 0%, #f4f7fb 60%, #eef2f7 100%); --card: rgba(0,0,0,.04); --card-2: rgba(0,0,0,.05); --text:#0b1220; --muted:#4b5563; --accent:#2563eb; --accent-2:#7c3aed; --ok:#059669; --warn:#b45309; --err:#dc2626; --shadow: 0 6px 20px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.6)}
     .theme-btn{margin-left:auto;padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.06));color:var(--text);cursor:pointer;font-weight:600;box-shadow:var(--shadow);backdrop-filter:var(--glass)}
     :root[data-theme="light"] .theme-btn{border-color:rgba(0,0,0,.08);background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.5))}
-  </style>
+    /* 移动端自适配：按钮与输入全宽堆叠 */
+  @media (max-width: 720px){
+    .container{padding:20px 12px 100px}
+    .card h2{font-size:15px}
+    .row{gap:10px}
+    .row > *{flex:1 1 100%}
+    .btn{font-size:15px; padding:12px 14px; border-radius:14px}
+    input[type="text"], input[type="url"], input[type="password"], textarea{font-size:15px; padding:12px}
+    .field{flex-wrap:wrap}
+    .link-list{grid-template-columns:1fr}
+    .code{font-size:13px}
+  }
+</style>
 </head>
 <body>
   <div class="container">
@@ -229,7 +241,10 @@
     function genRaw(){ const rel = $('#relPath').value.trim().replace(/^\/+/, ''); const raw = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/${rel}`; const api = `https://api.github.com/repos/${st.repo}/contents/${rel}?ref=${encodeURIComponent(st.branch)}`; $('#rawOut').textContent = [`# 公共直链 (Raw)\n${raw}`, `\n# 私库 / 需 token 的 API 读取\n${api}`].join('\n'); }
 
     // --- GitHub API curl helper ---
-    async function genCurl(method){ const filePath = $('#apiPath').value.trim().replace(/^\/+/, ''); const msg = $('#apiMsg').value.trim(); const api = `https://api.github.com/repos/${st.repo}/contents/${filePath}`; if(method==='GET'){ $('#curlOut').textContent = `curl -H \"Authorization: Bearer YOUR_TOKEN\" \n  -H \"Accept: application/vnd.github+json\" \n  \"${api}?ref=${st.branch}\"`; return; } try{ let sha=''; const res = await fetch(`${api}?ref=${st.branch}`); if(res.ok){ const j = await res.json(); sha = j.sha || ''; } const contentSource = ($('#codeIn') && $('#codeIn').value.trim()) ? $('#codeIn').value : '/* replace with your JS */'; const payload = { message: msg, content: btoa(unescape(encodeURIComponent(contentSource))), branch: st.branch, sha: sha || undefined }; const pretty = JSON.stringify(payload, null, 2); const curl = [`curl -X PUT \\\`, `  -H \"Authorization: Bearer YOUR_TOKEN\" \\\`, `  -H \"Accept: application/vnd.github+json\" \\\`, `  ${JSON.stringify(api)} \\\`, `  -d ${JSON.stringify(pretty)}`].join('\n'); $('#curlOut').textContent = curl; }catch(e){ $('#curlOut').textContent = '# 生成失败：' + e.message; } }
+    async function genCurl(method){ const filePath = $('#apiPath').value.trim().replace(/^\/+/, ''); const msg = $('#apiMsg').value.trim(); const api = `https://api.github.com/repos/${st.repo}/contents/${filePath}`; if(method==='GET'){ $('#curlOut').textContent = `curl -H \"Authorization: Bearer YOUR_TOKEN\" 
+  -H \"Accept: application/vnd.github+json\" 
+  \"${api}?ref=${st.branch}\"`; return; } try{ let sha=''; const res = await fetch(`${api}?ref=${st.branch}`); if(res.ok){ const j = await res.json(); sha = j.sha || ''; } const contentSource = ($('#codeIn') && $('#codeIn').value.trim()) ? $('#codeIn').value : '/* replace with your JS */'; const payload = { message: msg, content: btoa(unescape(encodeURIComponent(contentSource))), branch: st.branch, sha: sha || undefined }; const pretty = JSON.stringify(payload, null, 2); const curl = [`curl -X PUT \\`, `  -H \"Authorization: Bearer YOUR_TOKEN\" \\`, `  -H \"Accept: application/vnd.github+json\" \\`, `  ${JSON.stringify(api)} \\`, `  -d ${JSON.stringify(pretty)}`].join('
+'); $('#curlOut').textContent = curl; }catch(e){ $('#curlOut').textContent = '# 生成失败：' + e.message; } }
 
     // --- Direct GitHub API via Token ---
     function ghHeaders(){ const t = $('#apiToken').value.trim(); return { 'Authorization': `Bearer ${t}`, 'Accept': 'application/vnd.github+json' } }
@@ -271,7 +286,8 @@
     function clearAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; toast('已清除'); }
 
     // --- Output preview ---
-    async function loadOutput(){ const url = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/output.js`; try{ const res = await fetch(url); if(!res.ok) throw new Error(res.status + ' ' + res.statusText); const txt = await res.text(); $('#outputView').textContent = txt.slice(0, 200000); toast('已拉取最新 output.js'); }catch(e){ $('#outputView').textContent = '# 拉取失败：' + e.message + '\n' + url; } }
+    async function loadOutput(){ const url = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/output.js`; try{ const res = await fetch(url); if(!res.ok) throw new Error(res.status + ' ' + res.statusText); const txt = await res.text(); $('#outputView').textContent = txt.slice(0, 200000); toast('已拉取最新 output.js'); }catch(e){ $('#outputView').textContent = '# 拉取失败：' + e.message + '
+' + url; } }
     function downloadOutput(){
       const txt = $('#outputView').textContent;
       const blob = new Blob([txt || ''], {type:'text/javascript;charset=utf-8'});
