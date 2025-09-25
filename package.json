@@ -7,8 +7,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "scripts": {
     "decode": "node src/main.js -i input.js -o output/output.js",
-    "second": "node second-pass.js output/output.js output/output.deob2.js",
+    "second": "node src/plugin/extra-codecs/second-pass.js output/output.js output/output.deob2.js",
     "decode:all": "npm run decode && npm run second",
     "deob": "node src/main.js -t obfuscator -i input.js -o output/output.js",
     "deso": "node src/main.js -t sojson -i input.js -o output/output.js",
