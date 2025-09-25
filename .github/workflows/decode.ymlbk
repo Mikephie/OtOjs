@@ -3,12 +3,13 @@ name: Decode JS
 on:
   push:
     paths:
-      - "input/**.js"
+      - "input.js"                 # ✅ 关键：根目录 input.js
       - "decode.js"
       - "package.json"
       - "package-lock.json"
       - "npm-shrinkwrap.json"
       - "yarn.lock"
+      - ".github/workflows/decode.yml"
   workflow_dispatch:
 
 permissions:
@@ -20,8 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0           # ✅ 提交更稳妥
 
-      # 先检测是否存在任一锁文件
       - name: Detect lockfile
         id: lock
         run: |
@@ -31,7 +33,6 @@ jobs:
             echo "has_lock=false" >> $GITHUB_OUTPUT
           fi
 
-      # 有锁文件：启用缓存
       - name: Setup Node (cache)
         if: steps.lock.outputs.has_lock == 'true'
         uses: actions/setup-node@v4
@@ -39,14 +40,12 @@ jobs:
           node-version: "20"
           cache: npm
 
-      # 无锁文件：不启用缓存，避免 setup-node 的警告
       - name: Setup Node (no cache)
         if: steps.lock.outputs.has_lock == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      # 安装依赖：有锁->ci，无锁->i
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
@@ -55,37 +54,38 @@ jobs:
             npm i --no-audit --fund=false
           fi
 
-      - name: Ensure output dir
-        run: mkdir -p output
-
-      # 解码失败不让整单失败
-      - name: Decode (non-blocking)
-        id: decode
-        run: |
-          set -o pipefail
-          npm run decode || echo "::warning::decode returned non-zero exit code"
-        continue-on-error: true
-
-      - name: Show git status (output/)
-        run: git status --porcelain output/ || true
-
-      - name: Commit deobf outputs if changed
+      - name: Run decode
         run: |
           set -e
-          if [ -n "$(git status --porcelain output/)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add output/
-            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
-            git push
-            echo "Committed."
-          else
-            echo "nothing to commit"
+          # 尝试你项目里的命令；按需调整
+          npm run decode --if-present || node src/main.js || node decode.js
+
+          # 确保结果在根目录，若你的脚本写在 output/output.js，则 copy 过来
+          if [ -f output/output.js ] && [ ! -f output.js ]; then
+            cp -f output/output.js ./output.js
           fi
 
-      - name: Upload artifact (output/)
+          test -f output.js || (echo "❌ 未生成 output.js" && exit 1)
+          ls -l output.js
+
+      - name: Commit output.js if changed
+        run: |
+          set -e
+          # 若 .gitignore 忽略了 output.js，强制添加
+          git add -f output.js
+
+          if git diff --cached --quiet -- output.js; then
+            echo "nothing to commit"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update output.js [skip ci]"
+          git push
+
+      - name: Upload artifact (output.js)
         uses: actions/upload-artifact@v4
         with:
           name: deobf-output
-          path: output/
-          if-no-files-found: ignore
+          path: output.js
