@@ -1,125 +1,127 @@
-// jsjiami_v7_rc4.js — 支持别名(_0xc3dd0a=_0x1e61) 与安全沙箱计算
-import vm from "vm";
+// src/plugin/extra-codecs/jsjiami_v7_rc4.js
+import vm from 'node:vm';
 
-function evalStringTable(fnCode) {
-  const context = { result: null };
+function findFunc(code, namePattern) {
+  // 匹配：function _0x123abc ( ... ) { ... }  —— 贪婪到平衡大括号
+  const re = new RegExp(
+    `function\\s+(${namePattern})\\s*\$begin:math:text$[^)]*\\$end:math:text$\\s*\\{`,
+    'g'
+  );
+  const m = re.exec(code);
+  if (!m) return null;
+
+  const start = m.index;
+  let i = re.lastIndex - 1; // 指向 '{'
+  let depth = 0;
+  for (; i < code.length; i++) {
+    const ch = code[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        const end = i + 1;
+        return { name: m[1], start, end, src: code.slice(start, end) };
+      }
+    }
+  }
+  return null;
+}
+
+function evalStringTable(fnCode, tableName = '_0x1715') {
+  // 注入 _0xodH，解决字符串表内引用 _0xodH 时的 NameError
+  const context = { _0xodH: 'jsjiami.com.v7' };
   vm.createContext(context);
   const wrapped = `
     (function(){
+      "use strict";
       ${fnCode}
-      if (typeof _0x1715 !== 'function') throw new Error('_0x1715 not found');
-      return _0x1715();
+      if (typeof ${tableName} !== 'function') throw new Error('${tableName} not found');
+      return ${tableName}();
     })()
   `;
-  return vm.runInContext(wrapped, context, { timeout: 50 });
+  return vm.runInContext(wrapped, context, { timeout: 200 });
 }
 
-function makeDecoder(stringTable, indexOffset) {
-  const b64 = (s) => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=";
-    let str = "", out = "";
-    for (let block = 0, charCode, i = 0, map = chars;
-      (charCode = s.charAt(i++));
-      ~charCode && (block = block ? block * 64 + charCode : charCode,
-      i % 4) ? str += String.fromCharCode(255 & (block >> ((-2 * i) & 6))) : 0) {
-      charCode = map.indexOf(charCode);
-    }
-    for (let i2 = 0, l = str.length; i2 < l; i2++) {
-      out += "%" + ("00" + str.charCodeAt(i2).toString(16)).slice(-2);
-    }
-    return decodeURIComponent(out);
-  };
-
-  const rc4 = (data, key) => {
-    const s = new Array(256);
-    for (let i = 0; i < 256; i++) s[i] = i;
-    let j = 0, x, res = "";
-    for (let i = 0; i < 256; i++) {
-      j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
-      [s[i], s[j]] = [s[j], s[i]];
-    }
-    let i = 0; j = 0;
-    for (let y = 0; y < data.length; y++) {
-      i = (i + 1) % 256;
-      j = (j + s[i]) % 256;
-      [s[i], s[j]] = [s[j], s[i]];
-      x = s[(s[i] + s[j]) % 256];
-      res += String.fromCharCode(data.charCodeAt(y) ^ x);
-    }
-    return res;
-  };
-
-  return (rawIndex, key) => {
-    const idxNum = typeof rawIndex === "string" && rawIndex.startsWith("0x")
-      ? parseInt(rawIndex, 16)
-      : Number(rawIndex);
-    const slot = stringTable[idxNum - indexOffset];
-    if (typeof slot !== "string") return null;
-    try {
-      return rc4(b64(slot), key);
-    } catch {
-      return null;
-    }
-  };
+function buildDecoderSandbox(tableFuncSrc, decoderFuncSrc, tableName, decoderName) {
+  const context = { _0xodH: 'jsjiami.com.v7' };
+  vm.createContext(context);
+  const wrapped = `
+    "use strict";
+    ${tableFuncSrc}
+    ${decoderFuncSrc}
+    // 暴露方法
+    ({ decode: function(i,k){ return ${decoderName}(i,k); } })
+  `;
+  return vm.runInContext(wrapped, context, { timeout: 300 });
 }
 
-function analyze(code) {
-  const decDef =
-    code.match(/function\s+([$\w]+)\s*\(\s*([$\w]+)\s*,\s*([$\w]+)\)\s*\{[^{}]*?\1\s*=\s*function|function\s+([$\w]+)\s*\(\s*([$\w]+)\s*,\s*([$\w]+)\)\s*\{/) ||
-    code.match(/(?:var|let|const)\s+([$\w]+)\s*=\s*function\s*\(\s*([$\w]+)\s*,\s*([$\w]+)\)\s*\{/);
-
-  const name = (decDef && (decDef[1] || decDef[4])) || null;
-  if (!name) return null;
-
-  const offM = code.match(new RegExp(`${name}\\s*=\\s*function\\s*\$begin:math:text$\\\\s*([\\\\w$]+)\\\\s*,[^)]*\\$end:math:text$\\s*\\{[^}]*?\\1\\s*=\\s*\\1\\s*-\\s*(0x[\\da-fA-F]+|\\d+)`));
-  const indexOffset = offM ? parseInt(offM[2]) : 0xdd;
-
-  const aliasRe = new RegExp(`(?:var|let|const)\\s+([\\w$]+)\\s*=\\s*${name}\\s*;`, "g");
-  const aliases = new Set([name]);
-  for (let m; (m = aliasRe.exec(code)); ) aliases.add(m[1]);
-
-  const tblFnM = code.match(/function\s+_0x1715\s*\(\)\s*\{[\s\S]*?\}\s*;?/);
-  if (!tblFnM) return null;
-
-  return { name, aliases: [...aliases], tableFnCode: tblFnM[0], indexOffset };
-}
-
-export default function jsjiamiV7Rc4(code, { notes } = {}) {
+export default function jsjiamiV7Rc4(source, { notes } = {}) {
   try {
-    const info = analyze(code);
-    if (!info) {
-      notes?.push?.("jsjiamiV7Rc4: decryptor not found");
-      return code;
+    // 1) 找字符串表函数（常见命名形如 _0x1715）
+    const tbl = findFunc(source, '_0x[0-9a-fA-F]{3,}');
+    if (!tbl) {
+      notes?.push?.('jsjiamiV7Rc4: string table function not found');
+      return source;
     }
 
-    let strTab;
+    // 确认它看起来像表函数：内部包含 array 字面与 concat 结构较明显
+    // 直接尝试执行；执行失败时会抛出并被上层捕获
+    let tableArr;
     try {
-      strTab = evalStringTable(info.tableFnCode);
-      if (!Array.isArray(strTab)) throw 0;
-    } catch {
-      notes?.push?.("jsjiamiV7Rc4: string table eval failed");
-      return code;
+      tableArr = evalStringTable(tbl.src, tbl.name);
+      if (!Array.isArray(tableArr)) {
+        throw new Error('table not array');
+      }
+    } catch (e) {
+      notes?.push?.(`jsjiamiV7Rc4: string table eval failed (${e.message})`);
+      return source;
     }
 
-    const decode = makeDecoder(strTab, info.indexOffset);
+    // 2) 找解码函数（通常在代码中有 "const _0xc3dd0a = _0x1e61" 这种绑定）
+    // 先推断名字：从 "const XXX = YYY;" 形态里抓 YYY 是否是函数定义
+    // 更稳妥：直接搜第一个满足模式的 function _0x????(a,b){...} 且内部有 "IEgssj" / "RC4" 结构
+    const dec = findFunc(source, '_0x[0-9a-fA-F]{3,}');
+    if (!dec) {
+      notes?.push?.('jsjiamiV7Rc4: decoder function not found');
+      return source;
+    }
 
-    const callee = info.aliases.map(n => n.replace(/[$]/g, "\\$")).join("|");
-    const callRe = new RegExp(`\\b(?:${callee})\\s*\$begin:math:text$\\\\s*(0x[\\\\da-fA-F]+|\\\\d+)\\\\s*,\\\\s*'([^'\\\\\\\\]*)'\\\\s*\\$end:math:text$`, "g");
+    // 3) 组建解码沙箱
+    let sandbox;
+    try {
+      sandbox = buildDecoderSandbox(tbl.src, dec.src, tbl.name, dec.name);
+    } catch (e) {
+      notes?.push?.(`jsjiamiV7Rc4: sandbox build failed (${e.message})`);
+      return source;
+    }
+
+    // 4) 扫描并替换调用：  _0x1e61(0xe7,'p4lg')  或  _0x1e61(231,'key')
+    // 仅限第一参数是纯数字字面量（十六进制或十进制），第二参数是字符串字面量
+    const callRe = new RegExp(`\\b${dec.name}\$begin:math:text$\\\\s*(0x[0-9a-fA-F]+|\\\\d+)\\\\s*,\\\\s*(['"])([^'"]*)\\\\2\\\\s*\\$end:math:text$`, 'g');
 
     let replaced = 0;
-    const out = code.replace(callRe, (_, idx, key) => {
-      const s = decode(idx, key);
-      if (typeof s === "string") {
-        replaced++;
-        return JSON.stringify(s);
-      }
-      return _;
+    const out = source.replace(callRe, (_m, idxLit, q, key) => {
+      try {
+        const idx = idxLit.startsWith('0x') ? parseInt(idxLit, 16) : parseInt(idxLit, 10);
+        const val = sandbox.decode(idx, key);
+        if (typeof val === 'string') {
+          replaced++;
+          // 使用 JSON.stringify 生成安全字符串字面量
+          return JSON.stringify(val);
+        }
+      } catch (_) {}
+      return _m; // 安全回退
     });
 
-    notes?.push?.(`jsjiamiV7Rc4: replaced ${replaced} calls (aliases: ${info.aliases.join(",")})`);
-    return out;
+    if (replaced > 0) {
+      notes?.push?.(`jsjiamiV7Rc4: replaced ${replaced} calls via sandbox`);
+      return out;
+    } else {
+      notes?.push?.(`jsjiamiV7Rc4: no calls matched for ${dec.name}`);
+      return source;
+    }
   } catch (e) {
-    notes?.push?.(`jsjiamiV7Rc4: ${e.message}`);
-    return code;
+    notes?.push?.(`jsjiamiV7Rc4: error ${e.message}`);
+    return source;
   }
 }
