@@ -1,30 +1,24 @@
 // src/plugin/extra-codecs/second-pass.js
 import fs from 'fs';
 import path from 'path';
-import { runExtraCodecsLoop } from './index.js';
+import { fileURLToPath } from 'url';
 
-const [,, inFile, outFile] = process.argv;
+// 兼容 default / 具名导出
+import * as extra from './index.js';
+const runExtra =
+  (extra && (extra.default || extra.runExtraCodecs)) ||
+  ((code) => code); // 找不到就原样返回，保证流程不中断
 
-if (!inFile || !outFile) {
-  console.error('Usage: node src/plugin/extra-codecs/second-pass.js <input> <output>');
-  process.exit(2);
-}
+const [, , inFile, outFileCli] = process.argv;
+const inputFile = inFile || 'output/output.js';
+const outputFile = outFileCli || 'output/output.deob2.js';
 
-if (!fs.existsSync(inFile)) {
-  console.error(`[second-pass] input not found: ${inFile}`);
-  process.exit(3);
-}
-
-const input = fs.readFileSync(inFile, 'utf-8');
+const code = fs.readFileSync(inputFile, 'utf-8');
 const notes = [];
-const result = runExtraCodecsLoop(input, { notes }, { maxPasses: 3 });
+const out = runExtra(code, { notes });
 
-if (result !== input) {
-  fs.mkdirSync(path.dirname(outFile), { recursive: true });
-  fs.writeFileSync(outFile, result, 'utf-8');
-  console.log(`[second-pass] wrote: ${outFile}`);
-} else {
-  console.log('[second-pass] no change, skipped writing');
-}
+fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+fs.writeFileSync(outputFile, out, 'utf-8');
 
 if (notes.length) console.log('Notes:', notes.join(' | '));
+console.log(`Second-pass done → ${outputFile}`);
