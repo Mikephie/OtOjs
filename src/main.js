@@ -1,4 +1,4 @@
-// src/main.js —— 稳定链式版（支持可选编码库预处理 + 动态清理 + 格式化）
+// src/main.js —— 稳定链式版（支持二次 RC4 循环）
 
 import fs from 'fs';
 import process from 'process';
@@ -6,8 +6,8 @@ import process from 'process';
 // ---------------------- 可选：编码库预处理（存在则自动启用） ----------------------
 let runExtraCodecs = null;
 try {
-  const extra = await import('./plugin/extra-codecs/index.js'); // 若无该文件会被 catch
-  runExtraCodecs = (extra.runExtraCodecs || extra.default || null);
+  const extra = await import('./plugin/extra-codecs/index.js');
+  runExtraCodecs = extra.runExtraCodecs || extra.default || null;
 } catch (_) {
   // 忽略：未提供编码库也能正常运行
 }
@@ -21,20 +21,14 @@ const obfuscatorModule  = await import('./plugin/obfuscator.js');
 const awscModule        = await import('./plugin/awsc.js');
 const jsconfuserModule  = await import('./plugin/jsconfuser.js');
 
-// 新增：动态清理 & 格式化插件（独立后处理阶段）
-const cleanupDynamicModule = await import('./plugin/cleanup-dynamic.js');
-const formatModule         = await import('./plugin/format.js');
-
 // 兼容 default / 命名导出
-const PluginCommon         = commonModule.default         ?? commonModule;
-const PluginJjencode       = jjencodeModule.default       ?? jjencodeModule;
-const PluginSojson         = sojsonModule.default         ?? sojsonModule;
-const PluginSojsonV7       = sojsonv7Module.default       ?? sojsonv7Module;
-const PluginObfuscator     = obfuscatorModule.default     ?? obfuscatorModule;
-const PluginAwsc           = awscModule.default           ?? awscModule;
-const PluginJsconfuser     = jsconfuserModule.default     ?? jsconfuserModule;
-const PluginCleanupDynamic = cleanupDynamicModule.default ?? cleanupDynamicModule;
-const PluginFormat         = formatModule.default         ?? formatModule;
+const PluginCommon     = commonModule.default     ?? commonModule;
+const PluginJjencode   = jjencodeModule.default   ?? jjencodeModule;
+const PluginSojson     = sojsonModule.default     ?? sojsonModule;
+const PluginSojsonV7   = sojsonv7Module.default   ?? sojsonv7Module;
+const PluginObfuscator = obfuscatorModule.default ?? obfuscatorModule;
+const PluginAwsc       = awscModule.default       ?? awscModule;
+const PluginJsconfuser = jsconfuserModule.default ?? jsconfuserModule;
 
 // ---------------------- CLI 参数 ----------------------
 let encodeFile = 'input.js';
@@ -62,10 +56,10 @@ const getCode = (ret) => {
   return '';
 };
 
-// 早停的哨兵关键字检查：对“当前代码”判断
+// 早停的哨兵关键字检查
 const shouldEarlyStop = (code) => code.includes('smEcV');
 
-// ---------------------- 0) 可选：编码库预处理 ----------------------
+// ---------------------- 0) 初次编码库预处理 ----------------------
 if (runExtraCodecs) {
   try {
     const before = processedCode;
@@ -81,8 +75,8 @@ if (runExtraCodecs) {
   }
 }
 
-// ---------------------- 1) 原有插件（链式，命中即早停） ----------------------
-const deobPlugins = [
+// ---------------------- 1) 原有插件链 ----------------------
+const plugins = [
   { name: 'obfuscator', plugin: PluginObfuscator },
   { name: 'sojsonv7',   plugin: PluginSojsonV7 },
   { name: 'sojson',     plugin: PluginSojson },
@@ -93,57 +87,39 @@ const deobPlugins = [
 ];
 
 if (!shouldEarlyStop(processedCode)) {
-  for (const { name, plugin } of deobPlugins) {
+  for (const { name, plugin } of plugins) {
     try {
       const before = processedCode;
-      const ret = await plugin(before);               // 统一 await，兼容异步插件
+      const ret = await plugin(before);
       const after = getCode(ret) || ret || before;
-
-      if (typeof after !== 'string') {
-        console.warn(`插件 ${name} 返回非字符串，已忽略`);
-        continue;
-      }
 
       if (after !== before) {
         processedCode = after;
         pluginUsed = name;
         console.log(`命中插件：${name}`);
-        break;                                        // 有变化就早停（保持你原本语义）
+        break; // 命中即早停
       }
     } catch (error) {
-      console.error(`插件 ${name} 处理时发生错误: ${error?.message || error}`);
+      console.error(`插件 ${name} 处理时发生错误: ${error.message}`);
     }
   }
 } else {
   console.log('命中早停哨兵（smEcV），跳过插件链。');
 }
 
-// ---------------------- 2) 后处理（始终执行，不早停） ----------------------
-const postPlugins = [
-  { name: 'cleanup-dynamic', plugin: PluginCleanupDynamic }, // 动态清理（无硬编码）
-  { name: 'format',          plugin: PluginFormat },         // 格式化：Prettier/Babel 兜底
-];
-
-for (const { name, plugin } of postPlugins) {
-  try {
-    const before = processedCode;
-    const ret = await plugin(before, { notes });
-    const after = getCode(ret) || ret || before;
-
-    if (typeof after !== 'string') {
-      console.warn(`后处理插件 ${name} 返回非字符串，已忽略`);
-      continue;
-    }
-    if (after !== before) {
-      processedCode = after;
-      console.log(`命中插件：${name}`);
-    }
-  } catch (e) {
-    console.error(`后处理插件 ${name} 失败：${e?.message || e}`);
+// ---------------------- 2) 二次 RC4 循环 ----------------------
+try {
+  const { runExtraCodecsLoop } = await import('./plugin/extra-codecs/index.js');
+  const afterDeob = runExtraCodecsLoop(processedCode, { notes }, { maxPasses: 3 });
+  if (typeof afterDeob === 'string' && afterDeob !== processedCode) {
+    processedCode = afterDeob;
+    console.log('二次预处理（编码库循环）已生效');
   }
+} catch (e) {
+  console.error('二次预处理失败：', e?.message || e);
 }
 
-// ---------------------- 3) 写出结果（同步写，避免 CI 早退） ----------------------
+// ---------------------- 3) 写出结果 ----------------------
 if (processedCode !== sourceCode) {
   const time = new Date();
   const header = [
@@ -153,7 +129,7 @@ if (processedCode !== sourceCode) {
   ].join('\n');
 
   const outputCode = `${header}\n${processedCode}`;
-  fs.writeFileSync(decodeFile, outputCode, 'utf-8');   // 改为同步写
+  fs.writeFileSync(decodeFile, outputCode, 'utf-8');
   console.log(`使用插件 ${pluginUsed || 'extra-codecs/unknown'} 成功处理并写入文件 ${decodeFile}`);
   if (notes.length) console.log('Notes:', notes.join(' | '));
 } else {
