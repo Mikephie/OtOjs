@@ -114,6 +114,21 @@
         </div>
       </section>
 
+      <!-- 诊断与自检 -->
+      <section class="card">
+        <h2>🔧 诊断与自检</h2>
+        <div class="sub">用来判断是脚本未运行、文件读取失败，还是网络取回失败。所有结果会写到下面的日志里。</div>
+        <div class="section">
+          <div class="row">
+            <button class="btn ok" id="btnTestJS">测试 JS 运行</button>
+            <button class="btn" id="btnTestFR">测试本地文件读取</button>
+            <button class="btn warn" id="btnTestFetch">测试远程加载(raw.githubusercontent)</button>
+            <button class="btn err" id="btnClearLog">清空日志</button>
+          </div>
+          <pre id="diagLog" class="code" style="margin-top:8px;max-height:280px"></pre>
+        </div>
+      </section>
+
       <section class="card">
         <h2>③ output.js 预览</h2>
         <div class="sub">从 Raw 拉取快速查看，并可下载</div>
@@ -135,7 +150,8 @@
     const $ = s => document.querySelector(s);
     const st = { get repo(){return localStorage.getItem('repo')||'Mikephie/OtOjs'}, set repo(v){localStorage.setItem('repo',v)}, get branch(){return localStorage.getItem('branch')||'main'}, set branch(v){localStorage.setItem('branch',v)} };
 
-    function toast(msg){ const el=document.createElement('div'); el.textContent=msg; el.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;z-index:9999'; document.body.appendChild(el); setTimeout(()=>el.remove(),1800); }
+    function toast(msg){ const el=document.createElement('div'); el.textContent=msg; el.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;z-index:9999'; document.body.appendChild(el); setTimeout(()=>el.remove(),1800); diag(`Toast: ${msg}`); }
+    function diag(msg){ const log=$('#diagLog'); if(!log) return; const t=new Date().toLocaleTimeString(); log.textContent += `[${t}] ${msg}\n`; log.scrollTop=log.scrollHeight; }
 
     function genRaw(){ const rel=$('#relPath').value.trim().replace(/^\/+/, '')||'input.js'; const raw=`https://raw.githubusercontent.com/${st.repo}/${st.branch}/${rel}`; const api=`https://api.github.com/repos/${st.repo}/contents/${rel}?ref=${encodeURIComponent(st.branch)}`; $('#rawOut').textContent=`# 公共直链 (Raw)\n${raw}\n\n# 私库 / 需 token 的 API 读取\n${api}`; $('#status').textContent=''; }
 
@@ -151,7 +167,7 @@
     function setCodeIn(text){ const ta=$('#codeIn'); const s=String(text??''); ta.value=s; ta.textContent=s; ta.innerHTML=''; ta.style.visibility='hidden'; ta.offsetHeight; ta.style.visibility='visible'; requestAnimationFrame(()=>{ ta.value=s; }); const stEl=$('#status'); if(stEl) stEl.textContent=`已载入内容 · 长度 ${s.length} 字符`; }
     function pickFile(){ $('#file').click(); }
     function readFile(f){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsText(f,'utf-8'); }); }
-    function attachDnd(){ const box=$('#drop'); box.addEventListener('dragover',e=>{e.preventDefault(); box.classList.add('drag')}); box.addEventListener('dragleave',()=>box.classList.remove('drag')); box.addEventListener('drop',async e=>{e.preventDefault(); box.classList.remove('drag'); const f=e.dataTransfer.files?.[0]; if(f){ const txt=await readFile(f); setCodeIn(txt); toast('已载入：'+f.name); }}); }
+    function attachDnd(){ const box=$('#drop'); if(!box){ diag('未找到拖拽容器 #drop'); return } box.addEventListener('dragover',e=>{e.preventDefault(); box.classList.add('drag')}); box.addEventListener('dragleave',()=>box.classList.remove('drag')); box.addEventListener('drop',async e=>{e.preventDefault(); box.classList.remove('drag'); const f=e.dataTransfer.files?.[0]; if(f){ const txt=await readFile(f); setCodeIn(txt); toast('已载入：'+f.name); diag('DND 读取成功，长度 '+(txt?txt.length:0)); }}); diag('拖拽绑定完成'); }); box.addEventListener('dragleave',()=>box.classList.remove('drag')); box.addEventListener('drop',async e=>{e.preventDefault(); box.classList.remove('drag'); const f=e.dataTransfer.files?.[0]; if(f){ const txt=await readFile(f); setCodeIn(txt); toast('已载入：'+f.name); }}); }
     async function loadRemote(){ let u=$('#remoteUrl').value.trim(); if(!u){ toast('请输入 URL'); return } if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){ u=u.replace(/https?:\/\/github\.com\//,'https://raw.githubusercontent.com/').replace(/\/blob\//,'/'); } const tryUrls=[u]; const m=u.match(/^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/); if(m){ const [,user,repo,branch,path]=m; tryUrls.push(`https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/${path}`); } let lastErr=''; for(const url of tryUrls){ try{ const res=await fetch(url,{cache:'no-cache'}); const txt=await res.text(); if(!res.ok){ lastErr=`${res.status} ${res.statusText}`; continue } setCodeIn(txt); toast('已加载远程脚本'); return }catch(e){ lastErr=e.message } } toast('加载失败：'+lastErr); }
     async function pasteClipboard(){ try{ const t=await navigator.clipboard.readText(); setCodeIn(t); toast('已粘贴'); }catch(e){ toast('读取剪贴板失败：'+e.message); } }
     function clearInput(){ setCodeIn(''); toast('已清空输入'); }
@@ -172,9 +188,17 @@
 
     function bind(){ $('#repo').value=st.repo; $('#branch').value=st.branch; genRaw(); attachDnd(); $('#btnSaveRepo').addEventListener('click',()=>{ st.repo=$('#repo').value.trim(); st.branch=$('#branch').value.trim(); genRaw(); toast('已保存'); }); $('#btnGenRaw').addEventListener('click',genRaw); $('#btnCopyRaw').addEventListener('click',()=>copy('#rawOut','#btnCopyRaw')); $('#btnCurlPut').addEventListener('click',()=>genCurl('PUT')); $('#btnCurlGet').addEventListener('click',()=>genCurl('GET')); $('#btnCurlCopy').addEventListener('click',()=>copy('#curlOut','#btnCurlCopy')); $('#btnApiPut').addEventListener('click',apiPut); $('#btnApiGet').addEventListener('click',apiGet); $('#btnPick').addEventListener('click',()=>$('#file').click()); $('#file').addEventListener('change',async e=>{ const f=e.target.files?.[0]; if(f){ const txt=await readFile(f); setCodeIn(txt); toast('已载入：'+f.name); }}); $('#btnRemote').addEventListener('click',loadRemote); $('#btnPaste').addEventListener('click',pasteClipboard); $('#btnClearInput').addEventListener('click',clearInput); $('#btnSubmitInput').addEventListener('click',submitToInputJs); $('#btnWaitPoll').addEventListener('click',()=>waitAndPollOutput(60)); $('#btnBeautify').addEventListener('click',beautify); $('#btnCopyOut').addEventListener('click',()=>copy('#codeOut','#btnCopyOut')); $('#btnClearAll').addEventListener('click',()=>{ setCodeIn(''); $('#codeOut').textContent=''; $('#status').textContent=''; toast('已清除'); }); $('#btnLoadOutput').addEventListener('click',loadOutput); $('#btnCopyOutput').addEventListener('click',()=>copy('#outputView','#btnCopyOutput')); $('#btnDownloadOutput').addEventListener('click',downloadOutput); }
 
-    window.addEventListener('error', e=> toast('脚本错误: '+(e?.message||'')) );
-    window.addEventListener('unhandledrejection', e=> toast('未处理异常: '+(e?.reason?.message||e?.reason||'')) );
+    window.addEventListener('error', e=> { toast('脚本错误: '+(e?.message||'')); diag('window.onerror: '+(e?.message||'')); });
+    window.addEventListener('unhandledrejection', e=> { const m=(e?.reason?.message||e?.reason||''); toast('未处理异常: '+m); diag('unhandledrejection: '+m); });
     document.addEventListener('DOMContentLoaded', bind);
+
+    // 诊断按钮绑定
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const js=$('#btnTestJS'); if(js){ js.addEventListener('click',()=>{ diag('JS 正在运行，按钮可响应'); setCodeIn('/* JS runtime OK */'); }); }
+      const fr=$('#btnTestFR'); if(fr){ fr.addEventListener('click',()=>{ const inp=$('#file'); if(!inp || !inp.files || !inp.files[0]){ diag('请先在上方选择一个本地文件'); toast('请选择文件'); return } const f=inp.files[0]; readFile(f).then(t=>{ setCodeIn(t); diag('FileReader 成功：'+f.name+' · 长度 '+(t?t.length:0)); }).catch(e=>{ diag('FileReader 失败：'+e.message); toast('文件读取失败'); }); }); }
+      const ft=$('#btnTestFetch'); if(ft){ ft.addEventListener('click',async ()=>{ const url='https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore'; diag('尝试 fetch: '+url); try{ const r=await fetch(url,{cache:'no-cache'}); const txt=await r.text(); diag('fetch 状态: '+r.status+' · 长度 '+(txt?txt.length:0)); setCodeIn(txt); toast('远程拉取成功'); }catch(e){ diag('fetch 失败：'+e.message); toast('远程加载失败'); } }); }
+      const cl=$('#btnClearLog'); if(cl){ cl.addEventListener('click',()=>{ const log=$('#diagLog'); if(log) log.textContent=''; }); }
+    });
   </script>
 </body>
 </html>
