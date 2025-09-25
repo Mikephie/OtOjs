@@ -63,31 +63,45 @@ const plugins = [
   { name: 'jsconfuser', plugin: PluginJsconfuser },
   { name: 'awsc',       plugin: PluginAwsc },
   { name: 'jjencode',   plugin: PluginJjencode },
-  { name: 'common',     plugin: PluginCommon }, // 兜底
+  { name: 'common',     plugin: PluginCommon }, // 最后兜底
 ];
 
 if (!shouldEarlyStop(processedCode)) {
   for (const { name, plugin } of plugins) {
     try {
       const before = processedCode;
-      const ret = await plugin(before);         // 统一 await，兼容异步
-      const after = getCode(ret, before);
+      const ret = await plugin(before);
+      const after = getCode(ret) || ret || before;
 
       if (after !== before) {
         processedCode = after;
         pluginUsed = name;
         console.log(`命中插件：${name}`);
-        break;                                  // 有变化就早停
+        break;
       }
-    } catch (err) {
-      console.error(`插件 ${name} 处理时发生错误: ${err.message}`);
+    } catch (error) {
+      console.error(`插件 ${name} 处理时发生错误: ${error.message}`);
     }
   }
 } else {
   console.log('命中早停哨兵（smEcV），跳过插件链。');
 }
 
-// ---------------------- 2) 二次预处理（主插件之后跑 extra-codecs） ----------------------
+// ---------------------- 1.5) 主链之后，强制跑 RC4 多轮收敛 ----------------------
+try {
+  const { runExtraCodecsLoop } = await import('./plugin/extra-codecs/index.js');
+  const before = processedCode;
+  const after = runExtraCodecsLoop(before, { notes }, { maxPasses: 3 });
+  if (typeof after === 'string' && after !== before) {
+    processedCode = after;
+    if (!pluginUsed) pluginUsed = 'extra-codecs';
+    notes.push('extra-codecs: rc4 loop applied');
+  }
+} catch (e) {
+  notes.push(`extra-codecs loop error: ${e.message}`);
+}
+
+// ---------------------- 2) 写出结果 二次预处理（主插件之后跑 extra-codecs） ----------------------
 if (runExtraCodecs) {
   try {
     const before = processedCode;
