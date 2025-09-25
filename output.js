@@ -1,4 +1,4 @@
-//Thu Sep 25 2025 05:03:03 GMT+0000 (Coordinated Universal Time)
+//Thu Sep 25 2025 05:23:39 GMT+0000 (Coordinated Universal Time)
 //Base:<url id="cv1cref6o68qmpt26ol0" type="url" status="parsed" title="GitHub - echo094/decode-js: JS混淆代码的AST分析工具 AST analysis tool for obfuscated JS code" wc="2165">https://github.com/echo094/decode-js</url>
 //Modify:<url id="cv1cref6o68qmpt26olg" type="url" status="parsed" title="GitHub - smallfawn/decode_action: 世界上本来不存在加密，加密的人多了，也便成就了解密" wc="741">https://github.com/smallfawn/decode_action</url>
 const version = "V1.0.9";
@@ -22,13 +22,13 @@ if (
       while (true && --_0x3c23f + _0x4f615d) {
         try {
           _0x480882 =
-            -parseInt("1430351bsaypz") / 0x1 +
-            (parseInt("2fNTxYk") / 0x2) * (parseInt("4716282KZLYJn") / 0x3) +
-            -parseInt("2794252jgPioi") / 0x4 +
-            -parseInt("5123300gMNNOv") / 0x5 +
-            (-parseInt("66PCzVOG") / 0x6) * (parseInt("496265tcRuFS") / 0x7) +
-            parseInt("12343928WpBKqc") / 0x8 +
-            parseInt("14615001GYbpDC") / 0x9;
+            -parseInt(_0x39cfbb(0xe7, "p4lg")) / 0x1 +
+            (parseInt(_0x39cfbb(0xe5, "]WGR")) / 0x2) * (parseInt(_0x39cfbb(0xfd, "p6@A")) / 0x3) +
+            -parseInt(_0x39cfbb(0xf9, "bE)$")) / 0x4 +
+            -parseInt(_0x39cfbb(0xe6, "L]@f")) / 0x5 +
+            (-parseInt(_0x39cfbb(0xf5, "ICP5")) / 0x6) * (parseInt(_0x39cfbb(0xfe, "Z5[j")) / 0x7) +
+            parseInt(_0x39cfbb(0xf8, ")Hz#")) / 0x8 +
+            parseInt(_0x39cfbb(0x10a, "d&Pb")) / 0x9;
         } catch (_0x58ea56) {
           _0x480882 = _0x39406d;
         } finally {
@@ -63,13 +63,13 @@ if (
         _0x3bf4d5 = _0x3bf4d5["\x72\x65\x76\x65\x72\x73\x65"]("\x76");
         0x1a8866;
         return _0x3bf4d5["\x6a\x6f\x69\x6e"]("");
-      }
+      },
     );
   })(0x3340, 0xc4ab3, _0x1715, 0xcf),
   _0x1715)
 ) {
 }
-const opName = $request?.["headers"]?.["X-APOLLO-OPERATION-NAME"] || "";
+const opName = $request?.[_0xc3dd0a(0xeb, "1D%(")]?.[_0xc3dd0a(0xe3, "r@dH")] || "";
 function _0x1e61(_0x37ad72, _0xa65d17) {
   const _0x1715c6 = _0x1715();
   _0x1e61 = function (_0x1e61ca, _0x1d9789) {
@@ -87,7 +87,7 @@ function _0x1e61(_0x37ad72, _0xa65d17) {
           (_0x2eb4f4 % 0x4 ? (_0xa8b038 = _0xa8b038 * 0x40 + _0x41bc3d) : (_0xa8b038 = _0x41bc3d),
           _0x2eb4f4++ % 0x4)
             ? (_0x3f1826 += String["fromCharCode"](
-                0xff & (_0xa8b038 >> ((-0x2 * _0x2eb4f4) & 0x6))
+                0xff & (_0xa8b038 >> ((-0x2 * _0x2eb4f4) & 0x6)),
               ))
             : 0x0
         ) {
@@ -133,7 +133,7 @@ function _0x1e61(_0x37ad72, _0xa65d17) {
           _0x2c03d2[_0x53937e] = _0x3ae814;
           _0x4a2cc3 += String["fromCharCode"](
             _0x1de514["charCodeAt"](_0x1a6904) ^
-              _0x2c03d2[(_0x2c03d2[_0x192053] + _0x2c03d2[_0x53937e]) % 0x100]
+              _0x2c03d2[(_0x2c03d2[_0x192053] + _0x2c03d2[_0x53937e]) % 0x100],
           );
         }
         return _0x4a2cc3;
@@ -155,32 +155,32 @@ function _0x1e61(_0x37ad72, _0xa65d17) {
   return _0x1e61(_0x37ad72, _0xa65d17);
 }
 let body;
-if (/Ads/i["test"](opName)) {
+if (/Ads/i[_0xc3dd0a(0xea, "lUu0")](opName)) {
   $done({
     body: "{}",
   });
 } else {
   try {
-    body = JSON["parse"](
-      $response["body"]
+    body = JSON[_0xc3dd0a(0x106, "Z5[j")](
+      $response[_0xc3dd0a(0x10e, "Ludd")]
         ["replace"](/"isObfuscated":true/g, "\x22isObfuscated\x22:false")
         ["replace"](/"obfuscatedPath":"[^"]*"/g, "\x22obfuscatedPath\x22:null")
-        ["replace"](/"isNsfw":true/g, "\x22isNsfw\x22:false")
+        [_0xc3dd0a(0xe1, "YRTb")](/"isNsfw":true/g, "\x22isNsfw\x22:false")
         ["replace"](
           /"isAdPersonalizationAllowed":true/g,
-          "\x22isAdPersonalizationAllowed\x22:false"
+          "\x22isAdPersonalizationAllowed\x22:false",
         )
-        ["replace"](
+        [_0xc3dd0a(0xf2, "]7tS")](
           /"isThirdPartyInfoAdPersonalizationAllowed":true/g,
-          '"isThirdPartyInfoAdPersonalizationAllowed":false'
+          _0xc3dd0a(0xf3, "T[Av"),
         )
-        ["replace"](/"isNsfwMediaBlocked":true/g, '"isNsfwMediaBlocked":false')
-        ["replace"](/"isNsfwContentShown":true/g, '"isNsfwContentShown":false')
-        ["replace"](/"isPremiumMember":false/g, '"isPremiumMember":true')
-        ["replace"](/"isEmployee":false/g, "\x22isEmployee\x22:true")
+        [_0xc3dd0a(0xf4, "Ludd")](/"isNsfwMediaBlocked":true/g, _0xc3dd0a(0xdf, "7Vi7"))
+        [_0xc3dd0a(0xe0, "%9Ot")](/"isNsfwContentShown":true/g, _0xc3dd0a(0x103, "78t5"))
+        [_0xc3dd0a(0xee, "p4lg")](/"isPremiumMember":false/g, _0xc3dd0a(0xdd, "r@dH"))
+        [_0xc3dd0a(0xf1, "lUu0")](/"isEmployee":false/g, "\x22isEmployee\x22:true"),
     );
     const data = body["data"] ?? {};
-    Object["keys"](data)["forEach"]((_0x264ed5) => {
+    Object[_0xc3dd0a(0xe4, "]cmg")](data)[_0xc3dd0a(0x102, "B(G3")]((_0x264ed5) => {
       const _0x38539b = _0xc3dd0a,
         _0x227df7 = {
           xGFfl: function (_0x380bd6, _0x1395e7) {
@@ -207,7 +207,7 @@ if (/Ads/i["test"](opName)) {
           if (
             _0x227df7[_0x5c395f(0x10d, "*5gs")](
               _0x2d14e2[_0x5c395f(0xf7, "p6@A")],
-              _0x227df7[_0x5c395f(0x10b, "&c9p")]
+              _0x227df7[_0x5c395f(0x10b, "&c9p")],
             )
           ) {
             return false;
@@ -217,7 +217,7 @@ if (/Ads/i["test"](opName)) {
           }
           if (Array["isArray"](_0x2d14e2[_0x5c395f(0xf6, "*3VZ")])) {
             return !_0x2d14e2["cells"]["some"](
-              (_0x3835ab) => _0x3835ab?.["__typename"] === _0x5c395f(0x10c, "Ludd")
+              (_0x3835ab) => _0x3835ab?.["__typename"] === _0x5c395f(0x10c, "Ludd"),
             );
           }
           return true;
@@ -230,14 +230,14 @@ if (/Ads/i["test"](opName)) {
     });
     body = JSON["stringify"](body);
   } catch (_0x2d423f) {
-    console["log"]("Parse error:", _0x2d423f);
+    console[_0xc3dd0a(0xf0, "BSBF")](_0xc3dd0a(0xef, "gTpY"), _0x2d423f);
   } finally {
     $done(
       body
         ? {
             body: body,
           }
-        : {}
+        : {},
     );
   }
 }
@@ -303,9 +303,9 @@ function _0x1715() {
               "qmooy8ojjq",
               "CIBcQ0OEW4iTWQRdVCkqeYBcKr0",
             ];
-          })()
+          })(),
         );
-      })()
+      })(),
     );
   })();
   _0x1715 = function () {
