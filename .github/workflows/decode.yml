@@ -1,4 +1,4 @@
-name: Decode JS
+name: Decode JS (1st + 2nd)
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # 需要写权限才能提交 lockfile
+  contents: write
 
 jobs:
   decode:
@@ -22,56 +22,67 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true  # 用 GITHUB_TOKEN 推送
+          persist-credentials: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      # 1) 如果缺少 lockfile，则只生成 lockfile（不完整安装），并提交推回
+      # 如果没有 lockfile，自动生成并推回（只做一次）
       - name: Create package-lock.json if missing
-        id: mklock
         run: |
           set -e
           if [ ! -f package-lock.json ]; then
-            echo "no_lock=true" >> $GITHUB_OUTPUT
+            echo "===> GEN LOCKFILE"
             npm install --package-lock-only --no-audit --fund=false
             git config user.name  "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add package-lock.json
-            git commit -m "chore: add package-lock.json [skip ci]"
-            # 仅在非 PR 场景推送
-            if [ "${{ github.event_name }}" != "pull_request" ]; then
-              git push
-              echo "lock_pushed=true" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "no_lock=false" >> $GITHUB_OUTPUT
+            git commit -m "chore: add package-lock.json [skip ci]" || true
+            git push || true
           fi
 
-      # 2) 安装依赖：有 lockfile 用 npm ci，否则退回 npm install
-      - name: Install dependencies
+      - name: Install deps
         run: |
-          set -e
           if [ -f package-lock.json ]; then
             npm ci
           else
             npm install --no-audit --fund=false
           fi
 
-      # 3) 运行解密
       - name: Ensure output dir
         run: mkdir -p output
 
-      - name: Decode (non-blocking)
-        id: decode
+      # —— 第一次解密（主插件链）——
+      - name: ▶ FIRST PASS (npm run decode)
+        id: first
         run: |
-          set -o pipefail
-          npm run decode || echo "::warning::decode returned non-zero exit code"
+          echo "===== FIRST PASS START ====="
+          npm run decode
+          echo "===== FIRST PASS END ====="
         continue-on-error: true
 
-      # 4) 仅提交 output 目录的变化
+      - name: Check first pass result
+        id: has_first
+        run: |
+          if [ -s output/output.js ]; then
+            echo "has_first=true" >> $GITHUB_OUTPUT
+            echo "Found output/output.js (size: $(wc -c < output/output.js) bytes)"
+          else
+            echo "has_first=false" >> $GITHUB_OUTPUT
+            echo "::warning::output/output.js not found or empty, skip second pass."
+          fi
+
+      # —— 第二次解密（只在第一次产物存在时执行）——
+      - name: ▶ SECOND PASS (node second-pass.js)
+        if: steps.has_first.outputs.has_first == 'true'
+        run: |
+          echo "===== SECOND PASS START ====="
+          node src/plugin/extra-codecs/second-pass.js output/output.js output/output.deob2.js
+          echo "===== SECOND PASS END ====="
+
+      # 只提交 output/ 变化
       - name: Show git status (output/)
         run: git status --porcelain output/ || true
 
@@ -84,7 +95,7 @@ jobs:
             git add output/
             git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
             git push
-            echo "Committed."
+            echo "Committed new outputs."
           else
             echo "nothing to commit"
           fi
