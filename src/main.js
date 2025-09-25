@@ -9,7 +9,7 @@ try {
   const extra = await import("./plugin/extra-codecs/index.js");
   runExtraCodecs = extra.runExtraCodecs || extra.default || null;
 } catch (_) {
-  // 没有 extra-codecs 目录也能正常跑
+  // 没有 extra-codecs 也能正常跑
 }
 
 // ---------------------- 动态加载原有插件 ----------------------
@@ -47,22 +47,34 @@ console.log(`输入: ${encodeFile}`);
 console.log(`输出: ${decodeFile}`);
 
 // ---------------------- 读取源代码 ----------------------
-const sourceCode = fs.readFileSync(encodeFile, "utf-8");
-let processedCode = sourceCode;
+// Read as Buffer so extra-codecs can detect encoding if present
+const inputBuffer = fs.readFileSync(encodeFile); // Buffer
+let processedCode = inputBuffer; // may be Buffer initially
 let pluginUsed = "";
 const notes = [];
 
 // ---------------------- 预处理（编码库） ----------------------
 if (runExtraCodecs) {
   try {
+    // runExtraCodecs must accept Buffer or string and return string
     const ret = await runExtraCodecs(processedCode, { notes });
-    if (typeof ret === "string" && ret !== processedCode) {
+    if (typeof ret === "string") {
       processedCode = ret;
       notes.push("预处理（编码库）已替换部分字符串/解码调用");
+    } else {
+      console.warn("[extra-codecs] 返回非字符串，已忽略");
+      // if not string, keep processedCode as-is (Buffer or previous string)
+      if (Buffer.isBuffer(processedCode)) {
+        processedCode = processedCode.toString("utf8");
+      }
     }
   } catch (e) {
     console.error(`[extra-codecs] 运行失败: ${e.message}`);
+    if (Buffer.isBuffer(processedCode)) processedCode = processedCode.toString("utf8");
   }
+} else {
+  // if no encoder, ensure we have string to pass to plugins
+  if (Buffer.isBuffer(processedCode)) processedCode = processedCode.toString("utf8");
 }
 
 // ---------------------- 插件链（稳定组合） ----------------------
@@ -83,7 +95,7 @@ for (const { name, plugin } of plugins) {
     const out = await plugin(processedCode, { notes });
 
     if (typeof out !== "string") {
-      // 某些插件会返回 AST/对象/undefined，这里直接跳过，避免 Babel 接收到非字符串
+      // 某些插件可能返回 AST/对象/undefined -> 跳过并继续
       console.warn(`插件 ${name} 返回非字符串，跳过（type=${typeof out}）`);
       continue;
     }
@@ -94,21 +106,21 @@ for (const { name, plugin } of plugins) {
       console.log(`命中插件：${name}`);
     }
   } catch (e) {
-    console.error(`插件 ${name} 处理时发生错误: ${e.message}`);
+    console.error(`插件 ${name} 处理时发生错误: ${e && e.message ? e.message : e}`);
   }
 }
 
 // ---------------------- 写入文件 ----------------------
-if (processedCode !== sourceCode) {
+if (processedCode !== inputBuffer.toString("utf8")) {
   const time = new Date();
   const header = [
     `//${time}`,
-    "//Base:<url id=\"cv1cref6o68qmpt26ol0\" type=\"url\" status=\"parsed\" title=\"GitHub - echo094/decode-js: JS混淆代码的AST分析工具 AST analysis tool for obfuscated JS code\" wc=\"2165\">https://github.com/echo094/decode-js</url>",
-    "//Modify:<url id=\"cv1cref6o68qmpt26olg\" type=\"url\" status=\"parsed\" title=\"GitHub - smallfawn/decode_action: 世界上本来不存在加密，加密的人多了，也便成就了解密\" wc=\"741\">https://github.com/smallfawn/decode_action</url>",
+    "//Base:<url id=\"cv1cref6o68qmpt26ol0\" type=\"url\" status=\"parsed\" title=\"GitHub - echo094/decode-js: JS混淆代码的AST分析工具\" wc=\"2165\">https://github.com/echo094/decode-js</url>",
+    "//Modify:<url id=\"cv1cref6o68qmpt26olg\" type=\"url\" status=\"parsed\" title=\"GitHub - smallfawn/decode_action\" wc=\"741\">https://github.com/smallfawn/decode_action</url>",
   ].join("\n");
 
   fs.writeFileSync(decodeFile, header + "\n" + processedCode, "utf-8");
-  console.log(`使用插件 ${pluginUsed || "extra-codecs/format"} 成功处理并写入文件 ${decodeFile}`);
+  console.log(`使用插件 ${pluginUsed || "format"} 成功处理并写入文件 ${decodeFile}`);
   if (notes.length) console.log("Notes:", notes.join(" | "));
 } else {
   console.log("所有插件处理后的代码与原代码一致，未写入文件。");
