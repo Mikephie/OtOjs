@@ -1,258 +1,279 @@
-// src/plugin/extra-codecs/second-pass.js
-// Second pass: evaluate obfuscated decoder calls with constant args and replace them.
-// Usage: node src/plugin/extra-codecs/second-pass.js inputFile outputFile
+// ESM
+import fs from 'node:fs';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import * as parser from "@babel/parser";
+import { parse } from '@babel/parser';
+import traverse from '@babel/traverse';
+import generate from '@babel/generator';
+import * as t from '@babel/types';
 
-// ESM-friendly imports (important!)
-import traverseModule from "@babel/traverse";
-const traverse = traverseModule.default;
+// ---------- helpers ----------
+const log = (...a) => console.log('[second-pass]', ...a);
+const read = p => fs.readFileSync(p, 'utf8');
+const write = (p, s) => fs.writeFileSync(p, s);
 
-import generatorModule from "@babel/generator";
-const generate = generatorModule.default;
-
-import * as t from "@babel/types";
-import { VM } from "vm2";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// -------- CLI args --------
-const inFile = process.argv[2] || path.resolve(process.cwd(), "output/output.js");
-const outFile =
-  process.argv[3] || path.resolve(process.cwd(), "output/output.deob2.js");
-
-function log(...args) {
-  console.log(...args);
-}
-
-// -------- Parser options --------
 const parserOpts = {
-  sourceType: "unambiguous",
+  sourceType: 'unambiguous',
   allowReturnOutsideFunction: true,
   plugins: [
-    "jsx",
-    "classProperties",
-    "classPrivateProperties",
-    "classPrivateMethods",
-    "objectRestSpread",
-    "optionalChaining",
-    "nullishCoalescingOperator",
-    "numericSeparator",
-    "bigInt",
-    "topLevelAwait",
-  ],
+    'jsx',
+    'optionalChaining',
+    'classProperties',
+    'classPrivateProperties',
+    'classPrivateMethods',
+    'topLevelAwait'
+  ]
 };
 
-// -------- Read & parse --------
-const code = fs.readFileSync(inFile, "utf8");
-const ast = parser.parse(code, parserOpts);
-
-// -------- Heuristics to find decoder funcs & aliases --------
-const decoderNameRe = /^_0x[0-9a-f]+$/i;
-
-// function declarations / variable-declared function expressions with names like _0x****
-// also collect alias like: const _0xc3dd0a = _0x1e61;
-const functionDecls = new Map(); // name -> node
-const aliasPairs = []; // [alias, target]
-
-traverse(ast, {
-  FunctionDeclaration(p) {
-    const id = p.node.id?.name;
-    if (id && decoderNameRe.test(id)) {
-      functionDecls.set(id, p.node);
-    }
-  },
-  VariableDeclarator(p) {
-    const id = p.node.id;
-    const init = p.node.init;
-    if (!id || id.type !== "Identifier" || !init) return;
-
-    // alias: const alias = _0xabc123;
-    if (init.type === "Identifier") {
-      const alias = id.name;
-      const target = init.name;
-      if (decoderNameRe.test(alias) && decoderNameRe.test(target)) {
-        aliasPairs.push([alias, target]);
-      }
-    }
-
-    // named function expression: const _0xabc123 = function (...) {...}
-    if (
-      (init.type === "FunctionExpression" || init.type === "ArrowFunctionExpression") &&
-      decoderNameRe.test(id.name)
-    ) {
-      // synthesize a FunctionDeclaration for uniform handling
-      const fakeDecl = t.functionDeclaration(
-        t.identifier(id.name),
-        init.params,
-        init.type === "ArrowFunctionExpression"
-          ? t.blockStatement([t.returnStatement(init.body)])
-          : init.body,
-      );
-      functionDecls.set(id.name, fakeDecl);
-    }
-  },
-});
-
-// Special helper providers that many obfuscators use (e.g. _0x1715 -> returns array)
-const helperNames = new Set(["_0x1715"]); // 可按需要扩展
-traverse(ast, {
-  FunctionDeclaration(p) {
-    const id = p.node.id?.name;
-    if (id && helperNames.has(id)) {
-      functionDecls.set(id, p.node);
-    }
-  },
-});
-
-// -------- Build a safe VM with just those functions/aliases --------
-let bootSrc = "";
-for (const [, fn] of functionDecls) {
-  bootSrc += generate(fn, { comments: false }).code + "\n";
-}
-for (const [alias, target] of aliasPairs) {
-  bootSrc += `var ${alias} = ${target};\n`;
-}
-
-// 有些样本还会出现 `var version_ = 'jsjiami.com.v7'` 等变量，
-// 不影响求值，这里无需特别处理。
-
-const vm = new VM({
-  timeout: 2000,
-  sandbox: {},
-});
-
-// try create callable table
-let decoderCallable = new Map();
-try {
-  vm.run(bootSrc);
-  for (const name of functionDecls.keys()) {
-    // 仅把真正看起来像“索引+key”的解码器收进来
-    // 供调用点静态求值时匹配
-    if (decoderNameRe.test(name)) {
-      const fn = vm.run(`typeof ${name} === 'function' ? ${name} : null`);
-      if (typeof fn === "function") decoderCallable.set(name, fn);
-    }
-  }
-  // 把 alias 也映射成可调用
-  for (const [alias, target] of aliasPairs) {
-    if (decoderCallable.has(target)) {
-      const fn = vm.run(`typeof ${target} === 'function' ? ${target} : null`);
-      if (typeof fn === "function") decoderCallable.set(alias, fn);
-    }
-  }
-} catch (e) {
-  log("[second-pass] sandbox init error：", e?.message || e);
-}
-
-// -------- Utility: test if node is a constant (literal-ish) --------
+// const-folding: 判断并计算“静态常量”表达式
 function isConstNode(n) {
   if (!n) return false;
-  if (t.isStringLiteral(n) || t.isNumericLiteral(n) || t.isBooleanLiteral(n) || t.isNullLiteral(n) || t.isBigIntLiteral(n)) return true;
-  if (t.isUnaryExpression(n) && ["+", "-", "~", "!"].includes(n.operator)) {
-    return isConstNode(n.argument);
-  }
-  // template literals without expressions
-  if (t.isTemplateLiteral(n) && n.expressions.length === 0) return true;
-  return false;
+  return (
+    t.isStringLiteral(n) ||
+    t.isNumericLiteral(n) ||
+    t.isBooleanLiteral(n) ||
+    t.isNullLiteral(n) ||
+    t.isBigIntLiteral(n) ||
+    t.isRegExpLiteral(n) ||
+    t.isTemplateLiteral(n) && n.expressions.every(isConstNode) ||
+    t.isUnaryExpression(n) && isConstNode(n.argument) &&
+      ['+', '-', '!', '~', 'void', 'typeof'].includes(n.operator) ||
+    t.isBinaryExpression(n) && isConstNode(n.left) && isConstNode(n.right) ||
+    t.isLogicalExpression(n) && isConstNode(n.left) && isConstNode(n.right) ||
+    t.isConditionalExpression(n) &&
+      isConstNode(n.test) && isConstNode(n.consequent) && isConstNode(n.alternate) ||
+    t.isArrayExpression(n) && n.elements.every(e => e == null || isConstNode(e)) ||
+    t.isObjectExpression(n) && n.properties.every(p =>
+      t.isObjectProperty(p) && isConstNode(p.value)
+    ) ||
+    // arr[const]
+    t.isMemberExpression(n) && !n.computed && t.isIdentifier(n.property) && false // 保守
+  );
 }
 
-function nodeToValue(n) {
-  if (t.isStringLiteral(n)) return n.value;
-  if (t.isNumericLiteral(n)) return n.value;
-  if (t.isBooleanLiteral(n)) return n.value;
-  if (t.isNullLiteral(n)) return null;
-  if (t.isBigIntLiteral(n)) return BigInt(n.value);
-  if (t.isUnaryExpression(n)) {
-    const v = nodeToValue(n.argument);
-    // 只处理常见一元
-    try {
-      switch (n.operator) {
-        case "+": return +v;
-        case "-": return -v;
-        case "~": return ~v;
-        case "!": return !v;
+function evalConst(node) {
+  if (!isConstNode(node)) return { ok: false };
+  try {
+    const code = generate(node).code;
+    // 用 Function 计算，避免拿到外层作用域
+    const out = Function(`return (${code});`)();
+    return { ok: true, value: out };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// 提取解码函数源码 + 依赖（目前重点拉上 _0x1715）
+function collectDecoderPrelude(ast, decoderNames) {
+  const decls = new Map();
+
+  function record(idName, node) {
+    if (!decls.has(idName)) decls.set(idName, node);
+  }
+
+  traverse(ast, {
+    FunctionDeclaration(path) {
+      const name = path.node.id?.name;
+      if (!name) return;
+      if (decoderNames.has(name) || name === '_0x1715') {
+        record(name, path.node);
       }
-    } catch {
-      return undefined;
+    },
+    VariableDeclaration(path) {
+      // 形如: const _0x1e61 = function(...) {...}
+      for (const d of path.node.declarations) {
+        const idName = t.isIdentifier(d.id) ? d.id.name : null;
+        if (!idName) continue;
+        const init = d.init;
+        if (
+          (t.isFunctionExpression(init) || t.isArrowFunctionExpression(init)) &&
+          (decoderNames.has(idName) || idName === '_0x1715')
+        ) {
+          record(idName, path.node);
+        }
+      }
+    }
+  });
+
+  // 小优化：如果没找到 _0x1715，但文件里存在也捞一下
+  if (!decls.has('_0x1715')) {
+    traverse(ast, {
+      FunctionDeclaration(p) {
+        if (p.node.id?.name === '_0x1715') record('_0x1715', p.node);
+      }
+    });
+  }
+
+  // 生成 prelude 源码
+  let prelude = '';
+  for (const [, node] of decls) {
+    prelude += generate(node, { comments: false }).code + '\n';
+  }
+  return prelude;
+}
+
+// 在沙箱中执行指定函数
+function makeSandbox(prelude) {
+  // atob/btoa polyfill（Node 环境）
+  const _atob = s => Buffer.from(s, 'base64').toString('binary');
+  const _btoa = s => Buffer.from(s, 'binary').toString('base64');
+
+  const sandbox = {
+    atob: _atob,
+    btoa: _btoa,
+    decodeURIComponent,
+    encodeURIComponent,
+    String,
+    Number,
+    Boolean,
+    Buffer,
+    $request: {},
+    $response: {}
+  };
+  vm.createContext(sandbox);
+  if (prelude.trim()) vm.runInContext(prelude, sandbox, { timeout: 50 });
+  return sandbox;
+}
+
+function runDecoder(sandbox, fnName, args) {
+  try {
+    const expr = `${fnName}.apply(null, ${JSON.stringify(args)});`;
+    const res = vm.runInContext(expr, sandbox, { timeout: 50 });
+    return { ok: true, value: res };
+  } catch (e) {
+    return { ok: false, err: String(e && e.message || e) };
+  }
+}
+
+// ---------- main ----------
+const inFile = process.argv[2] || 'output/output.js';
+const outFile = process.argv[3] || 'output/output.deob2.js';
+
+console.log('===== SECOND PASS START =====');
+
+const code = read(inFile);
+const ast = parse(code, parserOpts);
+
+// 1) 找到疑似解码器：名字形如 _0xXXXX 且**经常被两参调用**
+const decoderNames = new Map(); // name -> count
+traverse(ast, {
+  CallExpression(path) {
+    const cal = path.node.callee;
+    let name = null;
+
+    // 直接调用
+    if (t.isIdentifier(cal)) name = cal.name;
+
+    // .call/.apply
+    if (t.isMemberExpression(cal) && t.isIdentifier(cal.object)) {
+      name = cal.object.name;
+    }
+
+    if (name && /^_0x[0-9a-z]+$/i.test(name)) {
+      const argc = path.node.arguments.length;
+      if (argc >= 1 && argc <= 3) {
+        decoderNames.set(name, (decoderNames.get(name) || 0) + 1);
+      }
     }
   }
-  if (t.isTemplateLiteral(n) && n.expressions.length === 0) {
-    return n.quasis[0].value.cooked ?? n.quasis[0].value.raw;
-  }
-  return undefined;
+});
+
+const candidateSet = new Set(
+  [...decoderNames.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6) // 取前几个高频的
+    .map(([n]) => n)
+);
+
+if (candidateSet.size === 0) {
+  log('未发现解码器候选，跳过');
+  console.log('===== SECOND PASS END =====');
+  process.exit(0);
 }
 
-// -------- Traverse calls & replace --------
-let candidateCalls = 0;
-let replaced = 0;
+log('候选：', [...candidateSet].join(', '));
+
+// 2) 组装前置依赖（解码函数 + _0x1715）
+const prelude = collectDecoderPrelude(ast, candidateSet);
+const sandbox = makeSandbox(prelude);
+
+// 3) 遍历并回填
+let found = 0;
+let filled = 0;
+
+function tryFoldCall(path, calleeName, argsNodes, isApplyArray = false) {
+  found++;
+
+  // 解析实参
+  let args = [];
+  if (isApplyArray) {
+    // fn.apply(null, [consts...])
+    const arrNode = argsNodes[1];
+    const ev = evalConst(arrNode);
+    if (!ev.ok || !Array.isArray(ev.value)) return;
+    args = ev.value;
+  } else {
+    for (const a of argsNodes) {
+      const ev = evalConst(a);
+      if (!ev.ok) return; // 有一个不是常量就放弃
+      args.push(ev.value);
+    }
+  }
+
+  const run = runDecoder(sandbox, calleeName, args);
+  if (!run.ok) return; // 执行失败跳过
+
+  const v = run.value;
+  let rep;
+  if (typeof v === 'string') rep = t.stringLiteral(v);
+  else if (typeof v === 'number') rep = t.numericLiteral(v);
+  else if (typeof v === 'boolean') rep = t.booleanLiteral(v);
+  else return;
+
+  path.replaceWith(rep);
+  filled++;
+}
 
 traverse(ast, {
   CallExpression(path) {
-    const callee = path.node.callee;
-
-    // 仅处理简单标识符调用：_0x1e61(...), _0xc3dd0a(...)
-    if (!t.isIdentifier(callee)) return;
-    const name = callee.name;
-    if (!decoderCallable.has(name)) return;
-
-    // 参数必须全是常量；（更激进的情况可自行扩展）
-    const args = path.node.arguments;
-    if (!args.length || !args.every(isConstNode)) return;
-
-    candidateCalls++;
-
-    // 取值
-    const argv = args.map(nodeToValue);
-    try {
-      // 用 VM 执行解码函数
-      // 注意：这里通过 vm.run 间接调用，而不是把函数带回宿主。
-      // 传参通过全局临时变量的方式安全传递。
-      vm.run(`globalThis.__args = ${JSON.stringify(argv)};`);
-      const result = vm.run(`${name}.apply(null, globalThis.__args)`);
-
-      // 替换结果：仅接收 string/number/bool/bigint/null
-      if (
-        typeof result === "string" ||
-        typeof result === "number" ||
-        typeof result === "boolean" ||
-        typeof result === "bigint" ||
-        result === null
-      ) {
-        let replacement;
-        if (typeof result === "string") replacement = t.stringLiteral(result);
-        else if (typeof result === "number")
-          replacement = t.numericLiteral(result);
-        else if (typeof result === "boolean")
-          replacement = t.booleanLiteral(result);
-        else if (typeof result === "bigint")
-          replacement = t.bigIntLiteral(result.toString() + "n");
-        else replacement = t.nullLiteral();
-
-        path.replaceWith(replacement);
-        replaced++;
+    const { node } = path;
+    // 直呼： _0x1e61(0x123, 'xx')
+    if (t.isIdentifier(node.callee) && candidateSet.has(node.callee.name)) {
+      // 全为常量？
+      if (node.arguments.length >= 1 && node.arguments.every(isConstNode)) {
+        tryFoldCall(path, node.callee.name, node.arguments, false);
       }
-    } catch (e) {
-      // 忽略单点失败，继续走
+      return;
     }
-  },
+
+    // .call/.apply
+    if (t.isMemberExpression(node.callee) && t.isIdentifier(node.callee.object)) {
+      const obj = node.callee.object.name;
+      const prop = t.isIdentifier(node.callee.property) ? node.callee.property.name : null;
+      if (!candidateSet.has(obj) || !prop) return;
+
+      if (prop === 'call') {
+        // fn.call(thisArg, ...args) -> 取后面的参数
+        const args = node.arguments.slice(1);
+        if (args.length >= 1 && args.every(isConstNode)) {
+          tryFoldCall(path, obj, args, false);
+        }
+      } else if (prop === 'apply') {
+        // fn.apply(thisArg, [a,b])
+        if (node.arguments.length === 2 && isConstNode(node.arguments[1])) {
+          tryFoldCall(path, obj, node.arguments, true);
+        }
+      }
+    }
+  }
 });
 
-// -------- Print stats & write --------
-if (candidateCalls === 0) {
-  log("===== SECOND PASS START =====");
-  log("[second-pass] 未发现可静态求值的调用点（可能参数不是常量，或候选在更深的闭包里）");
-  log("===== SECOND PASS END =====");
-} else {
-  log("===== SECOND PASS START =====");
-  log(`[second-pass] 发现候选调用 ${candidateCalls} 处`);
-  log(`[second-pass] 已静态回填 ${replaced} 处`);
-  const out = generate(ast, { comments: true }).code;
-  fs.mkdirSync(path.dirname(outFile), { recursive: true });
-  fs.writeFileSync(outFile, out);
-  log("===== SECOND PASS END =====");
-}
+log(`发现候选调用 ${found} 处`);
+log(`已静态回填 ${filled} 处`);
+
+const out = generate(ast, { comments: true, compact: false }).code;
+write(outFile, out);
+
+console.log('===== SECOND PASS END =====');
