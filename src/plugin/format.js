@@ -36,7 +36,6 @@ export default async function formatPlugin(source, ctx = {}) {
       sourceType: "unambiguous",
       plugins: ["jsx", "classProperties", "optionalChaining"],
     });
-    // 这里不做 transform，只做一次生成，等价“规范化缩进/换行”
     const out = (generate.default || generate)(ast, {
       retainLines: false,
       compact: false,
@@ -46,7 +45,6 @@ export default async function formatPlugin(source, ctx = {}) {
     ctx.notes?.push?.("format: babel-generator");
     return out || source;
   } catch (e) {
-    // 连 babel 都失败，保底返回原文，防止崩
     ctx.notes?.push?.(`format: skip (${e.message})`);
     return source;
   }
