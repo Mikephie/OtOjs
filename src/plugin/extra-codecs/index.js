@@ -1,12 +1,8 @@
-// src/plugin/extra-codecs/index.js
 import jsjiamiV7Rc4 from './jsjiami_v7_rc4.js';
 
 export function runExtraCodecs(code, { notes } = {}) {
   let out = code;
-  const chain = [
-    jsjiamiV7Rc4,      // 先 RC4
-    // 这里将来可以追加其它编码器，比如 base64/URI 等
-  ];
+  const chain = [ jsjiamiV7Rc4 ]; // RC4 放链首
   for (const fn of chain) {
     try {
       const next = fn(out, { notes });
