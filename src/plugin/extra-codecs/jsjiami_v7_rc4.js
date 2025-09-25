@@ -1,107 +1,75 @@
 // plugin/extra-codecs/jsjiami_v7_rc4.js
-import { parse, print, traverse, t, evalInSandbox } from './common.js';
+// 专门处理 jsjiami.com.v7 RC4 变体
 
 /**
- * 识别特征：
- *  1) 函数 _0x1715() 返回数组（字符串表）
- *  2) 函数 _0x1e61(idx, key) 体内包含 base64 字符集：“abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=”
- *  3) 代码中有 _0x1e61(0xeb,'r@dH') 或其别名调用
+ * RC4 解密函数
  */
-function detectJsjiamiV7(ast) {
-  let hasTable = false, hasDecoder = false;
-  traverse.default(ast, {
-    FunctionDeclaration(p) {
-      const name = p.node.id?.name;
-      if (name === '_0x1715') hasTable = true;
-      if (name === '_0x1e61') {
-        const src = print(p.node);
-        if (src.includes('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=')) {
-          hasDecoder = true;
-        }
-      }
+function rc4(data, key) {
+  let s = Array.from({ length: 256 }, (_, i) => i);
+  let j = 0, x, res = '';
+  for (let i = 0; i < 256; i++) {
+    j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
+    [s[i], s[j]] = [s[j], s[i]];
+  }
+  i = j = 0;
+  for (let y = 0; y < data.length; y++) {
+    i = (i + 1) % 256;
+    j = (j + s[i]) % 256;
+    [s[i], s[j]] = [s[j], s[i]];
+    x = s[(s[i] + s[j]) % 256];
+    res += String.fromCharCode(data.charCodeAt(y) ^ x);
+  }
+  return res;
+}
+
+/**
+ * 插件入口
+ */
+export default async function jsjiamiV7Rc4Plugin(source, ctx = {}) {
+  try {
+    // 检测是否包含 jsjiami v7 的标记
+    if (!/jsjiami\.com\.v7/.test(source)) {
+      return source; // 不处理
     }
-  });
-  return hasTable && hasDecoder;
-}
 
-function extractBundle(ast) {
-  let tableFn = '', decFn = '';
-  traverse.default(ast, {
-    FunctionDeclaration(p) {
-      const name = p.node.id?.name;
-      if (name === '_0x1715') tableFn = print(p.node);
-      if (name === '_0x1e61') decFn   = print(p.node);
+    // 提取 var _0xodH = 'xxxx';
+    let keyMatch = source.match(/var\s+_0xodH\s*=\s*['"]([^'"]+)['"]/);
+    let key = keyMatch ? keyMatch[1] : null;
+
+    if (!key) {
+      ctx?.notes?.push('[extra-codecs] jsjiamiV7Rc4: 未找到 _0xodH');
+      return source;
     }
-  });
-  if (!tableFn || !decFn) throw new Error('Essential code missing: string table or decoder not found');
 
-  const bootstrap = `
-    ${tableFn}
-    ${decFn}
-    globalThis.__TABLE__ = _0x1715();
-    globalThis.__DEC__   = _0x1e61;
-  `;
-  evalInSandbox(bootstrap, {});
-  const decode = (idx, key) => globalThis.__DEC__(idx, key);
-  return { decode };
-}
+    // 找到加密字符串数组 (常见写法 function _0x1715() { return [ ... ]; })
+    let arrMatch = source.match(/function\s+_0x[0-9a-fA-F]+\s*\(\)\s*{[^}]*return\s*\[([\s\S]*?)\]/);
+    if (!arrMatch) {
+      ctx?.notes?.push('[extra-codecs] jsjiamiV7Rc4: 未找到字符串数组');
+      return source;
+    }
 
-function isAliasOf(path, targetName) {
-  const binding = path.scope.getBinding(path.node.callee?.name);
-  if (!binding || !binding.path?.isVariableDeclarator()) return false;
-  const init = binding.path.node.init;
-  return t.isIdentifier(init, { name: targetName });
-}
+    // 提取字符串数组
+    let rawArr = arrMatch[1]
+      .split(',')
+      .map(s => s.trim().replace(/^['"]|['"]$/g, ''));
 
-function replaceDecoderCalls(ast, decode) {
-  traverse.default(ast, {
-    CallExpression(p) {
-      const callee = p.node.callee;
-
-      const direct = t.isIdentifier(callee, { name: '_0x1e61' });
-      const alias  = t.isIdentifier(callee) && callee.name !== '_0x1e61' && isAliasOf(p, '_0x1e61');
-      if (!(direct || alias)) return;
-
-      const [a0, a1] = p.node.arguments;
-      if (!a0 || !a1) return;
-      if (!(t.isNumericLiteral(a0) || t.isStringLiteral(a0))) return;
-      if (!t.isStringLiteral(a1)) return;
-
+    let decodedArr = [];
+    for (let str of rawArr) {
       try {
-        const idx = t.isNumericLiteral(a0) ? a0.value : parseInt(a0.value, 16);
-        const key = a1.value;
-        const literal = decode(idx, key);
-        if (typeof literal === 'string') {
-          p.replaceWith(t.stringLiteral(literal));
-        }
-      } catch { /* 解不开就跳过 */ }
-    }
-  });
-}
-
-export async function jsjiamiV7Rc4(code, ctx = {}) {
-  const ast = parse(code);
-  if (!detectJsjiamiV7(ast)) return code;
-
-  const { decode } = extractBundle(ast);
-  replaceDecoderCalls(ast, decode);
-
-  // 可选清理：移除 _0x1715/_0x1e61 及别名（只做安全删除）
-  traverse.default(ast, {
-    FunctionDeclaration(p) {
-      const name = p.node.id?.name;
-      if (name === '_0x1715' || name === '_0x1e61') {
-        try { p.remove(); } catch {}
-      }
-    },
-    VariableDeclarator(p) {
-      if (t.isIdentifier(p.node.id) && t.isIdentifier(p.node.init, { name: '_0x1e61' })) {
-        try { p.remove(); } catch {}
+        decodedArr.push(rc4(str, key));
+      } catch (e) {
+        decodedArr.push(str);
       }
     }
-  });
 
-  const out = print(ast);
-  ctx.notes?.push?.('jsjiami_v7_rc4: replaced string-decoder calls');
-  return out;
+    ctx?.notes?.push(`[extra-codecs] jsjiamiV7Rc4: 成功解码 ${decodedArr.length} 条字符串`);
+
+    // 替换源码（仅替换数组部分，保留原始结构）
+    let newSource = source.replace(arrMatch[0], `function _0x1715(){ return ${JSON.stringify(decodedArr)} }`);
+
+    return newSource;
+  } catch (e) {
+    ctx?.notes?.push(`[extra-codecs] jsjiamiV7Rc4 failed: ${e.message}`);
+    return source;
+  }
 }
