@@ -1,22 +1,21 @@
-// src/plugin/extra-codecs/index.js
 import jsjiamiV7Rc4 from './jsjiami_v7_rc4.js';
+import base64 from './base64.js';
+import common from './common.js';
 
-// 单轮执行
 export function runExtraCodecs(code, { notes } = {}) {
   let out = code;
-  const chain = [jsjiamiV7Rc4];
+  const chain = [base64, common, jsjiamiV7Rc4]; // 可以多链
   for (const fn of chain) {
     try {
       const next = fn(out, { notes });
       if (typeof next === 'string' && next !== out) out = next;
     } catch (e) {
-      notes?.push?.(`[extra-codecs] ${fn.name || 'plugin'} failed: ${e.message}`);
+      notes?.push?.(`[extra-codecs] ${fn.name} failed: ${e.message}`);
     }
   }
   return out;
 }
 
-// 多轮循环直到稳定
 export function runExtraCodecsLoop(code, { notes } = {}, { maxPasses = 3 } = {}) {
   let out = code;
   for (let i = 1; i <= maxPasses; i++) {
