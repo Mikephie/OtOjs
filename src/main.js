@@ -1,4 +1,4 @@
-// src/main.js —— 稳定链式版（支持可选编码库预处理）
+// src/main.js —— 稳定链式版（支持可选编码库预处理 + 动态清理 + 格式化）
 
 import fs from 'fs';
 import process from 'process';
@@ -21,14 +21,20 @@ const obfuscatorModule  = await import('./plugin/obfuscator.js');
 const awscModule        = await import('./plugin/awsc.js');
 const jsconfuserModule  = await import('./plugin/jsconfuser.js');
 
+// 新增：动态清理 & 格式化插件（独立后处理阶段）
+const cleanupDynamicModule = await import('./plugin/cleanup-dynamic.js');
+const formatModule         = await import('./plugin/format.js');
+
 // 兼容 default / 命名导出
-const PluginCommon     = commonModule.default     ?? commonModule;
-const PluginJjencode   = jjencodeModule.default   ?? jjencodeModule;
-const PluginSojson     = sojsonModule.default     ?? sojsonModule;
-const PluginSojsonV7   = sojsonv7Module.default   ?? sojsonv7Module;
-const PluginObfuscator = obfuscatorModule.default ?? obfuscatorModule;
-const PluginAwsc       = awscModule.default       ?? awscModule;
-const PluginJsconfuser = jsconfuserModule.default ?? jsconfuserModule;
+const PluginCommon         = commonModule.default         ?? commonModule;
+const PluginJjencode       = jjencodeModule.default       ?? jjencodeModule;
+const PluginSojson         = sojsonModule.default         ?? sojsonModule;
+const PluginSojsonV7       = sojsonv7Module.default       ?? sojsonv7Module;
+const PluginObfuscator     = obfuscatorModule.default     ?? obfuscatorModule;
+const PluginAwsc           = awscModule.default           ?? awscModule;
+const PluginJsconfuser     = jsconfuserModule.default     ?? jsconfuserModule;
+const PluginCleanupDynamic = cleanupDynamicModule.default ?? cleanupDynamicModule;
+const PluginFormat         = formatModule.default         ?? formatModule;
 
 // ---------------------- CLI 参数 ----------------------
 let encodeFile = 'input.js';
@@ -76,7 +82,7 @@ if (runExtraCodecs) {
 }
 
 // ---------------------- 1) 原有插件（链式，命中即早停） ----------------------
-const plugins = [
+const deobPlugins = [
   { name: 'obfuscator', plugin: PluginObfuscator },
   { name: 'sojsonv7',   plugin: PluginSojsonV7 },
   { name: 'sojson',     plugin: PluginSojson },
@@ -87,27 +93,57 @@ const plugins = [
 ];
 
 if (!shouldEarlyStop(processedCode)) {
-  for (const { name, plugin } of plugins) {
+  for (const { name, plugin } of deobPlugins) {
     try {
       const before = processedCode;
-      const ret = await plugin(before);         // 统一 await，兼容异步插件
+      const ret = await plugin(before);               // 统一 await，兼容异步插件
       const after = getCode(ret) || ret || before;
+
+      if (typeof after !== 'string') {
+        console.warn(`插件 ${name} 返回非字符串，已忽略`);
+        continue;
+      }
 
       if (after !== before) {
         processedCode = after;
         pluginUsed = name;
         console.log(`命中插件：${name}`);
-        break;                                  // 有变化就早停（保持你原本语义）
+        break;                                        // 有变化就早停（保持你原本语义）
       }
     } catch (error) {
-      console.error(`插件 ${name} 处理时发生错误: ${error.message}`);
+      console.error(`插件 ${name} 处理时发生错误: ${error?.message || error}`);
     }
   }
 } else {
   console.log('命中早停哨兵（smEcV），跳过插件链。');
 }
 
-// ---------------------- 2) 写出结果（同步写，避免 CI 早退） ----------------------
+// ---------------------- 2) 后处理（始终执行，不早停） ----------------------
+const postPlugins = [
+  { name: 'cleanup-dynamic', plugin: PluginCleanupDynamic }, // 动态清理（无硬编码）
+  { name: 'format',          plugin: PluginFormat },         // 格式化：Prettier/Babel 兜底
+];
+
+for (const { name, plugin } of postPlugins) {
+  try {
+    const before = processedCode;
+    const ret = await plugin(before, { notes });
+    const after = getCode(ret) || ret || before;
+
+    if (typeof after !== 'string') {
+      console.warn(`后处理插件 ${name} 返回非字符串，已忽略`);
+      continue;
+    }
+    if (after !== before) {
+      processedCode = after;
+      console.log(`命中插件：${name}`);
+    }
+  } catch (e) {
+    console.error(`后处理插件 ${name} 失败：${e?.message || e}`);
+  }
+}
+
+// ---------------------- 3) 写出结果（同步写，避免 CI 早退） ----------------------
 if (processedCode !== sourceCode) {
   const time = new Date();
   const header = [
