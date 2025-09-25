@@ -5,10 +5,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as parser from "@babel/parser";
-import traverse from "@babel/traverse";
+import traverseModule from "@babel/traverse";
 import generate from "@babel/generator";
 import * as t from "@babel/types";
 import { VM } from "vm2";
+
+const traverse = traverseModule.default;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
