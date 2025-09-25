@@ -1,20 +1,50 @@
-{
-  "name": "decode-js",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "decode": "node src/main.js -i input.js -o output/output.js",
-    "second": "node src/plugin/extra-codecs/second-pass.js output/output.js output/output.deob2.js",
-    "decode:all": "npm run decode && npm run second"
-  },
-  "dependencies": {
-    "@babel/core": "^7.25.0",
-    "@babel/parser": "^7.25.0",
-    "@babel/traverse": "^7.25.0",
-    "@babel/generator": "^7.25.0",
-    "@babel/types": "^7.25.0",
-    "isolated-vm": "^4.7.2"
-  },
-  "devDependencies": {}
+// src/plugin/extra-codecs/second-pass.js
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 同时兼容 named / default 两种导出
+import runExtraCodecsDefault, { runExtraCodecs as runNamed, runExtraCodecsLoop } from './index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function pickRunner() {
+  // 优先用带循环的
+  if (typeof runExtraCodecsLoop === 'function') return (code, notes) => runExtraCodecsLoop(code, { notes });
+  const fn = typeof runNamed === 'function' ? runNamed : runExtraCodecsDefault;
+  return (code, notes) => fn(code, { notes });
 }
+
+async function main() {
+  const inFile = process.argv[2];
+  const outFile = process.argv[3];
+
+  if (!inFile || !outFile) {
+    console.error('Usage: node second-pass.js <inputFile> <outputFile>');
+    process.exit(2);
+  }
+
+  // 读取上一轮输出
+  const code = fs.readFileSync(inFile, 'utf-8');
+  const notes = [];
+
+  const run = pickRunner();
+  const deob = run(code, notes);
+
+  // 确保目录存在
+  const outDir = path.dirname(outFile);
+  fs.mkdirSync(outDir, { recursive: true });
+
+  fs.writeFileSync(outFile, deob, 'utf-8');
+
+  if (notes.length) {
+    console.log('Second-pass notes:', notes.join(' | '));
+  }
+  console.log(`Second pass saved -> ${outFile}`);
+}
+
+main().catch((e) => {
+  console.error('Second pass failed:', e?.stack || e?.message || e);
+  process.exit(1);
+});
