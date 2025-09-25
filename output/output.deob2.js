@@ -1,17 +1,3 @@
-//Thu, 25 Sep 2025 12:59:36 GMT
-//Base:https://github.com/echo094/decode-js
-//Modify:https://github.com/smallfawn/decode_action
-/***********************************************
-> 应用名称：墨鱼自用reddits去广告脚本
-> 脚本作者：@ddgksf2013
-> 微信账号：墨鱼手记
-> 更新时间：2025-05-3099
-> 通知频道：https://t.me/ddgksf2021
-> 贡献投稿：https://t.me/ddgksf2013_bot
-> 问题反馈：ddgksf2013@163.com
-> 特别提醒：如需转载请注明出处，谢谢合作！
-***********************************************/
-
 const version = 'V1.0.9';
 var _0xodH = 'jsjiami.com.v7';
 const _0xc3dd0a = _0x1e61;
@@ -39,7 +25,7 @@ if (function (_0x297b99, _0x23f2e1, _0x6df70d, _0x3c23f, _0x377ebd, _0x2c90c8, _
       }
     }
   }(_0x6df70d, _0x23f2e1, function (_0x3bf4d5, _0x51ea99, _0x4fa532, _0xb5ed0d, _0xee9e18, _0x219c74, _0x1ad289) {
-    return _0x51ea99 = '\x73\x70\x6c\x69\x74', _0x3bf4d5 = arguments[0x0], _0x3bf4d5 = _0x3bf4d5[_0x51ea99](''), _0x4fa532 = '\x72\x65\x76\x65\x72\x73\x65', _0x3bf4d5 = _0x3bf4d5[_0x4fa532]('\x76'), _0xb5ed0d = '\x6a\x6f\x69\x6e', 0x1a8866, _0x3bf4d5[_0xb5ed0d]('');
+    return _0x3bf4d5 = arguments[0x0], _0x3bf4d5 = _0x3bf4d5['\x73\x70\x6c\x69\x74'](''), _0x3bf4d5 = _0x3bf4d5['\x72\x65\x76\x65\x72\x73\x65']('\x76'), 0x1a8866, _0x3bf4d5['\x6a\x6f\x69\x6e']('');
   });
 }(0x3340, 0xc4ab3, _0x1715, 0xcf), _0x1715) {}
 const opName = $request?.[_0xc3dd0a(0xeb, '1D%(')]?.[_0xc3dd0a(0xe3, 'r@dH')] || '';
@@ -92,7 +78,7 @@ let body;
 if (/Ads/i[_0xc3dd0a(0xea, 'lUu0')](opName)) $done({
   'body': '{}'
 });else try {
-  body = JSON[_0xc3dd0a(0x106, 'Z5[j')]($response[_0xc3dd0a(0x10e, 'Ludd')]['replace'](/"isObfuscated":true/g, '\x22isObfuscated\x22:false')['replace'](/"obfuscatedPath":"[^"]*"/g, '\x22obfuscatedPath\x22:null')[_0xc3dd0a(0xe1, 'YRTb')](/"isNsfw":true/g, '\x22isNsfw\x22:false')['replace'](/"isAdPersonalizationAllowed":true/g, '\x22isAdPersonalizationAllowed\x22:false')[_0xc3dd0a(0xf2, ']7tS')](/"isThirdPartyInfoAdPersonalizationAllowed":true/g, _0xc3dd0a(0xf3, 'T[Av'))[_0xc3dd0a(0xf4, 'Ludd')](/"isNsfwMediaBlocked":true/g, _0xc3dd0a(0xdf, '7Vi7'))[_0xc3dd0a(0xe0, '%9Ot')](/"isNsfwContentShown":true/g, _0xc3dd0a(0x103, '78t5'))[_0xc3dd0a(0xee, 'p4lg')](/"isPremiumMember":false/g, _0xc3dd0a(0xdd, 'r@dH'))[_0xc3dd0a(0xf1, 'lUu0')](/"isEmployee":false/g, '\x22isEmployee\x22:true'));
+  body = JSON[_0xc3dd0a(0x106, 'Z5[j')]($response[_0xc3dd0a(0x10e, 'Ludd')]['replace'](/"isObfuscated":false/g, '\x22isObfuscated\x22:false')['replace'](/"obfuscatedPath":null]*"/g, '\x22obfuscatedPath\x22:null')[_0xc3dd0a(0xe1, 'YRTb')](/"isNsfw":false/g, '\x22isNsfw\x22:false')['replace'](/"isAdPersonalizationAllowed":false/g, '\x22isAdPersonalizationAllowed\x22:false')[_0xc3dd0a(0xf2, ']7tS')](/"isThirdPartyInfoAdPersonalizationAllowed":false/g, _0xc3dd0a(0xf3, 'T[Av'))[_0xc3dd0a(0xf4, 'Ludd')](/"isNsfwMediaBlocked":false/g, _0xc3dd0a(0xdf, '7Vi7'))[_0xc3dd0a(0xe0, '%9Ot')](/"isNsfwContentShown":false/g, _0xc3dd0a(0x103, '78t5'))[_0xc3dd0a(0xee, 'p4lg')](/"isPremiumMember":true/g, _0xc3dd0a(0xdd, 'r@dH'))[_0xc3dd0a(0xf1, 'lUu0')](/"isEmployee":true/g, '\x22isEmployee\x22:true'));
   const data = body['data'] ?? {};
   Object[_0xc3dd0a(0xe4, ']cmg')](data)[_0xc3dd0a(0x102, 'B(G3')](_0x264ed5 => {
     const _0x38539b = _0xc3dd0a,
