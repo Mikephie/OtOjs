@@ -95,25 +95,29 @@ try {
   if (typeof after === 'string' && after !== before) {
     processedCode = after;
     if (!pluginUsed) pluginUsed = 'extra-codecs';
-    notes.push('extra-codecs: rc4 loop applied');
+    console.log('二次预处理：extra-codecs rc4 loop applied');
+  } else {
+    console.log('二次预处理：无变化或导出相同');
   }
 } catch (e) {
-  notes.push(`extra-codecs loop error: ${e.message}`);
+  console.log(`二次预处理失败: ${e.message}`);
 }
 
-// ---------------------- 2) 写出结果 二次预处理（主插件之后跑 extra-codecs） ----------------------
-if (runExtraCodecs) {
-  try {
-    const before = processedCode;
-    const ret = await runExtraCodecs(before, { notes });
-    const after = getCode(ret, before);
-    if (after !== before) {
-      processedCode = after;
-      console.log('二次预处理：extra-codecs 生效');
-    }
-  } catch (e) {
-    notes.push(`extra-codecs failed: ${e.message}`);
-  }
+// ---------------------- 2) 写出结果（同步写，避免 CI 早退） ----------------------
+if (processedCode !== sourceCode) {
+  const time = new Date();
+  const header = [
+    `//${time}`,
+    '//Base:<url id="cv1cref6o68qmpt26ol0" type="url" status="parsed" title="GitHub - echo094/decode-js: JS混淆代码的AST分析工具 AST analysis tool for obfuscated JS code" wc="2165">https://github.com/echo094/decode-js</url>',
+    '//Modify:<url id="cv1cref6o68qmpt26olg" type="url" status="parsed" title="GitHub - smallfawn/decode_action: 世界上本来不存在加密，加密的人多了，也便成就了解密" wc="741">https://github.com/smallfawn/decode_action</url>'
+  ].join('\n');
+
+  const outputCode = `${header}\n${processedCode}`;
+  fs.writeFileSync(decodeFile, outputCode, 'utf-8');
+  console.log(`使用插件 ${pluginUsed || 'extra-codecs/unknown'} 成功处理并写入文件 ${decodeFile}`);
+  if (notes.length) console.log('Notes:', notes.join(' | '));
+} else {
+  console.log('所有插件处理后的代码与原代码一致，未写入文件。');
 }
 
 // ---------------------- 3) 写出结果（同步写，避免 CI 早退） ----------------------
