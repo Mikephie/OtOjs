@@ -1,56 +1,50 @@
 // plugin/extra-codecs/base64.js
-// 自动解码源码里的 Base64 字符串常量
+// 自动解码源码里的 Base64 字符串常量（ESM + Babel 兼容）
 
-import { parse } from "@babel/parser";
+import * as parser from "@babel/parser";
 import traverse from "@babel/traverse";
 import generate from "@babel/generator";
 import * as t from "@babel/types";
 
-/**
- * 判断一个字符串是不是 Base64
- */
 function looksLikeBase64(str) {
+  // 至少 8 位、仅 Base64 字符、长度为 4 的倍数
   return /^[A-Za-z0-9+/=]{8,}$/.test(str) && str.length % 4 === 0;
 }
 
-/**
- * Base64 解码
- */
 function safeDecode(str) {
   try {
     const buf = Buffer.from(str, "base64");
     const txt = buf.toString("utf-8");
-    // 只接受有意义的可打印字符
-    if (/^[\x09\x0A\x0D\x20-\x7E\u4e00-\u9fff]+$/.test(txt)) {
+    // 仅在解码后包含可打印字符/中日韩统一表意文字时替换
+    if (/^[\x09\x0A\x0D\x20-\x7E\u4E00-\u9FFF]+$/.test(txt)) {
       return txt;
     }
-  } catch (_) {}
+  } catch {}
   return null;
 }
 
-/**
- * 插件入口
- */
 export default async function base64Plugin(source, ctx = {}) {
-  const ast = parse(source, { sourceType: "unambiguous" });
+  const ast = parser.parse(source, { sourceType: "unambiguous" });
   let replaced = 0;
 
-  traverse(ast, {
+  // 注意：某些打包环境下 @babel/traverse 需要 .default
+  (traverse.default || traverse)(ast, {
     StringLiteral(path) {
       const raw = path.node.value;
-      if (looksLikeBase64(raw)) {
-        const decoded = safeDecode(raw);
-        if (decoded && decoded.length >= 3) {
-          path.replaceWith(t.stringLiteral(decoded));
-          replaced++;
-        }
+      if (!raw || raw.length < 8) return;
+      if (!looksLikeBase64(raw)) return;
+
+      const decoded = safeDecode(raw);
+      if (decoded && decoded.length >= 3) {
+        path.replaceWith(t.stringLiteral(decoded));
+        replaced++;
       }
-    }
+    },
   });
 
   if (replaced > 0) {
     ctx.notes?.push?.(`base64: 解码了 ${replaced} 个字符串常量`);
-    return generate(ast, { compact: false }).code;
+    return (generate.default || generate)(ast, { compact: false }).code;
   }
   return source;
 }
