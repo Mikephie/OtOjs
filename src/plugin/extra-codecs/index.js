@@ -1,20 +1,41 @@
 // plugin/extra-codecs/index.js
-import { jsjiamiV7Rc4 } from './jsjiami_v7_rc4.js';
+// 自动加载同目录下的所有插件（除了 index.js）
 
-const STEPS = [
-  jsjiamiV7Rc4,     // 往后可继续追加新的编码器
-];
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-export async function runExtraCodecs(code, ctx = {}) {
-  let out = code;
-  for (const step of STEPS) {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export async function runExtraCodecs(source, ctx = {}) {
+  let processed = source;
+
+  // 找到目录下所有 js 文件（排除 index.js 本身）
+  const files = fs.readdirSync(__dirname)
+    .filter(f => f.endsWith('.js') && f !== 'index.js');
+
+  for (const file of files) {
     try {
-      const before = out;
-      const ret = await step(out, ctx);
-      out = typeof ret === 'string' ? ret : (ret?.code ?? before);
+      const mod = await import(path.join(__dirname, file));
+      const plugin = mod.default || mod.run || null;
+
+      if (typeof plugin === 'function') {
+        const before = processed;
+        const ret = await plugin(before, ctx);
+        const after = (typeof ret === 'string') ? ret : before;
+
+        if (after !== before) {
+          ctx?.notes?.push(`[extra-codecs] ${file} 生效`);
+          processed = after;
+        }
+      }
     } catch (e) {
-      ctx.notes?.push?.(`[extra-codecs] ${step.name} failed: ${e.message}`);
+      ctx?.notes?.push(`[extra-codecs] ${file} 加载失败: ${e.message}`);
     }
   }
-  return out;
+
+  return processed;
 }
+
+export default runExtraCodecs;
