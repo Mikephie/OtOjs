@@ -1,185 +1,91 @@
 // src/plugin/extra-codecs/jsjiami_v7_rc4.js
-import vm from "node:vm";
+import vm from 'vm';
 
-/* ------------ 小工具：匹配函数定义 / 大数组 / 提取块 ------------- */
-function extractBlock(source, openPos) {
-  let i = openPos, depth = 0;
-  for (; i < source.length; i++) if (source[i] === "{") { depth = 1; i++; break; }
-  if (!depth) return null;
-  for (; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === "{") depth++;
-    else if (ch === "}") { depth--; if (!depth) return i + 1; }
-  }
-  return null;
+// 安全的 atob/btoa polyfill
+function atobPoly(b64) {
+  return Buffer.from(b64, 'base64').toString('binary');
 }
 
-function findFuncByName(source, name) {
-  // function name(...) { ... }
-  let re = new RegExp(`function\\s+${name}\\s*\$begin:math:text$[^)]*\\$end:math:text$\\s*\\{`, "g");
-  let m = re.exec(source);
-  if (m) {
-    const end = extractBlock(source, re.lastIndex - 1);
-    if (end) return source.slice(m.index, end);
-  }
-  // var/let/const name = function(...) { ... }
-  re = new RegExp(`(?:var|let|const)\\s+${name}\\s*=\\s*function\\s*\$begin:math:text$[^)]*\\$end:math:text$\\s*\\{`, "g");
-  m = re.exec(source);
-  if (m) {
-    const end = extractBlock(source, re.lastIndex - 1);
-    if (end) return source.slice(m.index, end);
-  }
-  // name = function(...) { ... }
-  re = new RegExp(`${name}\\s*=\\s*function\\s*\$begin:math:text$[^)]*\\$end:math:text$\\s*\\{`, "g");
-  m = re.exec(source);
-  if (m) {
-    const end = extractBlock(source, re.lastIndex - 1);
-    if (end) return source.slice(m.index, end);
-  }
-  return null;
-}
+export default function jsjiamiV7Rc4(code, { notes } = {}) {
+  if (typeof code !== 'string') return code;
 
-function findBigArrayLiteral(source) {
-  const re = /\[((?:[^"'[\]]+|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\[(?:[^\]]|\](?=[^,]))*\]){200,})\]/g;
-  let m;
-  while ((m = re.exec(source))) {
-    const frag = m[0];
-    const hits = (frag.match(/'W|\"W/g) || []).length;
-    if (hits >= 4) return { src: frag, start: m.index, end: re.lastIndex };
-  }
-  return null;
-}
+  // 粗检测：是否存在典型构型
+  const hasArrFn = /function\s+(_0x[0-9a-f]{3,})\s*\(\)\s*\{[\s\S]{0,2000}return\s+\[/.test(code);
+  const hasDecFn = /function\s+(_0x[0-9a-f]{3,})\s*\(\s*[_$a-zA-Z0-9]+\s*,\s*[_$a-zA-Z0-9]+\s*\)\s*\{[\s\S]{200,8000}IEgssj/.test(code);
+  if (!hasArrFn || !hasDecFn) return code;
 
-/* ---------------------- 沙箱执行 ---------------------- */
-function evalInSandbox(code, ctxObj = {}) {
-  const ctx = { _0xodH: "jsjiami.com.v7", ...ctxObj };
-  vm.createContext(ctx);
-  return vm.runInContext(code, ctx, { timeout: 400 });
-}
+  // 提取函数名
+  const arrName = (code.match(/function\s+(_0x[0-9a-f]{3,})\s*\(\)\s*\{/i) || [])[1];
+  const decName = (code.match(/function\s+(_0x[0-9a-f]{3,})\s*\(\s*[_$a-zA-Z0-9]+\s*,\s*[_$a-zA-Z0-9]+\s*\)\s*\{/i) || [])[1];
+  if (!arrName || !decName) return code;
 
-function buildDecoder(tableSrc, decoderSrc, tableName, decoderName) {
-  const code = `
-    "use strict";
-    ${tableSrc}
-    ${decoderSrc}
-    (function(){
-      function safeDecode(i,k){
-        try { return ${decoderName}(i,k); } catch(e){ return undefined; }
-      }
-      return { decode: safeDecode };
-    })();
+  // 提取函数体（尽量局部提取，避免运行整份脚本）
+  const arrBody = extractWholeFunction(code, arrName);
+  const decBody = extractWholeFunction(code, decName);
+  if (!arrBody || !decBody) return code;
+
+  // 可选：若存在“版本常量”也一并放入，防止依赖
+  const odhInit = (code.match(/var\s+(_0xodH)\s*=\s*['"][^'"]+['"];/) || [])[0] || '';
+
+  // 组装一个最小可执行片段进沙箱
+  const bootstrap = `
+    ${odhInit}
+    ${arrBody}
+    ${decBody}
+    globalThis.atob = globalThis.atob || (${atobPoly.toString()});
+    // 导出到全局以便调用
+    globalThis.__ARR__ = ${arrName};
+    globalThis.__DEC__ = ${decName};
   `;
-  return evalInSandbox(code);
+
+  let ctx = { console };
+  vm.createContext(ctx);
+  try {
+    vm.runInContext(bootstrap, ctx, { timeout: 1000 });
+  } catch (e) {
+    notes?.push?.(`jsjiami_v7_rc4 bootstrap failed: ${e.message}`);
+    return code;
+  }
+  if (typeof ctx.__ARR__ !== 'function' || typeof ctx.__DEC__ !== 'function') {
+    return code;
+  }
+
+  // 先探测能否解出一个样本
+  try { void ctx.__DEC__(0, 'test'); } catch (_) { /* 忽略 */ }
+
+  // 替换所有形如  _0x1e61(0xNN,'xxx') 的调用
+  const callRe = new RegExp(`${decName}\$begin:math:text$\\\\s*(0x[0-9a-f]+|\\\\d+)\\\\s*,\\\\s*'([^']+)'\\\\s*\\$end:math:text$`, 'gi');
+  let replaced = 0;
+  const out = code.replace(callRe, (_, idxRaw, key) => {
+    try {
+      const idx = idxRaw.startsWith('0x') ? parseInt(idxRaw, 16) : parseInt(idxRaw, 10);
+      const text = ctx.__DEC__(idx, key);
+      replaced++;
+      return JSON.stringify(text); // 安全输出字面量
+    } catch (e) {
+      return _; // 保留原样
+    }
+  });
+
+  if (replaced > 0) notes?.push?.(`jsjiami_v7_rc4: replaced ${replaced} calls via sandbox`);
+  return out;
 }
 
-/* ---------------------- 主逻辑 ---------------------- */
-export default function jsjiamiV7Rc4(source, { notes } = {}) {
-  try {
-    // ① 抓调用点，反推出“解码器函数名”
-    //   形如  _0x1e61(0x12a, 'key') 或 _0x1e61(123, "key")
-    const callRe = /\b(_0x[0-9a-fA-F]{3,})\(\s*(0x[0-9a-fA-F]+|\d+)\s*,\s*(['"])([^'"]*)\3\s*\)/g;
-    const foundNames = new Set();
-    let m;
-    while ((m = callRe.exec(source))) foundNames.add(m[1]);
-
-    if (!foundNames.size) {
-      notes?.push?.("jsjiamiV7Rc4: no decoder-like callsites");
-      return source;
+/** 提取以 function <name>( 开头的完整函数文本（简单括号计数） */
+function extractWholeFunction(src, name) {
+  const start = src.indexOf(`function ${name}(`);
+  if (start < 0) return '';
+  // 找到第一个 '{'
+  const braceStart = src.indexOf('{', start);
+  if (braceStart < 0) return '';
+  let i = braceStart, depth = 0;
+  for (; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { i++; break; }
     }
-
-    // ② 拿“字符串表”
-    let tableArr = null, tableName = null, tableFuncSrc = null;
-    // 先尝试函数名常见：_0x1715 / _0x[a-f0-9]{3,}
-    const guessNames = ["_0x1715"];
-    // 从源码里再抓一个 function 返回数组的函数
-    const funcLike = /function\s+(_0x[0-9a-fA-F]{3,})\s*\(\)\s*\{\s*const\s+[A-Za-z_$][\w$]*\s*=\s*function\s*\(\)\s*\{\s*return\s*\[/;
-    const f2 = funcLike.exec(source);
-    if (f2) guessNames.push(f2[1]);
-
-    // 直接回退：大数组字面量
-    const literal = findBigArrayLiteral(source);
-    if (literal) {
-      try {
-        tableArr = evalInSandbox(`(function(){return ${literal.src};})()`);
-        tableName = "_0x1715_fallback";
-        tableFuncSrc = `function ${tableName}(){return ${literal.src};}`;
-        notes?.push?.("jsjiamiV7Rc4: string table extracted from big array literal");
-      } catch (e) {
-        notes?.push?.(`jsjiamiV7Rc4: big array eval failed (${e.message})`);
-      }
-    }
-
-    // 如果还没有，试着按常见名字找函数并执行
-    if (!tableArr) {
-      for (const nm of guessNames) {
-        const src = findFuncByName(source, nm);
-        if (!src) continue;
-        try {
-          const arr = evalInSandbox(`(function(){ ${src}; return ${nm}(); })()`);
-          if (Array.isArray(arr)) {
-            tableArr = arr;
-            tableName = nm;
-            tableFuncSrc = src;
-            break;
-          }
-        } catch (_) {}
-      }
-    }
-
-    if (!tableArr || !Array.isArray(tableArr)) {
-      notes?.push?.("jsjiamiV7Rc4: string table function not found");
-      return source;
-    }
-
-    // ③ 逐个候选的“解码器名”，尝试找到定义并替换调用
-    let replacedTotal = 0;
-    let out = source;
-
-    for (const decName of foundNames) {
-      const decSrc = findFuncByName(source, decName);
-      if (!decSrc) {
-        // 找不到定义，跳过这个名字
-        continue;
-      }
-
-      let sandbox;
-      try {
-        sandbox = buildDecoder(tableFuncSrc, decSrc, tableName, decName);
-      } catch (e) {
-        // 某些解码器包裹太多，构建失败也跳过
-        continue;
-      }
-
-      // 在 out 上替换这个“名字”的所有静态调用
-      const perNameRe = new RegExp(
-        `\\b${decName}\$begin:math:text$\\\\s*(0x[0-9a-fA-F]+|\\\\d+)\\\\s*,\\\\s*(['"])([^'"]*)\\\\2\\\\s*\\$end:math:text$`,
-        "g"
-      );
-
-      let replaced = 0;
-      out = out.replace(perNameRe, (m2, idxLit, q, key) => {
-        try {
-          const idx = idxLit.startsWith("0x") ? parseInt(idxLit, 16) : parseInt(idxLit, 10);
-          const val = sandbox.decode(idx, key);
-          if (typeof val === "string") {
-            replaced++;
-            return JSON.stringify(val);
-          }
-        } catch {}
-        return m2;
-      });
-
-      if (replaced) {
-        replacedTotal += replaced;
-        notes?.push?.(`jsjiamiV7Rc4: ${decName} => replaced ${replaced} calls`);
-      }
-    }
-
-    if (replacedTotal) return out;
-    notes?.push?.("jsjiamiV7Rc4: decoder function found but no static calls matched");
-    return source;
-  } catch (e) {
-    notes?.push?.(`jsjiamiV7Rc4: unexpected error: ${e.message}`);
-    return source;
   }
+  return src.slice(start, i);
 }
