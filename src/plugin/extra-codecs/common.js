@@ -1,24 +1,25 @@
-// plugins/extra-codecs/common.js
-const babel = require('@babel/core');
-const t = require('@babel/types');
-const parser = require('@babel/parser');
-const traverse = require('@babel/traverse').default;
-const generate = require('@babel/generator').default;
-const vm = require('node:vm');
+// plugin/extra-codecs/common.js
+import * as babel from '@babel/core';
+import * as t from '@babel/types';
+import parser from '@babel/parser';
+import traverse from '@babel/traverse';
+import generate from '@babel/generator';
+import vm from 'node:vm';
 
-function parse(code) {
+export function parse(code) {
   return parser.parse(code, {
     sourceType: 'unambiguous',
     plugins: ['jsx', 'classProperties', 'optionalChaining']
   });
 }
+export function print(ast) {
+  return generate.default(ast, { retainLines: false }).code;
+}
 
-function print(ast) { return generate(ast, { retainLines: false }).code; }
-
-// 在安全沙箱里仅执行“解码相关函数”，不提供 Node 能力
-function evalInSandbox(src, context = {}) {
+// 安全沙箱：只用于执行“解码函数”，不暴露 Node 能力
+export function evalInSandbox(src, context = {}) {
   const sandbox = vm.createContext(Object.assign(Object.create(null), context));
   return vm.runInContext(src, sandbox, { timeout: 2000 });
 }
 
-module.exports = { babel, t, parse, print, traverse, generate, evalInSandbox };
+export { babel, t, traverse, generate };

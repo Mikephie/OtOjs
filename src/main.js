@@ -1,9 +1,9 @@
-// src/main.js  —— 稳定链式版（支持可选编码库预处理）
+// src/main.js —— 稳定链式版（支持可选编码库预处理）
 
 import fs from 'fs';
 import process from 'process';
 
-// ---------------------- 可选：编码库预处理 ----------------------
+// ---------------------- 可选：编码库预处理（存在则自动启用） ----------------------
 let runExtraCodecs = null;
 try {
   const extra = await import('./plugin/extra-codecs/index.js'); // 若无该文件会被 catch
@@ -56,6 +56,9 @@ const getCode = (ret) => {
   return '';
 };
 
+// 早停的哨兵关键字检查：对“当前代码”判断
+const shouldEarlyStop = (code) => code.includes('smEcV');
+
 // ---------------------- 0) 可选：编码库预处理 ----------------------
 if (runExtraCodecs) {
   try {
@@ -72,7 +75,7 @@ if (runExtraCodecs) {
   }
 }
 
-// ---------------------- 1) 原有插件（链式，遇到生效即早停） ----------------------
+// ---------------------- 1) 原有插件（链式，命中即早停） ----------------------
 const plugins = [
   { name: 'obfuscator', plugin: PluginObfuscator },
   { name: 'sojsonv7',   plugin: PluginSojsonV7 },
@@ -80,25 +83,21 @@ const plugins = [
   { name: 'jsconfuser', plugin: PluginJsconfuser },
   { name: 'awsc',       plugin: PluginAwsc },
   { name: 'jjencode',   plugin: PluginJjencode },
-  { name: 'common',     plugin: PluginCommon }, // 放最后兜底
+  { name: 'common',     plugin: PluginCommon }, // 最后兜底
 ];
-
-// 早停的哨兵关键字检查：对“当前代码”判断
-const shouldEarlyStop = (code) => code.includes('smEcV'); // 按你原逻辑保留
 
 if (!shouldEarlyStop(processedCode)) {
   for (const { name, plugin } of plugins) {
     try {
       const before = processedCode;
-      // 统一 await，兼容异步插件
-      const ret = await plugin(before);
+      const ret = await plugin(before);         // 统一 await，兼容异步插件
       const after = getCode(ret) || ret || before;
 
       if (after !== before) {
         processedCode = after;
         pluginUsed = name;
         console.log(`命中插件：${name}`);
-        break; // 按你原语义：有变化就早停
+        break;                                  // 有变化就早停（保持你原本语义）
       }
     } catch (error) {
       console.error(`插件 ${name} 处理时发生错误: ${error.message}`);
@@ -118,7 +117,7 @@ if (processedCode !== sourceCode) {
   ].join('\n');
 
   const outputCode = `${header}\n${processedCode}`;
-  fs.writeFileSync(decodeFile, outputCode, 'utf-8');   // ← 改为同步写
+  fs.writeFileSync(decodeFile, outputCode, 'utf-8');   // 改为同步写
   console.log(`使用插件 ${pluginUsed || 'extra-codecs/unknown'} 成功处理并写入文件 ${decodeFile}`);
   if (notes.length) console.log('Notes:', notes.join(' | '));
 } else {

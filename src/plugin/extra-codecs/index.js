@@ -1,22 +1,20 @@
-// plugins/extra-codecs/index.js
-const { jsjiamiV7Rc4 } = require('./jsjiami_v7_rc4');
+// plugin/extra-codecs/index.js
+import { jsjiamiV7Rc4 } from './jsjiami_v7_rc4.js';
 
 const STEPS = [
-  jsjiamiV7Rc4,       // 先试 jsjiami v7 RC4 + Base64 + 字符串表/旋转
-  // ……后面可以继续加新编码
+  jsjiamiV7Rc4,     // 往后可继续追加新的编码器
 ];
 
-async function runExtraCodecs(code, ctx = {}) {
+export async function runExtraCodecs(code, ctx = {}) {
+  let out = code;
   for (const step of STEPS) {
     try {
-      const before = code;
-      code = await step(code, ctx);
-      if (code !== before) ctx.changed = true;
+      const before = out;
+      const ret = await step(out, ctx);
+      out = typeof ret === 'string' ? ret : (ret?.code ?? before);
     } catch (e) {
       ctx.notes?.push?.(`[extra-codecs] ${step.name} failed: ${e.message}`);
     }
   }
-  return code;
+  return out;
 }
-
-module.exports = { runExtraCodecs };
