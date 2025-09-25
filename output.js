@@ -1,4 +1,4 @@
-//Thu Sep 25 2025 04:51:08 GMT+0000 (Coordinated Universal Time)
+//Thu Sep 25 2025 04:53:57 GMT+0000 (Coordinated Universal Time)
 //Base:<url id="cv1cref6o68qmpt26ol0" type="url" status="parsed" title="GitHub - echo094/decode-js: JS混淆代码的AST分析工具 AST analysis tool for obfuscated JS code" wc="2165">https://github.com/echo094/decode-js</url>
 //Modify:<url id="cv1cref6o68qmpt26olg" type="url" status="parsed" title="GitHub - smallfawn/decode_action: 世界上本来不存在加密，加密的人多了，也便成就了解密" wc="741">https://github.com/smallfawn/decode_action</url>
 const version = 'V1.0.9';
@@ -11,7 +11,7 @@ if (function (_0x297b99, _0x23f2e1, _0x6df70d, _0x3c23f, _0x377ebd, _0x2c90c8, _
     const _0x548169 = _0x2e8807();
     while (true && --_0x3c23f + _0x4f615d) {
       try {
-        _0x480882 = -parseInt(_0x39cfbb(0xe7, 'p4lg')) / 0x1 + parseInt(_0x39cfbb(0xe5, ']WGR')) / 0x2 * (parseInt(_0x39cfbb(0xfd, 'p6@A')) / 0x3) + -parseInt(_0x39cfbb(0xf9, 'bE)$')) / 0x4 + -parseInt(_0x39cfbb(0xe6, 'L]@f')) / 0x5 + -parseInt(_0x39cfbb(0xf5, 'ICP5')) / 0x6 * (parseInt(_0x39cfbb(0xfe, 'Z5[j')) / 0x7) + parseInt(_0x39cfbb(0xf8, ')Hz#')) / 0x8 + parseInt(_0x39cfbb(0x10a, 'd&Pb')) / 0x9;
+        _0x480882 = -parseInt("1430351bsaypz") / 0x1 + parseInt("2fNTxYk") / 0x2 * (parseInt("4716282KZLYJn") / 0x3) + -parseInt("2794252jgPioi") / 0x4 + -parseInt("5123300gMNNOv") / 0x5 + -parseInt("66PCzVOG") / 0x6 * (parseInt("496265tcRuFS") / 0x7) + parseInt("12343928WpBKqc") / 0x8 + parseInt("14615001GYbpDC") / 0x9;
       } catch (_0x58ea56) {
         _0x480882 = _0x39406d;
       } finally {
@@ -31,7 +31,7 @@ if (function (_0x297b99, _0x23f2e1, _0x6df70d, _0x3c23f, _0x377ebd, _0x2c90c8, _
     return _0x3bf4d5 = arguments[0x0], _0x3bf4d5 = _0x3bf4d5['\x73\x70\x6c\x69\x74'](''), _0x3bf4d5 = _0x3bf4d5['\x72\x65\x76\x65\x72\x73\x65']('\x76'), 0x1a8866, _0x3bf4d5['\x6a\x6f\x69\x6e']('');
   });
 }(0x3340, 0xc4ab3, _0x1715, 0xcf), _0x1715) {}
-const opName = $request?.[_0xc3dd0a(0xeb, '1D%(')]?.[_0xc3dd0a(0xe3, 'r@dH')] || '';
+const opName = $request?.["headers"]?.["X-APOLLO-OPERATION-NAME"] || '';
 function _0x1e61(_0x37ad72, _0xa65d17) {
   const _0x1715c6 = _0x1715();
   return _0x1e61 = function (_0x1e61ca, _0x1d9789) {
@@ -78,12 +78,12 @@ function _0x1e61(_0x37ad72, _0xa65d17) {
   }, _0x1e61(_0x37ad72, _0xa65d17);
 }
 let body;
-if (/Ads/i[_0xc3dd0a(0xea, 'lUu0')](opName)) $done({
+if (/Ads/i["test"](opName)) $done({
   'body': '{}'
 });else try {
-  body = JSON[_0xc3dd0a(0x106, 'Z5[j')]($response[_0xc3dd0a(0x10e, 'Ludd')]['replace'](/"isObfuscated":true/g, '\x22isObfuscated\x22:false')['replace'](/"obfuscatedPath":"[^"]*"/g, '\x22obfuscatedPath\x22:null')[_0xc3dd0a(0xe1, 'YRTb')](/"isNsfw":true/g, '\x22isNsfw\x22:false')['replace'](/"isAdPersonalizationAllowed":true/g, '\x22isAdPersonalizationAllowed\x22:false')[_0xc3dd0a(0xf2, ']7tS')](/"isThirdPartyInfoAdPersonalizationAllowed":true/g, _0xc3dd0a(0xf3, 'T[Av'))[_0xc3dd0a(0xf4, 'Ludd')](/"isNsfwMediaBlocked":true/g, _0xc3dd0a(0xdf, '7Vi7'))[_0xc3dd0a(0xe0, '%9Ot')](/"isNsfwContentShown":true/g, _0xc3dd0a(0x103, '78t5'))[_0xc3dd0a(0xee, 'p4lg')](/"isPremiumMember":false/g, _0xc3dd0a(0xdd, 'r@dH'))[_0xc3dd0a(0xf1, 'lUu0')](/"isEmployee":false/g, '\x22isEmployee\x22:true'));
+  body = JSON["parse"]($response["body"]['replace'](/"isObfuscated":true/g, '\x22isObfuscated\x22:false')['replace'](/"obfuscatedPath":"[^"]*"/g, '\x22obfuscatedPath\x22:null')["replace"](/"isNsfw":true/g, '\x22isNsfw\x22:false')['replace'](/"isAdPersonalizationAllowed":true/g, '\x22isAdPersonalizationAllowed\x22:false')["replace"](/"isThirdPartyInfoAdPersonalizationAllowed":true/g, "\"isThirdPartyInfoAdPersonalizationAllowed\":false")["replace"](/"isNsfwMediaBlocked":true/g, "\"isNsfwMediaBlocked\":false")["replace"](/"isNsfwContentShown":true/g, "\"isNsfwContentShown\":false")["replace"](/"isPremiumMember":false/g, "\"isPremiumMember\":true")["replace"](/"isEmployee":false/g, '\x22isEmployee\x22:true'));
   const data = body['data'] ?? {};
-  Object[_0xc3dd0a(0xe4, ']cmg')](data)[_0xc3dd0a(0x102, 'B(G3')](_0x264ed5 => {
+  Object["keys"](data)["forEach"](_0x264ed5 => {
     const _0x38539b = _0xc3dd0a,
       _0x227df7 = {
         'xGFfl': function (_0x380bd6, _0x1395e7) {
@@ -113,7 +113,7 @@ if (/Ads/i[_0xc3dd0a(0xea, 'lUu0')](opName)) $done({
     });
   }), body = JSON['stringify'](body);
 } catch (_0x2d423f) {
-  console[_0xc3dd0a(0xf0, 'BSBF')](_0xc3dd0a(0xef, 'gTpY'), _0x2d423f);
+  console["log"]("Parse error:", _0x2d423f);
 } finally {
   $done(body ? {
     'body': body
