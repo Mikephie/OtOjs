@@ -1,162 +1,258 @@
 // src/plugin/extra-codecs/second-pass.js
-// 用法：node second-pass.js <infile> <outfile> [--simulate]
+// Second pass: evaluate obfuscated decoder calls with constant args and replace them.
+// Usage: node src/plugin/extra-codecs/second-pass.js inputFile outputFile
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as parser from "@babel/parser";
+
+// ESM-friendly imports (important!)
 import traverseModule from "@babel/traverse";
-import generate from "@babel/generator";
+const traverse = traverseModule.default;
+
+import generatorModule from "@babel/generator";
+const generate = generatorModule.default;
+
 import * as t from "@babel/types";
 import { VM } from "vm2";
-
-const traverse = traverseModule.default;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const inFile = process.argv[2];
-const outFile = process.argv[3] || "output/output.deob2.js";
-const SIMULATE = process.argv.includes("--simulate");
+// -------- CLI args --------
+const inFile = process.argv[2] || path.resolve(process.cwd(), "output/output.js");
+const outFile =
+  process.argv[3] || path.resolve(process.cwd(), "output/output.deob2.js");
 
-if (!inFile) {
-  console.error("[second-pass] 用法：node second-pass.js <infile> <outfile> [--simulate]");
-  process.exit(1);
+function log(...args) {
+  console.log(...args);
 }
 
-const code = fs.readFileSync(inFile, "utf8");
-
-// ---------- 1) 解析 + 抓候选 ----------
-const ast = parser.parse(code, {
+// -------- Parser options --------
+const parserOpts = {
   sourceType: "unambiguous",
   allowReturnOutsideFunction: true,
-  plugins: ["jsx", "optionalChaining"]
-});
+  plugins: [
+    "jsx",
+    "classProperties",
+    "classPrivateProperties",
+    "classPrivateMethods",
+    "objectRestSpread",
+    "optionalChaining",
+    "nullishCoalescingOperator",
+    "numericSeparator",
+    "bigInt",
+    "topLevelAwait",
+  ],
+};
 
-const HEX_ID = /^_0x[0-9a-fA-F]+$/;
+// -------- Read & parse --------
+const code = fs.readFileSync(inFile, "utf8");
+const ast = parser.parse(code, parserOpts);
 
-// 别名映射：aliasName -> realName（如 _0xc3dd0a -> _0x1e61）
-const aliasMap = new Map();
-// 记录调用点
-const calls = [];
+// -------- Heuristics to find decoder funcs & aliases --------
+const decoderNameRe = /^_0x[0-9a-f]+$/i;
 
-// 先扫一遍建立“别名”与“真实解码器”的映射
+// function declarations / variable-declared function expressions with names like _0x****
+// also collect alias like: const _0xc3dd0a = _0x1e61;
+const functionDecls = new Map(); // name -> node
+const aliasPairs = []; // [alias, target]
+
 traverse(ast, {
+  FunctionDeclaration(p) {
+    const id = p.node.id?.name;
+    if (id && decoderNameRe.test(id)) {
+      functionDecls.set(id, p.node);
+    }
+  },
   VariableDeclarator(p) {
     const id = p.node.id;
     const init = p.node.init;
-    if (t.isIdentifier(id) && HEX_ID.test(id.name) && t.isIdentifier(init) && HEX_ID.test(init.name)) {
-      aliasMap.set(id.name, init.name);
+    if (!id || id.type !== "Identifier" || !init) return;
+
+    // alias: const alias = _0xabc123;
+    if (init.type === "Identifier") {
+      const alias = id.name;
+      const target = init.name;
+      if (decoderNameRe.test(alias) && decoderNameRe.test(target)) {
+        aliasPairs.push([alias, target]);
+      }
     }
-  }
+
+    // named function expression: const _0xabc123 = function (...) {...}
+    if (
+      (init.type === "FunctionExpression" || init.type === "ArrowFunctionExpression") &&
+      decoderNameRe.test(id.name)
+    ) {
+      // synthesize a FunctionDeclaration for uniform handling
+      const fakeDecl = t.functionDeclaration(
+        t.identifier(id.name),
+        init.params,
+        init.type === "ArrowFunctionExpression"
+          ? t.blockStatement([t.returnStatement(init.body)])
+          : init.body,
+      );
+      functionDecls.set(id.name, fakeDecl);
+    }
+  },
 });
 
-// 实用函数：把别名链解到最底
-function resolveReal(name) {
-  let cur = name, guard = 0;
-  while (aliasMap.has(cur) && guard++ < 10_000) cur = aliasMap.get(cur);
-  return cur;
-}
-
-// 收集调用点
+// Special helper providers that many obfuscators use (e.g. _0x1715 -> returns array)
+const helperNames = new Set(["_0x1715"]); // 可按需要扩展
 traverse(ast, {
-  CallExpression(p) {
-    const callee = p.node.callee;
-    if (!t.isIdentifier(callee)) return;
-    if (!HEX_ID.test(callee.name)) return;
-
-    const real = resolveReal(callee.name);
-    // 判断“参数是否可静态求值”
-    const argPaths = p.get("arguments");
-    const simple = argPaths.every(ap => {
-      const { confident } = ap.evaluate();
-      return confident;
-    });
-
-    calls.push({ path: p, shownName: callee.name, realName: real, simple });
-  }
+  FunctionDeclaration(p) {
+    const id = p.node.id?.name;
+    if (id && helperNames.has(id)) {
+      functionDecls.set(id, p.node);
+    }
+  },
 });
 
-console.log("===== SECOND PASS START =====");
-console.log(`[second-pass] 发现候选调用 ${calls.length} 处；别名数 ${aliasMap.size}（例如：${[...aliasMap.entries()].slice(0,3).map(([a,b])=>`${a}->${b}`).join(", ") || "无"}）`);
-
-if (!calls.length) {
-  finish(ast, code, outFile, "[second-pass] 没发现解码器候选，跳过");
-  process.exit(0);
+// -------- Build a safe VM with just those functions/aliases --------
+let bootSrc = "";
+for (const [, fn] of functionDecls) {
+  bootSrc += generate(fn, { comments: false }).code + "\n";
+}
+for (const [alias, target] of aliasPairs) {
+  bootSrc += `var ${alias} = ${target};\n`;
 }
 
-// ---------- 2) 模拟模式：先看覆盖面 ----------
-if (SIMULATE) {
-  let n = 0;
-  for (const { path: p, shownName } of calls) {
-    const argsText = p.node.arguments.map(a => generate(a).code).join(", ");
-    p.replaceWith(t.stringLiteral(`__SIM__${shownName}(${argsText})__`));
-    n++;
-  }
-  console.log(`[second-pass] 模拟模式：已替换 ${n} 处调用为占位串`);
-  finish(ast, code, outFile);
-  process.exit(0);
-}
+// 有些样本还会出现 `var version_ = 'jsjiami.com.v7'` 等变量，
+// 不影响求值，这里无需特别处理。
 
-// ---------- 3) 真实模式：沙箱运行源码，静态回填 ----------
 const vm = new VM({
   timeout: 2000,
-  sandbox: {
-    console: { log(){}, warn(){}, error(){} },
-    $request: {}, $response: {}, $done(){},
-    global: {},
-    window: {}
-  },
-  eval: true,
-  wasm: false
+  sandbox: {},
 });
 
+// try create callable table
+let decoderCallable = new Map();
 try {
-  vm.run(code); // 注册 _0x1e61 / _0x1715 / 表函数等
+  vm.run(bootSrc);
+  for (const name of functionDecls.keys()) {
+    // 仅把真正看起来像“索引+key”的解码器收进来
+    // 供调用点静态求值时匹配
+    if (decoderNameRe.test(name)) {
+      const fn = vm.run(`typeof ${name} === 'function' ? ${name} : null`);
+      if (typeof fn === "function") decoderCallable.set(name, fn);
+    }
+  }
+  // 把 alias 也映射成可调用
+  for (const [alias, target] of aliasPairs) {
+    if (decoderCallable.has(target)) {
+      const fn = vm.run(`typeof ${target} === 'function' ? ${target} : null`);
+      if (typeof fn === "function") decoderCallable.set(alias, fn);
+    }
+  }
 } catch (e) {
-  console.log(`[second-pass] sandbox run error（忽略继续）：${e && e.message}`);
+  log("[second-pass] sandbox init error：", e?.message || e);
 }
 
-let evaluated = 0;
-const cache = new Map(); // key: "realName(argJSON...)" -> string
+// -------- Utility: test if node is a constant (literal-ish) --------
+function isConstNode(n) {
+  if (!n) return false;
+  if (t.isStringLiteral(n) || t.isNumericLiteral(n) || t.isBooleanLiteral(n) || t.isNullLiteral(n) || t.isBigIntLiteral(n)) return true;
+  if (t.isUnaryExpression(n) && ["+", "-", "~", "!"].includes(n.operator)) {
+    return isConstNode(n.argument);
+  }
+  // template literals without expressions
+  if (t.isTemplateLiteral(n) && n.expressions.length === 0) return true;
+  return false;
+}
 
-for (const { path: p, realName, simple } of calls) {
-  if (!simple) continue; // 只处理能静态求值的
-
-  // 让 Babel 计算出实参常量值
-  const argVals = p.get("arguments").map(ap => ap.evaluate());
-  if (!argVals.every(v => v.confident)) continue;
-  const args = argVals.map(v => v.value);
-
-  const key = `${realName}(${JSON.stringify(args)})`;
-  if (!cache.has(key)) {
+function nodeToValue(n) {
+  if (t.isStringLiteral(n)) return n.value;
+  if (t.isNumericLiteral(n)) return n.value;
+  if (t.isBooleanLiteral(n)) return n.value;
+  if (t.isNullLiteral(n)) return null;
+  if (t.isBigIntLiteral(n)) return BigInt(n.value);
+  if (t.isUnaryExpression(n)) {
+    const v = nodeToValue(n.argument);
+    // 只处理常见一元
     try {
-      // 把常量组装成源码片段在 VM 中调用
-      const argCodes = args.map(a => typeof a === "string" ? JSON.stringify(a) : String(a)).join(", ");
-      const ret = vm.run(`${realName}(${argCodes})`);
-      if (typeof ret === "string") cache.set(key, ret);
-    } catch (e) { /* 忽略 */ }
+      switch (n.operator) {
+        case "+": return +v;
+        case "-": return -v;
+        case "~": return ~v;
+        case "!": return !v;
+      }
+    } catch {
+      return undefined;
+    }
   }
-  const decoded = cache.get(key);
-  if (typeof decoded === "string") {
-    p.replaceWith(t.stringLiteral(decoded));
-    evaluated++;
+  if (t.isTemplateLiteral(n) && n.expressions.length === 0) {
+    return n.quasis[0].value.cooked ?? n.quasis[0].value.raw;
   }
+  return undefined;
 }
 
-if (evaluated) {
-  console.log(`[second-pass] 已静态回填 ${evaluated} 处字符串`);
+// -------- Traverse calls & replace --------
+let candidateCalls = 0;
+let replaced = 0;
+
+traverse(ast, {
+  CallExpression(path) {
+    const callee = path.node.callee;
+
+    // 仅处理简单标识符调用：_0x1e61(...), _0xc3dd0a(...)
+    if (!t.isIdentifier(callee)) return;
+    const name = callee.name;
+    if (!decoderCallable.has(name)) return;
+
+    // 参数必须全是常量；（更激进的情况可自行扩展）
+    const args = path.node.arguments;
+    if (!args.length || !args.every(isConstNode)) return;
+
+    candidateCalls++;
+
+    // 取值
+    const argv = args.map(nodeToValue);
+    try {
+      // 用 VM 执行解码函数
+      // 注意：这里通过 vm.run 间接调用，而不是把函数带回宿主。
+      // 传参通过全局临时变量的方式安全传递。
+      vm.run(`globalThis.__args = ${JSON.stringify(argv)};`);
+      const result = vm.run(`${name}.apply(null, globalThis.__args)`);
+
+      // 替换结果：仅接收 string/number/bool/bigint/null
+      if (
+        typeof result === "string" ||
+        typeof result === "number" ||
+        typeof result === "boolean" ||
+        typeof result === "bigint" ||
+        result === null
+      ) {
+        let replacement;
+        if (typeof result === "string") replacement = t.stringLiteral(result);
+        else if (typeof result === "number")
+          replacement = t.numericLiteral(result);
+        else if (typeof result === "boolean")
+          replacement = t.booleanLiteral(result);
+        else if (typeof result === "bigint")
+          replacement = t.bigIntLiteral(result.toString() + "n");
+        else replacement = t.nullLiteral();
+
+        path.replaceWith(replacement);
+        replaced++;
+      }
+    } catch (e) {
+      // 忽略单点失败，继续走
+    }
+  },
+});
+
+// -------- Print stats & write --------
+if (candidateCalls === 0) {
+  log("===== SECOND PASS START =====");
+  log("[second-pass] 未发现可静态求值的调用点（可能参数不是常量，或候选在更深的闭包里）");
+  log("===== SECOND PASS END =====");
 } else {
-  console.log(`[second-pass] 未发现可静态求值的调用点（可能参数在更深闭包或运行期变化）`);
-}
-
-finish(ast, code, outFile);
-
-// ---------- helper ----------
-function finish(ast, original, outFile, msg) {
+  log("===== SECOND PASS START =====");
+  log(`[second-pass] 发现候选调用 ${candidateCalls} 处`);
+  log(`[second-pass] 已静态回填 ${replaced} 处`);
   const out = generate(ast, { comments: true }).code;
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, out);
-  if (msg) console.log(msg);
-  console.log("===== SECOND PASS END =====");
+  log("===== SECOND PASS END =====");
 }
