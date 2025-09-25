@@ -1,15 +1,6 @@
 name: Decode JS (1st + 2nd)
 
 on:
-  push:
-    paths:
-      - "input/**.js"
-      - "src/**"
-      - "package.json"
-      - "package-lock.json"
-      - "npm-shrinkwrap.json"
-      - "yarn.lock"
-      - ".github/workflows/decode.yml"
   workflow_dispatch:
 
 permissions:
@@ -25,114 +16,40 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 锁文件检测：决定是否启用 npm cache
-      - name: Detect lockfile
-        id: lock
-        run: |
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
-            echo "has_lock=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_lock=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Node (with cache)
-        if: steps.lock.outputs.has_lock == 'true'
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-
-      - name: Setup Node (no cache)
-        if: steps.lock.outputs.has_lock == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Print versions
-        run: |
-          node -v
-          npm -v
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install deps
-        run: |
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci
-          else
-            npm i --no-audit --fund=false
-          fi
+        run: npm ci || npm i
 
-      - name: Ensure output dir
-        run: mkdir -p output
+      - name: Decode (1st + 2nd)
+        run: npm run decode:all
 
-      # ---------- 第一次解密 ----------
-      - name: First pass (npm run decode)
-        id: first
-        run: |
-          set -e
-          npm run decode
-          # 校验文件是否存在且非空
-          if [ ! -s "output/output.js" ]; then
-            echo "First pass produced empty output/output.js"
-            # 标记为空，供后续判断，但不中断流水线
-            echo "first_ok=false" >> $GITHUB_OUTPUT
-          else
-            echo "first_ok=true" >> $GITHUB_OUTPUT
-          fi
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deobf-outputs
+          if-no-files-found: ignore
+          path: |
+            output/output.js
+            output/output.deob2.js
 
-      # ---------- 第二次解密（仅当第一次成功且有内容） ----------
-      - name: Second pass (npm run second)
-        if: steps.first.outputs.first_ok == 'true'
-        id: second
-        run: |
-          set -e
-          # 两种方式任选一种（优先 decode:all 一步到位）
-          if npm run | grep -q "decode:all"; then
-            npm run decode:all
-          else
-            npm run second
-          fi
-          # 允许两种默认产物名：output.deob2.js 或 output.2nd.js
-          OUT2=""
-          if [ -s "output/output.deob2.js" ]; then OUT2="output/output.deob2.js"; fi
-          if [ -z "$OUT2" ] && [ -s "output/output.2nd.js" ]; then OUT2="output/output.2nd.js"; fi
-          if [ -z "$OUT2" ]; then
-            echo "Second pass did not produce a non-empty deob file."
-            echo "second_ok=false" >> $GITHUB_OUTPUT
-          else
-            echo "Second pass OK -> $OUT2"
-            echo "second_path=$OUT2" >> $GITHUB_OUTPUT
-            echo "second_ok=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Show outputs
-        run: |
-          echo "first_ok = ${{ steps.first.outputs.first_ok }}"
-          echo "second_ok = ${{ steps.second.outputs.second_ok || 'N/A' }}"
-          echo "second_path = ${{ steps.second.outputs.second_path || 'N/A' }}"
-          echo
-          echo "ls -l output/"
-          ls -l output/ || true
-
-      # 仅提交 output/ 下有变更时
       - name: Commit outputs if changed
         run: |
           set -e
-          if [ -n "$(git status --porcelain output/)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add output/
-            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
-            git push
-            echo "Committed."
-          else
-            echo "nothing to commit"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "no changes"
+            exit 0
           fi
 
-      # 永远上传产物用于下载排查
-      - name: Upload artifact (output/)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: deobf-output
-          path: output/
-          if-no-files-found: warn
+          git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+          # 关键：先拉取再推送，避免被远端拒绝
+          git pull --rebase origin ${{ github.ref_name }}
+          git push origin ${{ github.ref_name }}
