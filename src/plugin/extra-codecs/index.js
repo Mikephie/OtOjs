@@ -1,34 +1,31 @@
-import jsjiamiV7Rc4 from './jsjiami_v7_rc4.js';
-import base64 from './base64.js';
-import common from './common.js';
+// src/plugin/extra-codecs/second-pass.js
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { runExtraCodecs } from './index.js';
 
-export function runExtraCodecs(code, { notes } = {}) {
-  let out = code;
-  const chain = [base64, common, jsjiamiV7Rc4]; // 可以多链
-  for (const fn of chain) {
-    try {
-      const next = fn(out, { notes });
-      if (typeof next === 'string' && next !== out) out = next;
-    } catch (e) {
-      notes?.push?.(`[extra-codecs] ${fn.name} failed: ${e.message}`);
-    }
-  }
-  return out;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const [, , inFile, outFile] = process.argv;
+
+if (!inFile || !outFile) {
+  console.error('Usage: node second-pass.js <inputFile> <outputFile>');
+  process.exit(1);
 }
 
-export function runExtraCodecsLoop(code, { notes } = {}, { maxPasses = 3 } = {}) {
-  let out = code;
-  for (let i = 1; i <= maxPasses; i++) {
-    const next = runExtraCodecs(out, { notes });
-    if (typeof next !== 'string' || next === out) {
-      if (i > 1) notes?.push?.(`extra-codecs: converged at pass ${i - 1}`);
-      return out;
-    }
-    out = next;
-    notes?.push?.(`extra-codecs: pass ${i} changed`);
-  }
-  notes?.push?.(`extra-codecs: reached max passes ${maxPasses}`);
-  return out;
-}
+const inputPath = path.resolve(__dirname, '../../..', inFile);   // 兼容从仓库根目录执行
+const outputPath = path.resolve(__dirname, '../../..', outFile);
 
-export default runExtraCodecs;
+const src = fs.readFileSync(inputPath, 'utf8');
+
+const notes = [];
+const out = runExtraCodecs(src, { notes });
+
+fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+fs.writeFileSync(outputPath, out, 'utf8');
+
+if (notes.length) {
+  console.log('Notes:', notes.join(' | '));
+}
+console.log(`Second pass wrote: ${outFile}`);
