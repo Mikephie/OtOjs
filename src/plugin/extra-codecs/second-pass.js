@@ -1,13 +1,12 @@
 // src/plugin/extra-codecs/second-pass.js
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import * as extra from './index.js';
 
 // 兼容 default / 具名导出
-import * as extra from './index.js';
 const runExtra =
   (extra && (extra.default || extra.runExtraCodecs)) ||
-  ((code) => code); // 找不到就原样返回，保证流程不中断
+  ((code) => code);
 
 const [, , inFile, outFileCli] = process.argv;
 const inputFile = inFile || 'output/output.js';
