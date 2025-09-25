@@ -1,179 +1,126 @@
 // src/plugin/extra-codecs/jsjiami_v7_rc4.js
-// 识别并沙箱执行 jsjiami v7 的 RC4 解密器，然后把形如 _0x1e61(0xea, 'lUu0') 的调用替换为字面量字符串。
+// 兼容 jsjiami v7（RC4系）—— 单/双参调用均可匹配
+// 依赖：vm2（已在 package.json 中）
 
-import vm from 'vm';
+import { VM } from 'vm2';
 
-/** 从某个位置起，按花括号配对截取完整 function 源码 */
-function sliceBalancedFunction(code, startIdx) {
-  let i = startIdx;
-  // 找到第一个 '{'
-  while (i < code.length && code[i] !== '{') i++;
-  if (i >= code.length || code[i] !== '{') return null;
+const STR_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';
 
-  let depth = 0;
-  let j = i;
-  for (; j < code.length; j++) {
-    const ch = code[j];
-    if (ch === '{') depth++;
-    else if (ch === '}') {
-      depth--;
-      if (depth === 0) {
-        return code.slice(startIdx, j + 1);
-      }
+/** 在代码中用正则抓取 "function name(...) { ... }" 的完整源码与位置 */
+function findFunctionSource(code, predicate) {
+  const fnRe = /function\s+([$\w]+)\s*\(([\s\S]*?)\)\s*\{([\s\S]*?)\}/g;
+  let m;
+  while ((m = fnRe.exec(code))) {
+    const [full, name, params, body] = m;
+    if (predicate({ name, params, body, full, index: m.index })) {
+      return { name, params, body, full, index: m.index, end: m.index + full.length };
     }
   }
   return null;
 }
 
-/** 尝试匹配：function NAME(...) 或 var/const NAME = function(...) */
-function findDecryptorName(code) {
-  // 先找 function NAME(...)
-  let m =
-    code.match(/\bfunction\s+(_0x[a-f0-9]{3,})\s*\(/i) ||
-    code.match(/\b(?:var|let|const)\s+(_0x[a-f0-9]{3,})\s*=\s*function\s*\(/i);
-  return m ? m[1] : null;
+/** 尝试定位 jsjiami v7 的解密函数（体内含 base64 表或 IEgssj 标记） */
+function locateDecryptor(code) {
+  return (
+    findFunctionSource(
+      code,
+      ({ body }) => body.includes(STR_ALPHABET) || body.includes('IEgssj')
+    ) || null
+  );
 }
 
-/** 找到 _0x1715 的函数名（有时也会是其它类似命名，但常见是 _0x1715） */
-function findStringTableFuncName(code) {
-  // 优先找 _0x1715，找不到再兜底匹配 “返回数组.concat(…)” 的典型结构
-  if (/\bfunction\s+_0x1715\s*\(/.test(code) || /\b(?:var|let|const)\s+_0x1715\s*=/.test(code)) {
-    return '_0x1715';
-  }
-  const m =
-    code.match(
-      /\bfunction\s+(_0x[a-f0-9]{3,})\s*\([^)]*\)\s*\{\s*[^}]*return\s+\[.*?\]\.concat\(/is
-    ) ||
-    code.match(
-      /\b(?:var|let|const)\s+(_0x[a-f0-9]{3,})\s*=\s*function\s*\([^)]*\)\s*\{\s*[^}]*return\s+\[.*?\]\.concat\(/is
+/** 典型数组工厂：function _0x1715() { ... return [...]; } */
+function locateArrayFactory(code) {
+  return (
+    findFunctionSource(code, ({ body }) => /return\s+[\[\(]/.test(body) && /concat\(/.test(body)) ||
+    findFunctionSource(code, ({ body }) => /return\s+[\[\(]/.test(body) && body.includes('_0xodH'))
+  );
+}
+
+/** 将十进制/十六进制数值文本转为 Number */
+function readIndex(numText) {
+  if (/^0x[0-9a-f]+$/i.test(numText)) return parseInt(numText, 16);
+  return parseInt(numText, 10);
+}
+
+/** 转义以安全写回源码 */
+function strLiteral(s) {
+  return JSON.stringify(String(s));
+}
+
+/** 主入口：接收整段代码，返回替换后的代码（或原文） */
+export default function jsjiamiV7Rc4(code, { notes } = {}) {
+  try {
+    const dec = locateDecryptor(code);
+    const arr = locateArrayFactory(code);
+
+    if (!dec || !arr) {
+      notes?.push?.('jsjiamiV7Rc4: decryptor or array factory not found');
+      return code;
+    }
+
+    const decName = dec.name;
+
+    // 在替换前，先把两段函数源码临时打洞，避免误伤
+    const HOLE_DEC = '/*__JSD__HOLE_DEC__*/';
+    const HOLE_ARR = '/*__JSD__HOLE_ARR__*/';
+
+    let work = code;
+    work =
+      work.slice(0, dec.index) +
+      HOLE_DEC +
+      work.slice(dec.end, arr.index) +
+      HOLE_ARR +
+      work.slice(arr.end);
+
+    // 构建沙箱并注入两段定义
+    const bootstrap = `${arr.full}\n${dec.full}\n`;
+    const vm = new VM({
+      timeout: 1000,
+      sandbox: {
+        atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+        btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+        Buffer,
+      },
+    });
+    vm.run(bootstrap);
+
+    // 支持 单参/双参 的调用：
+    // _0x1e61(0xea, "key") | _0x1e61(234) | _0x1e61 ( 0xea , 'k' )
+    const callRe = new RegExp(
+      `${decName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\(\\s*(0x[0-9a-fA-F]+|\\d+)\\s*(?:,\\s*(['"])([^'"]+)\\2)?\\s*\\)`,
+      'g'
     );
-  return m ? m[1] : null;
-}
 
-/** 提取完整函数源码（支持两种声明方式） */
-function extractFullFunctionSource(code, funcName) {
-  // 1) function NAME(
-  let m = code.match(
-    new RegExp(`\\bfunction\\s+${funcName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\(`)
-  );
-  if (m) {
-    const start = m.index;
-    return sliceBalancedFunction(code, start);
-  }
-  // 2) var/let/const NAME = function(
-  m = code.match(
-    new RegExp(
-      `\\b(?:var|let|const)\\s+${funcName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*=\\s*function\\s*\\(`
-    )
-  );
-  if (m) {
-    const start = m.index;
-    return sliceBalancedFunction(code, start);
-  }
-  return null;
-}
+    let replaced = 0;
+    work = work.replace(callRe, (_m, idxText, _q, keyText) => {
+      try {
+        const idx = readIndex(idxText);
+        const expr =
+          keyText === undefined
+            ? `${decName}(${idx})`
+            : `${decName}(${idx}, ${strLiteral(keyText)})`;
+        const decoded = vm.run(`${expr}`);
+        replaced++;
+        return strLiteral(decoded);
+      } catch (e) {
+        // 失败就不替换，保持原样
+        return _m;
+      }
+    });
 
-/** 在沙箱里创建解密函数 */
-function buildSandboxDecryptor({ code, decName, tableName, notes }) {
-  const decSrc = extractFullFunctionSource(code, decName);
-  if (!decSrc) {
-    notes?.push?.(`jsjiamiV7Rc4: decryptor source not found for ${decName}`);
-    return null;
-  }
+    // 还原两段函数定义
+    // （注意：为了保持可复现性，我们把“洞”替换回原代码的原样函数体）
+    work = work.replace(HOLE_DEC, dec.full).replace(HOLE_ARR, arr.full);
 
-  const tblSrc = tableName ? extractFullFunctionSource(code, tableName) : null;
-  if (!tblSrc) {
-    notes?.push?.(`jsjiamiV7Rc4: string table function not found (${tableName || 'unknown'})`);
-    return null;
-  }
+    notes?.push?.(`jsjiamiV7Rc4: replaced ${replaced} calls via sandbox`);
+    if (replaced === 0) {
+      notes?.push?.(`jsjiamiV7Rc4: no calls matched for ${decName}`);
+    }
 
-  // 注入必要的环境：_0xodH、$request/$response 等置空，避免副作用
-  const ctx = {
-    console,
-    module: {},
-    exports: {},
-    globalThis: {},
-  };
-  vm.createContext(ctx);
-
-  const scaffold = `
-    var _0xodH = 'jsjiami.com.v7';
-    ${tblSrc}
-    ${decSrc}
-    module.exports = { dec: ${decName} };
-  `;
-
-  try {
-    vm.runInContext(scaffold, ctx, { timeout: 200, filename: 'rc4_scaffold.js' });
+    return work;
   } catch (e) {
-    notes?.push?.(`jsjiamiV7Rc4: scaffold failed: ${e.message}`);
-    return null;
-  }
-
-  const dec = ctx.module?.exports?.dec;
-  if (typeof dec !== 'function') {
-    notes?.push?.(`jsjiamiV7Rc4: decryptor not a function`);
-    return null;
-  }
-  return dec;
-}
-
-/** 把 dec(0xea,'xx') 替换为字面量 */
-function replaceCallsWithLiterals(code, decName, dec, { notes }) {
-  let count = 0;
-
-  // 形如：_0x1e61(0xea,'lUu0') / _0x1e61(234,'key')
-  const callRe = new RegExp(
-    `${decName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\(\\s*(0x[0-9a-fA-F]+|\\d+)\\s*,\\s*(['"])([^'"]+)\\2\\s*\\)`,
-    'g'
-  );
-
-  const out = code.replace(callRe, (_m, idxLit, _q, key) => {
-    try {
-      const idx = idxLit.startsWith('0x') ? parseInt(idxLit, 16) : parseInt(idxLit, 10);
-      const val = dec(idx, key);
-      // 用 JSON.stringify 生成安全的 JS 字面量字符串
-      count++;
-      return JSON.stringify(val);
-    } catch (e) {
-      // 保守：替换失败就不改动
-      return _m;
-    }
-  });
-
-  if (count > 0) notes?.push?.(`jsjiamiV7Rc4: replaced ${count} calls via sandbox`);
-  else notes?.push?.(`jsjiamiV7Rc4: no calls matched for ${decName}`);
-
-  return out;
-}
-
-export default function jsjiamiV7Rc4Plugin(code, { notes } = {}) {
-  try {
-    // 粗筛：必须出现标识或典型结构
-    if (!/jsjiami\.com\.v7/.test(code) && !/_0xodH\s*=/.test(code)) {
-      notes?.push?.('jsjiamiV7Rc4: marker not found, skipped');
-      return code;
-    }
-
-    const decName = findDecryptorName(code);
-    const tableName = findStringTableFuncName(code);
-
-    if (!decName || !tableName) {
-      notes?.push?.(
-        `jsjiamiV7Rc4: decryptor definition not found (dec=${decName || '-'}, table=${
-          tableName || '-'
-        })`
-      );
-      return code;
-    }
-
-    const dec = buildSandboxDecryptor({ code, decName, tableName, notes });
-    if (!dec) return code;
-
-    const out = replaceCallsWithLiterals(code, decName, dec, { notes });
-    return out;
-  } catch (e) {
-    notes?.push?.(`jsjiamiV7Rc4: fatal ${e.message}`);
+    notes?.push?.(`jsjiamiV7Rc4: error ${e.message}`);
     return code;
   }
 }
