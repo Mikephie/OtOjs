@@ -1,61 +1,65 @@
-name: Decode JS (1st + 2nd)
+name: 🔓 Decode & Commit
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: write
+  push:
+    paths:
+      - "src/**"
+      - "plugins/**"
+      - "scripts/**"
+  schedule:
+    - cron: "0 3 * * *"  # 每天凌晨 3 点执行
 
 jobs:
   decode:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout
+      - name: 📦 Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
-      # ⚠️ 去掉了 cache: 'npm'；没有 lock 文件时必须不用缓存
-      - name: Setup Node
+      - name: 🧱 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
-      # 如果没有 package-lock.json，不能用 `npm ci`，改为 npm install
-      - name: Install deps
+      - name: 📥 Install deps
         run: |
-          npm install --no-audit --no-fund
+          npm ci || npm install
 
-      # —— 第一次解密 —— 读 input.js，写入 output/output.js
-      - name: First pass
+      - name: 🕵️ Run decoder
         run: |
+          echo ">>> Running decode pipeline"
           mkdir -p output
-          node src/main.js -i input.js -o output/output.js
+          node src/main.js || echo "⚠️ decode step failed"
 
-      # —— 第二次解密 —— 基于第一次产物输出 output/output.deob2.js
-      - name: Second pass
+      - name: ⬆️ Commit & Push (safe)
         run: |
-          node src/plugin/extra-codecs/second-pass.js output/output.js output/output.deob2.js
+          set -e
+          BRANCH="${GITHUB_REF##refs/heads/}"
 
-      # 产物作为 artifact 方便下载
-      - name: Upload artefacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: deobf-outputs
-          path: |
-            output/output.js
-            output/output.deob2.js
-
-      # 提交回仓库（避免 fast-forward 报错，先 fetch & rebase）
-      - name: Commit outputs if changed
-        run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch --all
-          git pull --rebase
-          git add output/output.js output/output.deob2.js || true
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
-            git push
-          else
-            echo "No changes to commit."
-          fi
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 暂存并提交
+          git add -A
+          git commit -m "chore: update decode outputs [skip ci]" || echo "nothing to commit"
+
+          # 同步远端
+          git fetch origin "$BRANCH" --depth=1
+
+          # 自动 rebase + autostash
+          git pull --rebase --autostash origin "$BRANCH" || (
+            echo "Retrying pull with manual stash…"
+            git stash --include-untracked
+            git pull --rebase origin "$BRANCH"
+            git stash pop || true
+          )
+
+          # 推送
+          git push origin HEAD:"$BRANCH"
