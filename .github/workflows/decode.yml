@@ -1,65 +1,97 @@
-name: 🔓 Decode & Commit
+name: Decode JS
 
 on:
-  workflow_dispatch:
   push:
     paths:
+      - "input/**.js"
       - "src/**"
-      - "plugins/**"
-      - "scripts/**"
-  schedule:
-    - cron: "0 3 * * *"  # 每天凌晨 3 点执行
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/decode.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 需要写权限才能提交 lockfile
 
 jobs:
   decode:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: 📦 Checkout
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: true  # 用 GITHUB_TOKEN 推送
 
-      - name: 🧱 Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: 📥 Install deps
-        run: |
-          npm ci || npm install
-
-      - name: 🕵️ Run decoder
-        run: |
-          echo ">>> Running decode pipeline"
-          mkdir -p output
-          node src/main.js || echo "⚠️ decode step failed"
-
-      - name: ⬆️ Commit & Push (safe)
+      # 1) 如果缺少 lockfile，则只生成 lockfile（不完整安装），并提交推回
+      - name: Create package-lock.json if missing
+        id: mklock
         run: |
           set -e
-          BRANCH="${GITHUB_REF##refs/heads/}"
+          if [ ! -f package-lock.json ]; then
+            echo "no_lock=true" >> $GITHUB_OUTPUT
+            npm install --package-lock-only --no-audit --fund=false
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: add package-lock.json [skip ci]"
+            # 仅在非 PR 场景推送
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              git push
+              echo "lock_pushed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "no_lock=false" >> $GITHUB_OUTPUT
+          fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      # 2) 安装依赖：有 lockfile 用 npm ci，否则退回 npm install
+      - name: Install dependencies
+        run: |
+          set -e
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --fund=false
+          fi
 
-          # 暂存并提交
-          git add -A
-          git commit -m "chore: update decode outputs [skip ci]" || echo "nothing to commit"
+      # 3) 运行解密
+      - name: Ensure output dir
+        run: mkdir -p output
 
-          # 同步远端
-          git fetch origin "$BRANCH" --depth=1
+      - name: Decode (non-blocking)
+        id: decode
+        run: |
+          set -o pipefail
+          npm run decode || echo "::warning::decode returned non-zero exit code"
+        continue-on-error: true
 
-          # 自动 rebase + autostash
-          git pull --rebase --autostash origin "$BRANCH" || (
-            echo "Retrying pull with manual stash…"
-            git stash --include-untracked
-            git pull --rebase origin "$BRANCH"
-            git stash pop || true
-          )
+      # 4) 仅提交 output 目录的变化
+      - name: Show git status (output/)
+        run: git status --porcelain output/ || true
 
-          # 推送
-          git push origin HEAD:"$BRANCH"
+      - name: Commit deobf outputs if changed
+        run: |
+          set -e
+          if [ -n "$(git status --porcelain output/)" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add output/
+            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git push
+            echo "Committed."
+          else
+            echo "nothing to commit"
+          fi
+
+      - name: Upload artifact (output/)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deobf-output
+          path: output/
+          if-no-files-found: ignore
