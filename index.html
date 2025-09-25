@@ -1,298 +1,178 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OtOjs · 前端控制台</title>
-  <meta name="description" content="OtOjs 前端：一键跳转、生成 Raw 链接、粘贴代码打包 input.js、复制 GitHub API 上传命令、预览 output.js。" />
-  <style>
-    :root{
-      --bg: radial-gradient(1200px 800px at 10% 0%, #0ea5e95c 0%, transparent 50%),
-            radial-gradient(900px 700px at 90% 20%, #22c55e40 0%, transparent 60%),
-            linear-gradient(180deg,#0b0f14 0%, #0b0f14 60%, #0b0f14 100%);
-      --card: rgba(255,255,255,.06);
-      --card-2: rgba(255,255,255,.08);
-      --text: #e6eef7;
-      --muted: #9db1c7;
-      --accent: #6ee7ff;
-      --accent-2:#7c3aed;
-      --ok: #10b981;
-      --warn:#f59e0b;
-      --err:#ef4444;
-      --radius: 20px;
-      --shadow: 0 10px 30px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
-      --glass: blur(8px) saturate(120%);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; padding:0; color:var(--text); background:var(--bg);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    a{color:var(--accent)}
-    .container{max-width:1100px; margin:0 auto; padding:28px 16px 80px}
-    header{
-      display:flex; align-items:center; gap:14px; margin-bottom:18px;
-    }
-    .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#22d3ee, #a78bfa);
-      box-shadow: 0 8px 24px rgba(124,58,237,.35), inset 0 1px 0 rgba(255,255,255,.3);
-    }
-    .title h1{margin:0;font-size:26px;letter-spacing:0.2px}
-    .title p{margin:2px 0 0;color:var(--muted);font-size:13px}
-
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-    .card{
-      grid-column:span 12;
-      background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius);
-      box-shadow: var(--shadow); backdrop-filter: var(--glass);
-    }
-    @media (min-width:900px){
-      .span-5{grid-column:span 5}
-      .span-7{grid-column:span 7}
-      .span-6{grid-column:span 6}
-      .span-4{grid-column:span 4}
-      .span-8{grid-column:span 8}
-    }
-    .card h2{margin:0; padding:16px 16px 8px; font-size:16px; font-weight:600}
-    .card .sub{color:var(--muted); font-size:12px; padding:0 16px 12px}
-    .section{padding:12px 16px 16px}
-    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .field{display:flex;gap:8px; width:100%; align-items:center}
-    .field input[type="text"], .field input[type="url"], .field textarea{
-      flex:1; width:100%; background:var(--card-2); border:1px solid rgba(255,255,255,.08);
-      color:var(--text); padding:10px 12px; border-radius:12px; outline:none;
-    }
-    textarea{min-height:140px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px}
-
-    .btn{padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.12);
-      background:linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.05));
-      color:var(--text); cursor:pointer; font-weight:600; font-size:13px; letter-spacing:.2px;
-      box-shadow: var(--shadow); backdrop-filter: var(--glass);
-    }
-    .btn:hover{transform: translateY(-1px)}
-    .btn:active{transform: translateY(0)}
-    .btn.ok{border-color: rgba(16,185,129,.35)}
-    .btn.warn{border-color: rgba(245,158,11,.35)}
-    .btn.err{border-color: rgba(239,68,68,.35)}
-    .kbd{font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas; padding:2px 6px; border-radius:6px; background:#0b1020; border:1px solid rgba(255,255,255,.08)}
-
-    .link-list{display:grid;grid-template-columns:repeat(2,1fr); gap:8px}
-    .link-item{display:flex;gap:10px;align-items:center; padding:10px 12px; border-radius:10px; background:var(--card-2); border:1px solid rgba(255,255,255,.06)}
-    .dot{width:8px;height:8px;border-radius:50%; background:var(--accent)}
-
-    .code{white-space:pre-wrap; background:#0b1020; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px; font-size:12px; overflow:auto}
-
-    footer{margin-top:20px; color:var(--muted); font-size:12px; text-align:center}
-    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid rgba(255,255,255,.12); border-radius:999px; background:var(--card-2)}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OtOjs · 最简稳定版（基于最初版精简改）</title>
+<style>
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#0b0f14;color:#e6eef7}
+  a{color:#67e8f9}
+  .wrap{max-width:860px;margin:0 auto;padding:18px 14px 80px}
+  h1{margin:10px 0 6px;font-size:20px}
+  .card{background:#0f1621;border:1px solid #1f2937;border-radius:12px;padding:12px;margin:10px 0}
+  label{font-size:12px;color:#9db1c7;margin-right:6px}
+  input,textarea{width:100%;box-sizing:border-box;background:#0f1a2b;color:#e6eef7;border:1px solid #223046;border-radius:10px;padding:10px;font-size:13px}
+  textarea{min-height:140px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .row>*{flex:1 1 180px}
+  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:#152033;color:#e6eef7;cursor:pointer;font-weight:600}
+  .ok{border-color:#10b981}
+  .warn{border-color:#f59e0b}
+  .err{border-color:#ef4444}
+  pre{white-space:pre-wrap;background:#0b1020;border:1px solid #223046;border-radius:10px;padding:10px;font-size:12px;max-height:360px;overflow:auto}
+  small{color:#9db1c7}
+</style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo" aria-hidden="true"></div>
-      <div class="title">
-        <h1>OtOjs · 前端控制台</h1>
-        <p>面向 <span class="pill"><span class="dot"></span>GitHub 仓库</span> 的轻量工具页（单文件部署）。</p>
+<div class="wrap">
+  <h1>OtOjs · 最简稳定版（按你的最初版风格）</h1>
+  <div class="card">
+    <div class="row">
+      <div style="flex:2">
+        <label>REPO</label>
+        <input id="repo" value="Mikephie/OtOjs" />
       </div>
-    </header>
-
-    <div class="grid" id="app">
-      <!-- 基本仓库设置 -->
-      <section class="card span-7">
-        <h2>① 仓库设置</h2>
-        <p class="sub">用于生成 Raw 链接、跳转到编辑页、拼接 API 命令等。</p>
-        <div class="section">
-          <div class="field">
-            <label class="kbd">REPO</label>
-            <input id="repo" type="text" placeholder="例如：Mikephie/OtOjs" value="Mikephie/OtOjs" />
-            <button class="btn" onclick="saveRepo()">保存</button>
-          </div>
-          <div class="field" style="margin-top:8px">
-            <label class="kbd">BRANCH</label>
-            <input id="branch" type="text" placeholder="main / master / 其它分支" value="main" />
-            <button class="btn" onclick="saveBranch()">保存</button>
-          </div>
-        </div>
-        <div class="section">
-          <div class="link-list">
-            <div class="link-item"><span class="dot"></span><a id="linkRepo" target="_blank">打开仓库</a></div>
-            <div class="link-item"><span class="dot"></span><a id="linkActions" target="_blank">打开 Actions</a></div>
-            <div class="link-item"><span class="dot"></span><a id="linkInputEdit" target="_blank">编辑 input.js</a></div>
-            <div class="link-item"><span class="dot"></span><a id="linkOutputRaw" target="_blank">查看 output.js (Raw)</a></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 便捷生成链接/路径 -->
-      <section class="card span-5">
-        <h2>② Raw 链接生成器</h2>
-        <p class="sub">输入相对路径，快速生成 GitHub Raw 直链（支持私库经 token 的 API 方式）。</p>
-        <div class="section">
-          <div class="field">
-            <input id="relPath" type="text" placeholder="例如：input.js 或 src/xxx.js" value="input.js" />
-            <button class="btn" onclick="genRaw()">生成</button>
-          </div>
-          <div id="rawOut" class="code" style="margin-top:10px"></div>
-        </div>
-      </section>
-
-      <!-- 粘贴代码 → 打包下载 input.js -->
-      <section class="card span-6">
-        <h2>③ 粘贴代码 → 生成 input.js</h2>
-        <p class="sub">将混淆/待处理脚本粘贴到下方，点击“打包下载”即可得到 <code>input.js</code>，再在 GitHub 上替换上传。</p>
-        <div class="section">
-          <div class="field">
-            <textarea id="paste" placeholder="在此粘贴待处理 JavaScript 源码..."></textarea>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <button class="btn ok" onclick="downloadInput()">打包下载 input.js</button>
-            <button class="btn" onclick="clearPaste()">清空</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- GitHub API 上传命令（可选） -->
-      <section class="card span-6">
-        <h2>④ 生成 GitHub API 上传命令（可选）</h2>
-        <p class="sub">若需直接用 API 覆盖仓库文件（适合私库/自动化），在本地替换 <code>YOUR_TOKEN</code> 后执行。</p>
-        <div class="section">
-          <div class="field"><input id="apiPath" type="text" value="input.js" /></div>
-          <div class="field"><input id="apiMsg" type="text" value="update: input.js via OtOjs UI" /></div>
-          <div class="row" style="margin:8px 0">
-            <button class="btn" onclick="genCurl('PUT')">生成 curl (创建/更新)</button>
-            <button class="btn warn" onclick="genCurl('GET')">生成 curl (读取)</button>
-          </div>
-          <div id="curlOut" class="code"></div>
-        </div>
-      </section>
-
-      <!-- 输出预览（只读） -->
-      <section class="card span-12">
-        <h2>⑤ output.js 快速预览</h2>
-        <p class="sub">点击“拉取最新输出”从 Raw 链接抓取并展示，仅用于快速查看。</p>
-        <div class="section">
-          <div class="row">
-            <button class="btn" onclick="loadOutput()">拉取最新输出</button>
-            <small style="color:var(--muted)">如为私库，请先在浏览器已登录 GitHub；或改用 API + Token。</small>
-          </div>
-          <pre id="outputView" class="code" style="margin-top:10px; max-height:360px"></pre>
-        </div>
-      </section>
+      <div>
+        <label>BRANCH</label>
+        <input id="branch" value="main" />
+      </div>
+      <div>
+        <label>Token（contents: rw）</label>
+        <input id="token" type="password" placeholder="ghp_..." />
+      </div>
     </div>
-
-    <footer>
-      <p>OtOjs Frontend · 单文件部署。支持直接放在 <span class="kbd">docs/</span> 或 GitHub Pages。</p>
-    </footer>
+    <div class="row">
+      <div>
+        <label>input.js 路径</label>
+        <input id="pathIn" value="input.js" />
+      </div>
+      <div>
+        <label>output.js 路径</label>
+        <input id="pathOut" value="output.js" />
+      </div>
+      <div>
+        <label>提交信息</label>
+        <input id="commitMsg" value="update: input.js via UI" />
+      </div>
+    </div>
   </div>
 
-  <script>
-    // --- State helpers ---
-    const $ = (sel)=> document.querySelector(sel);
-    const st = {
-      get repo(){ return localStorage.getItem('repo') || 'Mikephie/OtOjs' },
-      set repo(v){ localStorage.setItem('repo', v) },
-      get branch(){ return localStorage.getItem('branch') || 'main' },
-      set branch(v){ localStorage.setItem('branch', v) },
-    }
+  <div class="card">
+    <small>把待解密脚本放到 <b>input.js</b> → 等约 60s → 在 <b>output.js</b> 查看</small>
+    <div class="row">
+      <input type="file" id="file" accept=".js,.txt,.json" />
+      <button onclick="pick()">选择文件</button>
+      <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
+      <button onclick="loadRemote()">远程加载</button>
+      <button onclick="pasteFromClipboard()">粘贴板</button>
+      <button class="err" onclick="clrIn()">清空输入</button>
+    </div>
+    <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
+    <div class="row">
+      <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
+      <button class="warn" onclick="pollOutput(60)">② 等待并轮询 output.js (60s)</button>
+      <button onclick="beautify()">（可选）结果美化</button>
+      <button onclick="copySel('#codeOut', this)">复制结果</button>
+      <button class="err" onclick="clrAll()">清空输入与结果</button>
+    </div>
+    <div id="status"><small>状态：就绪</small></div>
+    <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+  </div>
 
-    function initLinks(){
-      const base = `https://github.com/${st.repo}`;
-      const blob = `${base}/blob/${st.branch}`;
-      const raw  = `https://raw.githubusercontent.com/${st.repo}/${st.branch}`;
-      $('#linkRepo').href = base;
-      $('#linkActions').href = `${base}/actions`;
-      $('#linkInputEdit').href = `${blob}/input.js`;
-      $('#linkOutputRaw').href = `${raw}/output.js`;
-    }
+  <div class="card">
+    <div class="row">
+      <button onclick="loadOutputRaw()">拉取最新 output.js (Raw)</button>
+      <button onclick="copySel('#outputRaw', this)">复制</button>
+      <button onclick="downloadOutput()">下载 output.js</button>
+    </div>
+    <pre id="outputRaw"></pre>
+  </div>
+</div>
 
-    function saveRepo(){ st.repo = $('#repo').value.trim(); initLinks(); toast('已保存 REPO') }
-    function saveBranch(){ st.branch = $('#branch').value.trim(); initLinks(); toast('已保存 BRANCH') }
+<script>
+const $=s=>document.querySelector(s);
+function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 
-    // --- Raw link generator ---
-    function genRaw(){
-      const rel = $('#relPath').value.trim().replace(/^\/+/, '');
-      const raw = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/${rel}`;
-      const api = `https://api.github.com/repos/${st.repo}/contents/${rel}?ref=${encodeURIComponent(st.branch)}`;
-      $('#rawOut').textContent = [
-        `# 公共直链 (Raw)\n${raw}`,
-        `\n# 私库 / 需 token 的 API 读取\n${api}`
-      ].join('\n');
-    }
+function ghHeaders(){
+  const t=$('#token').value.trim();
+  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
+  return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' };
+}
+function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 
-    // --- Paste → download input.js ---
-    function downloadInput(){
-      const code = $('#paste').value;
-      const blob = new Blob([code], {type: 'text/javascript;charset=utf-8'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'input.js';
-      a.click();
-      URL.revokeObjectURL(a.href);
-      toast('已打包下载 input.js');
-    }
-    function clearPaste(){ $('#paste').value = ''; }
+function pick(){ $('#file').click(); }
+$('#file').addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
+});
 
-    // --- GitHub API curl helper ---
-    async function genCurl(method){
-      const filePath = $('#apiPath').value.trim().replace(/^\/+/, '');
-      const msg = $('#apiMsg').value.trim();
-      const api = `https://api.github.com/repos/${st.repo}/contents/${filePath}`;
-      if(method === 'GET'){
-        $('#curlOut').textContent = `curl -H "Authorization: Bearer YOUR_TOKEN" \n  -H "Accept: application/vnd.github+json" \n  \"${api}?ref=${st.branch}\"`;
-        return;
-      }
-      // PUT 需要先查 sha（若文件已存在）
-      try{
-        let sha = '';
-        const res = await fetch(`${api}?ref=${st.branch}`);
-        if(res.ok){ const j = await res.json(); sha = j.sha || ''; }
-        const payload = {
-          message: msg,
-          content: btoa(unescape(encodeURIComponent('/* replace with your JS */'))),
-          branch: st.branch,
-          sha: sha || undefined
-        };
-        const pretty = JSON.stringify(payload, null, 2);
-        const curl = [
-          `curl -X PUT \`,
-          `  -H "Authorization: Bearer YOUR_TOKEN" \`,
-          `  -H "Accept: application/vnd.github+json" \`,
-          `  ${JSON.stringify(api)} \`,
-          `  -d ${JSON.stringify(pretty)}`
-        ].join('\n');
-        $('#curlOut').textContent = curl;
-      }catch(e){
-        $('#curlOut').textContent = '# 生成失败：' + e.message;
-      }
-    }
+async function loadRemote(){
+  let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
+  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
+    u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
+  }
+  try{
+    const r=await fetch(u,{cache:'no-cache'}); const t=await r.text();
+    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
+    $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
+  }catch(e){ setStatus('远程加载失败：'+e.message); }
+}
 
-    // --- Load output.js ---
-    async function loadOutput(){
-      const url = `https://raw.githubusercontent.com/${st.repo}/${st.branch}/output.js`;
-      try{
-        const res = await fetch(url);
-        if(!res.ok) throw new Error(res.status + ' ' + res.statusText);
-        const txt = await res.text();
-        $('#outputView').textContent = txt.slice(0, 200000);
-        toast('已拉取最新 output.js');
-      }catch(e){
-        $('#outputView').textContent = '# 拉取失败：' + e.message + '\n' + url;
-      }
-    }
+async function pasteFromClipboard(){
+  try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }
+  catch(e){ setStatus('粘贴失败：'+e.message); }
+}
+function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
+function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; setStatus('已清空输入与结果'); }
 
-    // --- tiny toast ---
-    function toast(msg){
-      const el = document.createElement('div');
-      el.textContent = msg;
-      el.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 14px;border-radius:12px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(6px);box-shadow:${getComputedStyle(document.documentElement).getPropertyValue('--shadow')};z-index:9999;font-size:13px`;
-      document.body.appendChild(el);
-      setTimeout(()=>{ el.remove() }, 1600);
-    }
+async function submitInput(){
+  const path=$('#pathIn').value.trim()||'input.js';
+  const api=`${repoBase()}/contents/${path}`;
+  const code=$('#codeIn').value; if(!code){ setStatus('没有可上传的内容'); return }
+  try{
+    let sha='';
+    const head=await fetch(`${api}?ref=${$('#branch').value.trim()}`,{headers:ghHeaders()});
+    if(head.ok){ const j=await head.json(); sha=j.sha||''; }
+    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
+    const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body) });
+    const txt=await res.text();
+    if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
+    setStatus('提交成功 · 已写入 '+path);
+  }catch(e){ setStatus('提交失败：'+e.message); }
+}
 
-    // --- boot ---
-    (function boot(){
-      $('#repo').value = st.repo; $('#branch').value = st.branch; initLinks(); genRaw();
-    })();
-  </script>
+async function pollOutput(seconds){
+  try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
+  const path=$('#pathOut').value.trim()||'output.js';
+  const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+  const t0=Date.now(); let last='';
+  setStatus('开始轮询 '+seconds+'s …');
+  while((Date.now()-t0)/1000 < seconds){
+    try{
+      const r=await fetch(api,{headers:ghHeaders()}); const raw=await r.text();
+      if(r.ok){
+        const j=JSON.parse(raw); const b64=(j.content||'').replace(/\n/g,'');
+        const out=j.content?decodeURIComponent(escape(atob(b64))):'';
+        if(out && out.trim()){ $('#codeOut').textContent=out; setStatus('✅ 已获取到 output.js'); return }
+      }else{ last=r.status+' '+r.statusText }
+    }catch(e){ last=e.message }
+    await new Promise(r=>setTimeout(r,5000));
+    setStatus('等待中… '+Math.floor((Date.now()-t0)/1000)+'/'+seconds+'s'+(last?(' · 上次：'+last):''));
+  }
+  setStatus('⌛ 仍未获取到 output.js，可再等一会儿或点击下方“拉取最新 output.js”');
+}
+
+async function loadOutputRaw(){
+  const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${$('#pathOut').value.trim()||'output.js'}`;
+  try{ const r=await fetch(url,{cache:'no-cache'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText); $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符'); }
+  catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
+}
+function downloadOutput(){ const t=$('#outputRaw').textContent||$('#codeOut').textContent||''; const b=new Blob([t],{type:'text/javascript;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href); }
+
+async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return; const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js'; const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js'; document.body.appendChild(s1); await new Promise(r=>s1.onload=r); document.body.appendChild(s2); await new Promise(r=>s2.onload=r); }
+async function beautify(){ let s=$('#codeOut').textContent||$('#codeIn').value||''; if(!s){ setStatus('无待美化内容'); return } try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }catch(e){ setStatus('Prettier 失败：'+e.message); } }
+
+async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent='复制结果',1200); }catch(e){ setStatus('复制失败：'+e.message); } }
+</script>
 </body>
 </html>
