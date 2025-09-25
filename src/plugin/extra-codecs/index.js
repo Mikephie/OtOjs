@@ -1,5 +1,5 @@
 // src/plugin/extra-codecs/index.js
-import jsjiamiV7Rc4 from './jsjiami-v7-rc4.js';
+import jsjiamiV7Rc4 from './jsjiami_v7_rc4.js';
 
 // 单轮执行
 export function runExtraCodecs(code, { notes } = {}) {
