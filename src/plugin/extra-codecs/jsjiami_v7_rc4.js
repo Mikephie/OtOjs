@@ -1,124 +1,92 @@
 // src/plugin/extra-codecs/jsjiami_v7_rc4.js
-// 兼容 jsjiami v7（RC4系）—— 单/双参调用均可匹配
-// 依赖：vm2（已在 package.json 中）
-
 import { VM } from 'vm2';
 
-const STR_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';
+/** 同时兼容
+ *   function NAME(...) { ... }
+ *   var/let/const NAME = function(...) { ... }
+ */
+function findFunction(code, name) {
+  const reFn  = new RegExp(`function\\s+(${name})\\s*\$begin:math:text$([^)]*)\\$end:math:text$\\s*{([\\s\\S]*?)}`, 'm');
+  const reVar = new RegExp(`(?:var|let|const)\\s+(${name})\\s*=\\s*function\\s*\$begin:math:text$([^)]*)\\$end:math:text$\\s*{([\\s\\S]*?)}`, 'm');
+  const m = reFn.exec(code) || reVar.exec(code);
+  if (!m) return null;
+  return { full: m[0], name: m[1], params: m[2], body: m[3] };
+}
 
-/** 在代码中用正则抓取 "function name(...) { ... }" 的完整源码与位置 */
-function findFunctionSource(code, predicate) {
-  const fnRe = /function\s+([$\w]+)\s*\(([\s\S]*?)\)\s*\{([\s\S]*?)\}/g;
-  let m;
-  while ((m = fnRe.exec(code))) {
-    const [full, name, params, body] = m;
-    if (predicate({ name, params, body, full, index: m.index })) {
-      return { name, params, body, full, index: m.index, end: m.index + full.length };
-    }
-  }
+/** 在解密函数体里寻找 “= 某名字();” 推断数组工厂名 */
+function guessArrayFactoryName(decBody) {
+  const m = /=\s*([$_A-Za-z]\w*)\s*\(\)\s*;/.exec(decBody);
+  return m ? m[1] : null;
+}
+
+/** 兜底：在全局找一个返回大数组/concat 的函数当作数组工厂 */
+function fuzzyFindArrayFactory(code) {
+  // 直接返回数组字面量
+  let m = /function\s+([$_A-Za-z]\w*)\s*\(\)\s*{\s*return\s*\[\s*(['"][\s\S]*?['"]\s*,){5,}[\s\S]*?\]\s*;?\s*}/m.exec(code);
+  if (m) return { full: m[0], name: m[1] };
+  // 多段 concat 拼接的大数组
+  m = /function\s+([$_A-Za-z]\w*)\s*\(\)\s*{[\s\S]{0,200}return[\s\S]*?\.concat\(/m.exec(code);
+  if (m) return { full: m[0], name: m[1] };
   return null;
 }
 
-/** 尝试定位 jsjiami v7 的解密函数（体内含 base64 表或 IEgssj 标记） */
-function locateDecryptor(code) {
-  return (
-    findFunctionSource(
-      code,
-      ({ body }) => body.includes(STR_ALPHABET) || body.includes('IEgssj')
-    ) || null
-  );
-}
-
-/** 典型数组工厂：function _0x1715() { ... return [...]; } */
-function locateArrayFactory(code) {
-  return (
-    findFunctionSource(code, ({ body }) => /return\s+[\[\(]/.test(body) && /concat\(/.test(body)) ||
-    findFunctionSource(code, ({ body }) => /return\s+[\[\(]/.test(body) && body.includes('_0xodH'))
-  );
-}
-
-/** 将十进制/十六进制数值文本转为 Number */
-function readIndex(numText) {
-  if (/^0x[0-9a-f]+$/i.test(numText)) return parseInt(numText, 16);
-  return parseInt(numText, 10);
-}
-
-/** 转义以安全写回源码 */
-function strLiteral(s) {
-  return JSON.stringify(String(s));
-}
-
-/** 主入口：接收整段代码，返回替换后的代码（或原文） */
 export default function jsjiamiV7Rc4(code, { notes } = {}) {
   try {
-    const dec = locateDecryptor(code);
-    const arr = locateArrayFactory(code);
+    // 1) 找解密函数（常见叫 _0x1e61，已解密后名字可能没变）
+    const dec = findFunction(code, '[_$A-Za-z]\\w{3,}'); // 允许任意名字；后面再确认
+    // 最可靠方式：先按常用名找，找不到再做“确认”
+    const decByName = findFunction(code, '_0x1e61') || dec;
 
-    if (!dec || !arr) {
-      notes?.push?.('jsjiamiV7Rc4: decryptor or array factory not found');
+    if (!decByName) {
+      notes?.push?.('jsjiamiV7Rc4: decryptor not found');
       return code;
     }
 
-    const decName = dec.name;
+    // 2) 从解密函数体里推断数组工厂名
+    const arrNameGuess = guessArrayFactoryName(decByName.body);
+    let arr;
+    if (arrNameGuess) {
+      arr = findFunction(code, arrNameGuess);
+    }
+    if (!arr) arr = findFunction(code, '_0x1715') || fuzzyFindArrayFactory(code);
 
-    // 在替换前，先把两段函数源码临时打洞，避免误伤
-    const HOLE_DEC = '/*__JSD__HOLE_DEC__*/';
-    const HOLE_ARR = '/*__JSD__HOLE_ARR__*/';
-
-    let work = code;
-    work =
-      work.slice(0, dec.index) +
-      HOLE_DEC +
-      work.slice(dec.end, arr.index) +
-      HOLE_ARR +
-      work.slice(arr.end);
-
-    // 构建沙箱并注入两段定义
-    const bootstrap = `${arr.full}\n${dec.full}\n`;
-    const vm = new VM({
-      timeout: 1000,
-      sandbox: {
-        atob: (s) => Buffer.from(s, 'base64').toString('binary'),
-        btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
-        Buffer,
-      },
-    });
-    vm.run(bootstrap);
-
-    // 支持 单参/双参 的调用：
-    // _0x1e61(0xea, "key") | _0x1e61(234) | _0x1e61 ( 0xea , 'k' )
-    const callRe = new RegExp(
-      `${decName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\(\\s*(0x[0-9a-fA-F]+|\\d+)\\s*(?:,\\s*(['"])([^'"]+)\\2)?\\s*\\)`,
-      'g'
-    );
-
-    let replaced = 0;
-    work = work.replace(callRe, (_m, idxText, _q, keyText) => {
-      try {
-        const idx = readIndex(idxText);
-        const expr =
-          keyText === undefined
-            ? `${decName}(${idx})`
-            : `${decName}(${idx}, ${strLiteral(keyText)})`;
-        const decoded = vm.run(`${expr}`);
-        replaced++;
-        return strLiteral(decoded);
-      } catch (e) {
-        // 失败就不替换，保持原样
-        return _m;
-      }
-    });
-
-    // 还原两段函数定义
-    // （注意：为了保持可复现性，我们把“洞”替换回原代码的原样函数体）
-    work = work.replace(HOLE_DEC, dec.full).replace(HOLE_ARR, arr.full);
-
-    notes?.push?.(`jsjiamiV7Rc4: replaced ${replaced} calls via sandbox`);
-    if (replaced === 0) {
-      notes?.push?.(`jsjiamiV7Rc4: no calls matched for ${decName}`);
+    if (!arr) {
+      notes?.push?.('jsjiamiV7Rc4: array factory not found');
+      return code;
     }
 
-    return work;
+    const decName = decByName.name;
+
+    // 3) 在沙箱里只挂载这两个函数，避免执行其它逻辑
+    const vm = new VM({ timeout: 1000, sandbox: { Buffer } });
+    vm.run(`${arr.full}\n${decByName.full}`);
+
+    let replaced = 0;
+
+    // 4) 先匹配双参调用：dec(0x123, "key")
+    const reTwo = new RegExp(`${decName}\\((0x[0-9a-fA-F]+|\\d+)\\s*,\\s*(['"])([^'"]*)\\2\\)`, 'g');
+    code = code.replace(reTwo, (m, idxTxt, _q, keyTxt) => {
+      try {
+        const idx = Number(idxTxt);
+        const val = vm.run(`${decName}(${idx}, ${JSON.stringify(keyTxt)})`);
+        replaced++;
+        return JSON.stringify(val);
+      } catch { return m; }
+    });
+
+    // 5) 再匹配单参调用：dec(0x123)
+    const reOne = new RegExp(`${decName}\$begin:math:text$(0x[0-9a-fA-F]+|\\\\d+)\\$end:math:text$`, 'g');
+    code = code.replace(reOne, (m, idxTxt) => {
+      try {
+        const idx = Number(idxTxt);
+        const val = vm.run(`${decName}(${idx})`);
+        replaced++;
+        return JSON.stringify(val);
+      } catch { return m; }
+    });
+
+    notes?.push?.(`jsjiamiV7Rc4: replaced ${replaced} calls`);
+    return code;
   } catch (e) {
     notes?.push?.(`jsjiamiV7Rc4: error ${e.message}`);
     return code;
