@@ -1,0 +1,91 @@
+name: Decode JS
+
+on:
+  push:
+    paths:
+      - "input.js"                 # ✅ 关键：根目录 input.js
+      - "decode.js"
+      - "package.json"
+      - "package-lock.json"
+      - "npm-shrinkwrap.json"
+      - "yarn.lock"
+      - ".github/workflows/decode.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0           # ✅ 提交更稳妥
+
+      - name: Detect lockfile
+        id: lock
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
+            echo "has_lock=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_lock=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node (cache)
+        if: steps.lock.outputs.has_lock == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Node (no cache)
+        if: steps.lock.outputs.has_lock == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm i --no-audit --fund=false
+          fi
+
+      - name: Run decode
+        run: |
+          set -e
+          # 尝试你项目里的命令；按需调整
+          npm run decode --if-present || node src/main.js || node decode.js
+
+          # 确保结果在根目录，若你的脚本写在 output/output.js，则 copy 过来
+          if [ -f output/output.js ] && [ ! -f output.js ]; then
+            cp -f output/output.js ./output.js
+          fi
+
+          test -f output.js || (echo "❌ 未生成 output.js" && exit 1)
+          ls -l output.js
+
+      - name: Commit output.js if changed
+        run: |
+          set -e
+          # 若 .gitignore 忽略了 output.js，强制添加
+          git add -f output.js
+
+          if git diff --cached --quiet -- output.js; then
+            echo "nothing to commit"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update output.js [skip ci]"
+          git push
+
+      - name: Upload artifact (output.js)
+        uses: actions/upload-artifact@v4
+        with:
+          name: deobf-output
+          path: output.js
