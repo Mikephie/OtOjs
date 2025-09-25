@@ -13,42 +13,49 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
+      # ⚠️ 去掉了 cache: 'npm'；没有 lock 文件时必须不用缓存
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
+      # 如果没有 package-lock.json，不能用 `npm ci`，改为 npm install
       - name: Install deps
-        run: npm ci || npm i
+        run: |
+          npm install --no-audit --no-fund
 
-      - name: Decode (1st + 2nd)
-        run: npm run decode:all
+      # —— 第一次解密 —— 读 input.js，写入 output/output.js
+      - name: First pass
+        run: |
+          mkdir -p output
+          node src/main.js -i input.js -o output/output.js
 
+      # —— 第二次解密 —— 基于第一次产物输出 output/output.deob2.js
+      - name: Second pass
+        run: |
+          node src/plugin/extra-codecs/second-pass.js output/output.js output/output.deob2.js
+
+      # 产物作为 artifact 方便下载
       - name: Upload artefacts
         uses: actions/upload-artifact@v4
         with:
           name: deobf-outputs
-          if-no-files-found: ignore
           path: |
             output/output.js
             output/output.deob2.js
 
+      # 提交回仓库（避免 fast-forward 报错，先 fetch & rebase）
       - name: Commit outputs if changed
         run: |
-          set -e
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -A
-          if git diff --cached --quiet; then
-            echo "no changes"
-            exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch --all
+          git pull --rebase
+          git add output/output.js output/output.deob2.js || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git push
+          else
+            echo "No changes to commit."
           fi
-
-          git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
-          git pull --rebase origin ${{ github.ref_name }}
-          git push origin ${{ github.ref_name }}
