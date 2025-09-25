@@ -1,28 +1,9 @@
-name: Decode JS
-
-on:
-  push:
-    paths:
-      - "input.js"                 # ✅ 关键：根目录 input.js
-      - "decode.js"
-      - "package.json"
-      - "package-lock.json"
-      - "npm-shrinkwrap.json"
-      - "yarn.lock"
-      - ".github/workflows/decode.yml"
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
 jobs:
   decode:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0           # ✅ 提交更稳妥
 
       - name: Detect lockfile
         id: lock
@@ -54,38 +35,83 @@ jobs:
             npm i --no-audit --fund=false
           fi
 
-      - name: Run decode
+      - name: Ensure output dir
+        run: mkdir -p output
+
+      # 第一次解密（保持你原来的“非阻塞”）
+      - name: Decode (non-blocking)
+        id: decode
+        run: |
+          set -o pipefail
+          npm run decode || echo "::warning::decode returned non-zero exit code"
+        continue-on-error: true
+
+      # === 新增 A：等待 output/output.js 产出、非空且稳定 ===
+      - name: Wait for output.js (up to 5 min)
+        id: wait_output
         run: |
           set -e
-          # 尝试你项目里的命令；按需调整
-          npm run decode --if-present || node src/main.js || node decode.js
+          FILE="output/output.js"
+          # 最长等待 300 秒（5 分钟），每 5 秒检查一次
+          for i in $(seq 1 60); do
+            if [ -s "$FILE" ]; then
+              # 再给一次稳定机会：1 秒后大小不变视为“写完”
+              sz1=$(stat -c%s "$FILE")
+              sleep 1
+              sz2=$(stat -c%s "$FILE")
+              if [ "$sz1" = "$sz2" ]; then
+                echo "ready=true" >> $GITHUB_OUTPUT
+                echo "Output present and stable: $FILE ($sz2 bytes)"
+                exit 0
+              fi
+            fi
+            echo "Waiting for $FILE ..."
+            sleep 5
+          done
+          echo "ready=false" >> $GITHUB_OUTPUT
+          echo "::warning::Timeout waiting for output.js"
 
-          # 确保结果在根目录，若你的脚本写在 output/output.js，则 copy 过来
-          if [ -f output/output.js ] && [ ! -f output.js ]; then
-            cp -f output/output.js ./output.js
-          fi
-
-          test -f output.js || (echo "❌ 未生成 output.js" && exit 1)
-          ls -l output.js
-
-      - name: Commit output.js if changed
+      # === 新增 B：只在第一次解密成功时做二次解密，并另存 ===
+      - name: Second pass (only if output.js ready)
+        if: steps.wait_output.outputs.ready == 'true'
+        id: second
         run: |
           set -e
-          # 若 .gitignore 忽略了 output.js，强制添加
-          git add -f output.js
-
-          if git diff --cached --quiet -- output.js; then
-            echo "nothing to commit"
+          IN="output/output.js"
+          OUT="output/output.deob2.js"
+          node second-pass.js "$IN" "$OUT" || {
+            echo "::warning::second pass failed"
             exit 0
+          }
+          if [ -s "$OUT" ]; then
+            echo "second_ok=true" >> $GITHUB_OUTPUT
+            echo "Second pass wrote $OUT ($(stat -c%s "$OUT") bytes)"
+          else
+            echo "second_ok=false" >> $GITHUB_OUTPUT
+            echo "::warning::Second pass produced empty file"
           fi
 
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: update output.js [skip ci]"
-          git push
+      - name: Show git status (output/)
+        run: git status --porcelain output/ || true
 
-      - name: Upload artifact (output.js)
+      # 有变化就提交（包含 output.deob2.js）
+      - name: Commit outputs if changed
+        run: |
+          set -e
+          if [ -n "$(git status --porcelain output/)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add output/
+            git commit -m "chore: update outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git push
+            echo "Committed."
+          else
+            echo "nothing to commit"
+          fi
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: deobf-output
-          path: output.js
+          path: output/
+          if-no-files-found: ignore
