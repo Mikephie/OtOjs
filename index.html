@@ -83,7 +83,7 @@
         <input id="maxWait" type="number" value="150" />
       </div>
     </div>
-    <div class="hint">说明：提交后会自动轮询你上面选择的输出文件；你也可以随时切换下拉框并手动拉取。</div>
+    <div class="hint">提交后自动轮询你选择的输出文件；也可随时切换并手动拉取。</div>
   </div>
 
   <div class="card">
@@ -137,13 +137,13 @@ function ghHeaders(){
   return {
     'Authorization':'Bearer '+t,
     'Accept':'application/vnd.github+json',
-    'If-None-Match': '' // 强制不要带旧 ETag
+    'If-None-Match': '' // 禁止沿用旧 ETag
   };
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 function nowTs(){ return Date.now().toString() }
 
-// 文件选择
+// 本地文件
 function pick(){ $('#file').click(); }
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
@@ -157,7 +157,7 @@ async function loadRemote(){
     u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
   }
   try{
-    const r=await fetch(u+'?t='+nowTs(),{cache:'no-cache'}); const t=await r.text();
+    const r=await fetch(u+'?t='+nowTs(),{cache:'no-store'}); const t=await r.text();
     if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
     $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
   }catch(e){ setStatus('远程加载失败：'+e.message); }
@@ -196,15 +196,14 @@ async function submitInput(){
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
     setStatus('提交成功 · 工作流将自动开始');
-    // 提交成功后自动开始轮询
+    // 提交成功后自动轮询当前选择的输出文件
     startAutoPoll(true);
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
 
-// —— 自动轮询逻辑 ——
-// 依据下拉框选择的文件进行轮询；无倒数计时；展示进度动画条；命中即停
+// —— 自动轮询 ——（无倒计时，仅动画条 + 间隔轮询 + 最大等待）
 let pollingTimer=null, barTimer=null;
-async function startAutoPoll(justSubmitted=false){
+async function startAutoPoll(){
   try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
   if(pollingTimer){ clearInterval(pollingTimer); pollingTimer=null; }
   if(barTimer){ clearInterval(barTimer); barTimer=null; }
@@ -254,7 +253,7 @@ async function startAutoPoll(justSubmitted=false){
       const b64=(j.content||'').replace(/\n/g,'');
       const out=j.content?b64ToUtf8(b64):'';
       if(out && out.trim()){
-        lastSha=sha||nowTs(); // 记住这次的 sha，避免误判
+        lastSha=sha||nowTs();
         $('#codeOut').textContent=out;
         setStatus('✅ 已获取到最新 '+which+' · '+(out.length)+' 字符');
         return true;
@@ -269,7 +268,7 @@ async function startAutoPoll(justSubmitted=false){
   }
 }
 
-// 手动拉取 Raw（两个按钮分别拉两个文件）
+// 手动拉取 Raw（两按钮分别拉两个路径）
 async function loadOutputRaw(path){
   path = path || $('#whichOut').value;
   const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
@@ -284,7 +283,7 @@ async function loadOutputRaw(path){
   }
 }
 
-// 下载当前结果（优先 codeOut，其次 Raw）
+// 下载（优先 codeOut，其次 Raw）
 function downloadOutput(){
   const t=$('#codeOut').textContent||$('#outputRaw').textContent||'';
   const a=document.createElement('a');
