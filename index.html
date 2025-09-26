@@ -32,22 +32,27 @@
   .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:6px 10px;background:#0b1020}
   .hint{font-size:12px;color:var(--muted)}
 
-  /* ===== 横向卡片按钮（图二） ===== */
-  .btnbar{display:flex !important;flex-wrap:wrap !important;gap:12px !important;margin:6px 0 0 !important}
-  .btncard{flex:1 1 150px !important;min-width:130px !important;max-width:190px !important;
-    display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;
-    padding:14px 12px !important;border-radius:14px !important;background:rgba(255,255,255,.06) !important;
-    border:1px solid rgba(255,255,255,.18) !important;color:#fff !important;text-align:center !important;cursor:pointer !important;
-    user-select:none !important;transition:transform .18s,background .18s,box-shadow .18s !important}
-  .btncard:hover{background:rgba(255,255,255,.12) !important;transform:translateY(-2px) !important;box-shadow:0 6px 18px rgba(0,0,0,.25) !important}
-  .btncard:active{transform:none !important}
-  .btnicon{font-size:22px !important;line-height:1 !important;margin-bottom:6px !important}
-  .btntxt{font-size:14px !important;font-weight:600 !important;letter-spacing:.02em !important}
-  @media (max-width:420px){ .btncard{flex-basis:48% !important} }
-  @media (prefers-color-scheme: light){
-    .btncard{background:rgba(0,0,0,.04) !important;border-color:rgba(0,0,0,.08) !important;color:#111 !important}
-    .btncard:hover{background:rgba(0,0,0,.08) !important}
+  /* —— 紧凑一排五个按钮（图二风格，节省空间） —— */
+  .btnbar{
+    display:grid !important;
+    grid-template-columns:repeat(5,1fr) !important;
+    gap:6px !important;
+    margin-top:8px !important;
+    position:relative; z-index:1;
   }
+  .btncard{
+    min-width:0 !important;max-width:none !important;
+    padding:10px 6px !important;border-radius:10px !important;
+    background:rgba(255,255,255,.06) !important;
+    border:1px solid rgba(255,255,255,.18) !important;
+    color:#fff !important;display:flex !important;
+    flex-direction:column !important;align-items:center !important;justify-content:center !important;
+    cursor:pointer !important;transition:transform .15s,background .15s,box-shadow .15s !important;
+    pointer-events:auto !important; z-index:2;
+  }
+  .btncard:hover{background:rgba(255,255,255,.12) !important;transform:translateY(-1px) !important;box-shadow:0 3px 8px rgba(0,0,0,.2) !important}
+  .btnicon{font-size:16px !important;margin-bottom:3px !important}
+  .btntxt{font-size:11px !important;font-weight:600 !important}
 </style>
 </head>
 <body>
@@ -106,30 +111,30 @@
   <div class="card">
     <small>把待解密脚本放到 <b>input.js</b> → 工作流自动跑 → 在你选择的输出文件中获取结果</small>
 
-    <!-- URL 单独一行 -->
+    <!-- URL 输入框独占一行 -->
     <div class="row">
       <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
     </div>
 
-    <!-- 隐藏的文件 input（由卡片触发） -->
+    <!-- 隐藏文件输入（由卡片触发） -->
     <input type="file" id="file" accept=".js,.txt,.json" hidden />
 
-    <!-- 图二：横向方块按钮 -->
-    <div class="btnbar">
-      <label for="file" class="btncard" role="button" tabindex="0" aria-label="选择文件">
-        <span class="btnicon">📁</span><span class="btntxt">选择文件</span>
+    <!-- 紧凑按钮栏：一排五个小卡片 -->
+    <div class="btnbar" id="quick-btns">
+      <label for="file" class="btncard" id="btn-file" role="button" tabindex="0" aria-label="文件">
+        <span class="btnicon">📁</span><span class="btntxt">文件</span>
       </label>
-      <button class="btncard" type="button" onclick="loadRemote()">
-        <span class="btnicon">🌐</span><span class="btntxt">远程加载</span>
+      <button class="btncard" id="btn-remote" type="button" aria-label="远程">
+        <span class="btnicon">🌐</span><span class="btntxt">远程</span>
       </button>
-      <button class="btncard" type="button" onclick="pasteFromClipboard()">
-        <span class="btnicon">📋</span><span class="btntxt">粘贴板</span>
+      <button class="btncard" id="btn-paste" type="button" aria-label="粘贴">
+        <span class="btnicon">📋</span><span class="btntxt">粘贴</span>
       </button>
-      <button class="btncard" type="button" onclick="beautify()">
-        <span class="btnicon">🧹</span><span class="btntxt">清理代码</span>
+      <button class="btncard" id="btn-clean" type="button" aria-label="格式">
+        <span class="btnicon">🧹</span><span class="btntxt">格式</span>
       </button>
-      <button class="btncard" type="button" onclick="clrIn()">
-        <span class="btnicon">🗑️</span><span class="btntxt">清空输入</span>
+      <button class="btncard" id="btn-clear" type="button" aria-label="清空">
+        <span class="btnicon">🗑️</span><span class="btntxt">清空</span>
       </button>
     </div>
 
@@ -160,6 +165,7 @@
 </div>
 
 <script>
+/* ====== 你的原功能代码（完整保留） ====== */
 const $=s=>document.querySelector(s);
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 function showBar(){ $('#barWrap').style.display='block'; const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.background='var(--accent)'; setTimeout(()=>b.style.width='100%',50); }
@@ -179,13 +185,14 @@ function ghHeaders(){
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 function nowTs(){ return Date.now().toString() }
 
-// 本地文件（由隐藏 input 触发）
+// 本地文件（隐藏 input 变更）
+function pick(){ $('#file').click(); } // 兼容旧调用
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
 });
 
-// 远程加载
+// 远程加载（支持 github/blob → raw）
 async function loadRemote(){
   let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
   if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
@@ -353,6 +360,26 @@ async function copySel(sel,btn){
     const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
   }catch(e){ setStatus('复制失败：'+e.message); }
 }
+
+/* ====== 按钮事件补丁：确保点击必触发（不改你原函数名） ====== */
+(function(){
+  function bind(id, fn){
+    const el = document.getElementById(id);
+    if(!el || typeof fn !== 'function') return;
+    el.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      try { fn(); } catch(err){ console.error(err); }
+    }, { passive:false });
+  }
+  bind('btn-remote', window.loadRemote);
+  bind('btn-paste',  window.pasteFromClipboard);
+  bind('btn-clean',  (function(){
+    if (typeof window.beautify === 'function') return window.beautify;
+    if (typeof window.cleanCode === 'function') return window.cleanCode;
+    return function(){};
+  })());
+  bind('btn-clear',  (window.clrIn || window.clearInput));
+})();
 </script>
 </body>
 </html>
