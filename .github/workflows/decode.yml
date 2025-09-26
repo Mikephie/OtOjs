@@ -1,17 +1,38 @@
 name: Decode JS (1st + 2nd)
 
 on:
-  push:
-    paths:
-      - "input/**.js"
-      - "src/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/decode.yml"
+  # 手动触发（可传入 input/output）
   workflow_dispatch:
+    inputs:
+      input_path:
+        description: 'Path to input file'
+        required: false
+        default: 'input.js'
+      output_path:
+        description: 'Path to first output'
+        required: false
+        default: 'output/output.js'
+
+  # 提交输入或源码变更时自动触发
+  push:
+    branches: [ main ]
+    paths:
+      - 'input.js'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/decode.yml'
+
+  # 前端可发 repository_dispatch 事件兜底触发
+  repository_dispatch:
+    types: [decode]
 
 permissions:
   contents: write
+
+concurrency:
+  group: decode-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   decode:
@@ -27,9 +48,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
+          cache: 'npm'
 
-      # 如果没有 lockfile，自动生成并推回（只做一次）
+      # 若缺少 lockfile，自动生成一次并推回（仅首次）
       - name: Create package-lock.json if missing
         run: |
           set -e
@@ -51,38 +73,81 @@ jobs:
             npm install --no-audit --fund=false
           fi
 
+      # 解析输入/输出路径（支持三种触发来源的覆盖：workflow_dispatch / repository_dispatch / 默认）
+      - name: Resolve paths
+        id: paths
+        shell: bash
+        run: |
+          set -e
+
+          # defaults
+          INPUT_PATH="input.js"
+          OUTPUT_PATH="output/output.js"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.input_path }}" ]; then
+              INPUT_PATH="${{ github.event.inputs.input_path }}"
+            fi
+            if [ -n "${{ github.event.inputs.output_path }}" ]; then
+              OUTPUT_PATH="${{ github.event.inputs.output_path }}"
+            fi
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            if [ -n "${{ github.event.client_payload.input }}" ]; then
+              INPUT_PATH="${{ github.event.client_payload.input }}"
+            fi
+            if [ -n "${{ github.event.client_payload.output }}" ]; then
+              OUTPUT_PATH="${{ github.event.client_payload.output }}"
+            fi
+          fi
+
+          echo "INPUT_PATH=$INPUT_PATH"   | tee -a $GITHUB_ENV
+          echo "OUTPUT_PATH=$OUTPUT_PATH" | tee -a $GITHUB_ENV
+
+          # second pass 输出：同目录、同名加 .deob2.js
+          DIR=$(dirname "$OUTPUT_PATH")
+          BASE=$(basename "$OUTPUT_PATH" .js)
+          OUT2="$DIR/$BASE.deob2.js"
+          echo "OUTPUT2_PATH=$OUT2" | tee -a $GITHUB_ENV
+
+          echo "input=$INPUT_PATH"   >> $GITHUB_OUTPUT
+          echo "output=$OUTPUT_PATH" >> $GITHUB_OUTPUT
+          echo "output2=$OUT2"       >> $GITHUB_OUTPUT
+
       - name: Ensure output dir
-        run: mkdir -p output
+        run: |
+          mkdir -p "$(dirname "$OUTPUT_PATH")"
 
       # —— 第一次解密（主插件链）——
-      - name: ▶ FIRST PASS (npm run decode)
+      - name: ▶ FIRST PASS
         id: first
         run: |
           echo "===== FIRST PASS START ====="
-          npm run decode
+          node src/main.js -i "$INPUT_PATH" -o "$OUTPUT_PATH"
           echo "===== FIRST PASS END ====="
+        env:
+          INPUT_PATH: ${{ env.INPUT_PATH }}
+          OUTPUT_PATH: ${{ env.OUTPUT_PATH }}
         continue-on-error: true
 
       - name: Check first pass result
         id: has_first
         run: |
-          if [ -s output/output.js ]; then
+          if [ -s "$OUTPUT_PATH" ]; then
             echo "has_first=true" >> $GITHUB_OUTPUT
-            echo "Found output/output.js (size: $(wc -c < output/output.js) bytes)"
+            echo "Found $OUTPUT_PATH (size: $(wc -c < "$OUTPUT_PATH") bytes)"
           else
             echo "has_first=false" >> $GITHUB_OUTPUT
-            echo "::warning::output/output.js not found or empty, skip second pass."
+            echo "::warning::$OUTPUT_PATH not found or empty, skip second pass."
           fi
 
-      # —— 第二次解密（只在第一次产物存在时执行）——
-      - name: ▶ SECOND PASS (node second-pass.js)
+      # —— 第二次解密（仅当第一次产物存在）——
+      - name: ▶ SECOND PASS
         if: steps.has_first.outputs.has_first == 'true'
         run: |
           echo "===== SECOND PASS START ====="
-          node src/plugin/extra-codecs/second-pass.js output/output.js output/output.deob2.js
+          node src/plugin/extra-codecs/second-pass.js "$OUTPUT_PATH" "$OUTPUT2_PATH"
           echo "===== SECOND PASS END ====="
 
-      # 只提交 output/ 变化
       - name: Show git status (output/)
         run: git status --porcelain output/ || true
 
@@ -92,8 +157,10 @@ jobs:
           if [ -n "$(git status --porcelain output/)" ]; then
             git config user.name  "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
+            # 防止推送冲突
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
             git add output/
-            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git commit -m "chore: update deobf outputs ($(date -u +'%Y-%m-%dT%H:%M:%SZ')) [skip ci]"
             git push
             echo "Committed new outputs."
           else
