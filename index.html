@@ -32,48 +32,43 @@
   .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:6px 10px;background:#0b1020}
   .hint{font-size:12px;color:var(--muted)}
 
-  /* —— 紧凑一排五个按钮 —— */
+  /* —— 紧凑一排五个按钮（节省空间） —— */
   .btnbar{
-    display:grid !important;
-    grid-template-columns:repeat(5,1fr) !important;
-    gap:6px !important;
-    margin-top:8px !important;
-    position:relative; z-index:1;
+    display:grid; grid-template-columns:repeat(5,1fr);
+    gap:6px; margin-top:8px; position:relative; z-index:1;
   }
   .btncard{
-    min-width:0 !important;max-width:none !important;
-    padding:10px 6px !important;border-radius:10px !important;
-    background:rgba(255,255,255,.06) !important;
-    border:1px solid rgba(255,255,255,.18) !important;
-    color:#fff !important;display:flex !important;
-    flex-direction:column !important;align-items:center !important;justify-content:center !important;
-    cursor:pointer !important;transition:transform .15s,background .15s,box-shadow .15s !important;
-    pointer-events:auto !important; z-index:2;
+    min-width:0; max-width:none;
+    padding:10px 6px; border-radius:10px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.18);
+    color:#fff; display:flex;
+    flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .15s,background .15s,box-shadow .15s;
   }
-  .btncard:hover{background:rgba(255,255,255,.12) !important;transform:translateY(-1px) !important;box-shadow:0 3px 8px rgba(0,0,0,.2) !important}
-  .btnicon{font-size:16px !important;margin-bottom:3px !important}
-  .btntxt{font-size:11px !important;font-weight:600 !important}
+  .btncard:hover{background:rgba(255,255,255,.12); transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,.2)}
+  .btnicon{font-size:16px}
+  .btntxt{font-size:11px; font-weight:600; margin-top:2px}
 
-  /* —— 远程按钮的内嵌弹窗 —— */
-  #btn-remote{ position:relative; }
+  /* —— 远程弹窗（悬浮，不占布局） —— */
   .remote-pop{
-    position:absolute; left:50%; top:100%; transform:translate(-50%,8px);
-    width:min(92vw, 360px);
+    position:fixed; left:0; top:0; width:min(92vw,360px);
     background:#0f1621; border:1px solid var(--line2); border-radius:12px;
     padding:10px; box-shadow:0 12px 28px rgba(0,0,0,.35);
-    display:none; z-index:99;
+    display:none; z-index:9999;
   }
-  .remote-pop.show{ display:block; }
-  .remote-pop .pop-row{ display:flex; gap:8px; }
+  .remote-pop.show{display:block;}
+  .remote-pop .pop-row{display:flex; gap:8px; margin-top:6px}
   .remote-pop input[type="url"]{
     flex:1 1 auto; min-width:0; background:#0f1a2b; border:1px solid var(--line2);
     border-radius:10px; padding:10px; color:var(--text); font-size:13px;
   }
   .remote-pop .pop-btn{
-    white-space:nowrap; padding:10px 12px; border-radius:10px; border:1px solid #2b3b54; background:var(--btn); color:var(--text); cursor:pointer;
+    white-space:nowrap; padding:8px 12px; border-radius:10px; border:1px solid #2b3b54;
+    background:var(--btn); color:var(--text); cursor:pointer;
   }
-  .remote-pop .pop-btn.ok{ border-color:var(--ok); }
-  .remote-pop .pop-btn.cancel{ border-color:var(--err); }
+  .remote-pop .pop-btn.ok{ border-color:var(--ok) }
+  .remote-pop .pop-btn.cancel{ border-color:var(--err) }
 </style>
 </head>
 <body>
@@ -132,50 +127,44 @@
   <div class="card">
     <small>把待解密脚本放到 <b>input.js</b> → 工作流自动跑 → 在你选择的输出文件中获取结果</small>
 
-    <!-- 隐藏远程URL，用于和 loadRemote() 对接（弹窗会把值写到这里） -->
-    <input id="remoteUrl" type="url" style="display:none" />
-
-    <!-- 隐藏文件输入（由“文件”卡片触发） -->
+    <!-- 隐藏文件 input（由“文件”卡片触发） -->
     <input type="file" id="file" accept=".js,.txt,.json" hidden />
 
-    <!-- 紧凑按钮栏：一排五个小卡片 -->
+    <!-- 按钮栏：一排紧凑小按钮 -->
     <div class="btnbar" id="quick-btns">
       <label for="file" class="btncard" id="btn-file" role="button" tabindex="0" aria-label="文件">
         <span class="btnicon">📁</span><span class="btntxt">文件</span>
       </label>
-
-      <!-- 远程：内嵌弹窗输入框 -->
-      <button class="btncard" id="btn-remote" type="button" aria-expanded="false" aria-controls="remote-pop">
+      <div class="btncard" id="btn-remote" role="button" tabindex="0" aria-expanded="false" aria-controls="remote-pop">
         <span class="btnicon">🌐</span><span class="btntxt">远程</span>
-
-        <div class="remote-pop" id="remote-pop" role="dialog" aria-label="远程加载">
-          <div class="pop-row" style="margin-bottom:8px">
-            <input id="remoteUrlInline" type="url" placeholder="https:// 原始脚本 URL（支持 github/blob → raw）" />
-          </div>
-          <div class="pop-row">
-            <button class="pop-btn ok" id="remote-confirm">拉取</button>
-            <button class="pop-btn cancel" id="remote-cancel">取消</button>
-          </div>
-        </div>
-      </button>
-
+      </div>
       <button class="btncard" id="btn-paste" type="button" aria-label="粘贴">
         <span class="btnicon">📋</span><span class="btntxt">粘贴</span>
       </button>
-
       <button class="btncard" id="btn-clean" type="button" aria-label="格式">
         <span class="btnicon">🧹</span><span class="btntxt">格式</span>
       </button>
-
       <button class="btncard" id="btn-clear" type="button" aria-label="清空">
         <span class="btnicon">🗑️</span><span class="btntxt">清空</span>
       </button>
     </div>
 
+    <!-- 远程弹窗（悬浮层） -->
+    <div class="remote-pop" id="remote-pop" role="dialog" aria-label="远程加载">
+      <input id="remoteUrlInline" type="url" placeholder="https:// 原始脚本 URL（支持 github/blob → raw）" />
+      <div class="pop-row">
+        <button class="pop-btn ok" id="remote-confirm">拉取</button>
+        <button class="pop-btn cancel" id="remote-cancel">取消</button>
+      </div>
+    </div>
+    <!-- 隐藏 URL 输入：与 loadRemote() 对接 -->
+    <input id="remoteUrl" type="url" style="display:none" />
+
     <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
     <div class="row">
       <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
       <button class="warn" onclick="startAutoPoll()">② 开始自动轮询（根据选择的输出文件）</button>
+      <button onclick="beautify()">（可选）结果美化</button>
       <button onclick="copySel('#codeOut', this)">复制结果</button>
       <button class="err" onclick="clrAll()">清空输入与结果</button>
     </div>
@@ -199,7 +188,7 @@
 </div>
 
 <script>
-/* ====== 原功能代码（完整保留） ====== */
+/* ====== 你的原有功能函数（完整保留） ====== */
 const $=s=>document.querySelector(s);
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 function showBar(){ $('#barWrap').style.display='block'; const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.background='var(--accent)'; setTimeout(()=>b.style.width='100%',50); }
@@ -213,7 +202,7 @@ function ghHeaders(){
   return {
     'Authorization':'Bearer '+t,
     'Accept':'application/vnd.github+json',
-    'If-None-Match': ''
+    'If-None-Match': '' // 禁止沿用旧 ETag
   };
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
@@ -289,13 +278,14 @@ async function startAutoPoll(){
   const interval=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
   const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
 
-  let lastSha=''; 
+  let lastSha=''; // 防止把旧内容当新内容
   let waited=0;
 
   setStatus('正在轮询：'+which);
   showBar();
   barTimer=setInterval(()=>{ const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; },5000);
 
+  // 先拉一次
   await tryFetch();
 
   pollingTimer=setInterval(async ()=>{
@@ -342,7 +332,7 @@ async function startAutoPoll(){
   }
 }
 
-// 手动拉取 Raw
+// 手动拉取 Raw（两按钮分别拉两个路径）
 async function loadOutputRaw(path){
   path = path || $('#whichOut').value;
   const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
@@ -357,7 +347,7 @@ async function loadOutputRaw(path){
   }
 }
 
-// 下载
+// 下载（优先 codeOut，其次 Raw）
 function downloadOutput(){
   const t=$('#codeOut').textContent||$('#outputRaw').textContent||'';
   const a=document.createElement('a');
@@ -395,7 +385,7 @@ async function copySel(sel,btn){
   }catch(e){ setStatus('复制失败：'+e.message); }
 }
 
-/* ====== 远程弹窗交互：不改你的 loadRemote()，只写值再调用 ====== */
+/* ====== 远程弹窗交互（不改 loadRemote：只把值写入 #remoteUrl 再调用它） ====== */
 (function(){
   const btn = document.getElementById('btn-remote');
   const pop = document.getElementById('remote-pop');
@@ -404,44 +394,56 @@ async function copySel(sel,btn){
   const confirmBtn  = document.getElementById('remote-confirm');
   const cancelBtn   = document.getElementById('remote-cancel');
 
+  function placePop(){
+    const r = btn.getBoundingClientRect();
+    const popW = Math.min(360, Math.max(260, r.width*2));
+    pop.style.width = popW + 'px';
+    let left = r.left + r.width/2 - popW/2;
+    left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
+    const top = r.bottom + 8;
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+  }
   function openPop(){
+    placePop();
     pop.classList.add('show');
     btn.setAttribute('aria-expanded','true');
     setTimeout(()=>inputInline?.focus(), 0);
+    window.addEventListener('resize', placePop);
+    window.addEventListener('scroll', placePop, {passive:true});
   }
   function closePop(){
     pop.classList.remove('show');
     btn.setAttribute('aria-expanded','false');
+    window.removeEventListener('resize', placePop);
+    window.removeEventListener('scroll', placePop);
   }
 
-  // 点击“远程”按钮：切换弹窗
-  btn.addEventListener('click', (e)=>{
-    // 如果点击落在弹窗内部，不切换开关（交由内部按钮处理）
-    if(pop.contains(e.target)) return;
-    const isOpen = pop.classList.contains('show');
-    if(isOpen) closePop(); else openPop();
-  });
+  btn.addEventListener('click', (e)=>{ e.preventDefault(); pop.classList.contains('show')? closePop(): openPop(); });
+  btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); btn.click(); } });
 
-  // “取消”关闭
   cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closePop(); });
 
-  // “拉取”写值并调用原 loadRemote()
   async function doFetchFromInline(){
     const u = (inputInline.value||'').trim();
     if(!u){ setStatus('请输入 URL'); inputInline.focus(); return; }
-    inputHidden.value = u;  // 写入隐藏的 #remoteUrl
-    closePop();
-    try{
-      if(typeof window.loadRemote === 'function'){ await window.loadRemote(); }
-    }catch(err){ console.error(err); }
+    inputHidden.value = u;    // 写入隐藏 input
+    closePop();               // 关闭弹窗
+    try{ await loadRemote(); }catch(err){ console.error(err); }
   }
   confirmBtn.addEventListener('click', (e)=>{ e.preventDefault(); doFetchFromInline(); });
   inputInline.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doFetchFromInline(); } });
 
-  // 点击外部区域收起
   document.addEventListener('click', (e)=>{
-    if(!btn.contains(e.target)){ closePop(); }
+    const inBtn = btn.contains(e.target);
+    const inPop = pop.contains(e.target);
+    if(!inBtn && !inPop) closePop();
   });
+
+  // 其他按钮绑定（保持功能不变）
+  document.getElementById('btn-paste')?.addEventListener('click', (e)=>{ e.preventDefault(); pasteFromClipboard(); });
+  document.getElementById('btn-clean')?.addEventListener('click', (e)=>{ e.preventDefault(); beautify(); });
+  document.getElementById('btn-clear')?.addEventListener('click', (e)=>{ e.preventDefault(); clrIn(); });
 })();
 </script>
 </body>
