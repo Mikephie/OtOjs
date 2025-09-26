@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · Output 双选项 + 60s 计时动画</title>
+<title>OtOjs · Output 双选项 + 60s 计时动画（SVG）</title>
 <style>
   :root{--bg:#0b0f14;--card:#0f1621;--b:#1f2937;--ink:#e6eef7;--mut:#9db1c7;--pri:#3b82f6;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
   *{box-sizing:border-box}
@@ -25,21 +25,21 @@
   /* 线性进度条 */
   .progress{margin-top:8px;height:10px;background:#101827;border:1px solid #223046;border-radius:6px;overflow:hidden}
   .bar{height:100%;width:0;background:var(--pri);transition:width 1s linear}
-  /* 圆形计时环 */
-  .timer-wrap{display:flex;align-items:center;gap:12px;margin:8px 0}
-  .ring{--p:0; width:64px;height:64px;border-radius:50%;
-    background:
-      conic-gradient(var(--pri) calc(var(--p)*1%), #233043 0),
-      radial-gradient(#0b1020 62%, transparent 63%) ;
-    display:grid;place-items:center;border:1px solid #223046}
-  .ring > span{font-weight:700}
+  /* SVG 计时器 */
+  .timer-wrap{display:none;align-items:center;gap:12px;margin:8px 0}
+  .svgbox{position:relative;width:64px;height:64px}
+  .svgbox svg{transform:rotate(-90deg)}
+  .svgbox .sec{
+    position:absolute;inset:0;display:grid;place-items:center;
+    font-weight:800;font-size:14px
+  }
   .mut{color:var(--mut)}
   .row-right{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>OtOjs · Output 双选项 + 60s 计时动画</h1>
+  <h1>OtOjs · Output 双选项 + 60s 计时动画（SVG）</h1>
 
   <div class="card">
     <div class="row">
@@ -83,10 +83,17 @@
 
     <div id="status"><small>状态：就绪</small></div>
 
-    <!-- 计时动画（圆环+进度条） -->
-    <div id="timerBox" class="timer-wrap" style="display:none">
-      <div class="ring" id="ring"><span id="sec">0s</span></div>
-      <div class="mut">正在获取… 最多 60 秒。提前拿到会立刻结束并显示结果。</div>
+    <!-- 计时器（SVG 圆环 + 大号秒数） -->
+    <div id="timerBox" class="timer-wrap">
+      <div class="svgbox">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28" stroke="#223046" stroke-width="6" fill="none"/>
+          <circle id="arc" cx="32" cy="32" r="28" stroke="#3b82f6" stroke-width="6" fill="none"
+                  stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="176"/>
+        </svg>
+        <div class="sec" id="sec">0s</div>
+      </div>
+      <div class="mut" id="timerTip">正在获取… 最多 60 秒。提前拿到会立刻结束并显示结果。</div>
     </div>
     <div class="progress"><div class="bar" id="bar"></div></div>
 
@@ -137,7 +144,7 @@ async function submitInput(){
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
 
-/* ========== 轮询 + 计时动画 ========== */
+/* ========== 轮询 + 计时动画 (SVG) ========== */
 let aborter=null, rafId=0;
 function cancelPoll(){ if(aborter){ aborter.abort(); aborter=null; } setStatus('已取消'); $('#btnCancel').style.display='none'; $('#timerBox').style.display='none'; $('#bar').style.width='0%'; cancelAnimationFrame(rafId); }
 
@@ -146,21 +153,23 @@ async function pollOutput(seconds){
   const path=$('#pathOut').value.trim()||'output/output.js';
   const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
 
-  // UI: 显示计时器
+  // 显示计时器
   $('#btnCancel').style.display='inline-block';
   $('#timerBox').style.display='flex';
   $('#bar').style.width='0%';
-  const ring=$('#ring'), sec=$('#sec');
+
+  const arc=$('#arc'); const perimeter=176; // 2πr，r=28 => ≈175.9
+  const sec=$('#sec'); const tip=$('#timerTip');
   const t0=performance.now();
 
-  // 连续动画（1/60s 刷新环形进度）
   function paint(){
     const t=(performance.now()-t0)/1000;
-    const p=Math.min(100, t/seconds*100);
-    ring.style.setProperty('--p', p.toFixed(2));
+    const p=Math.min(1, t/seconds);
+    arc.setAttribute('stroke-dashoffset', String(perimeter*(1-p)));
     sec.textContent=Math.floor(Math.min(t,seconds))+'s';
     rafId=requestAnimationFrame(paint);
   }
+  arc.setAttribute('stroke-dashoffset', String(perimeter));
   rafId=requestAnimationFrame(paint);
 
   aborter=new AbortController();
@@ -176,6 +185,7 @@ async function pollOutput(seconds){
           $('#codeOut').textContent=out;
           setStatus('✅ 已获取：'+path);
           $('#bar').style.width='100%';
+          tip.textContent='已获取结果';
           cancelAnimationFrame(rafId);
           $('#btnCancel').style.display='none';
           return;
@@ -183,12 +193,13 @@ async function pollOutput(seconds){
       }else{ last=r.status+' '+r.statusText }
     }catch(e){ if(e.name==='AbortError') return; last=e.message; }
     $('#bar').style.width=(100*(i+1)/seconds)+'%';
-    setStatus('等待中… '+(i+1)+'/'+seconds+'s'+(last?(' · 上次：'+last):''));
+    setStatus('等待中… '+(i+1)+'/'+seconds+'s'+(last?(' · 上次：'+last):''));    
     await new Promise(r=>setTimeout(r,1000));
   }
   cancelAnimationFrame(rafId);
   $('#btnCancel').style.display='none';
-  setStatus('⌛ 仍未获取到：'+path+'（可继续点下方“拉取最新 output (Raw)”）');
+  tip.textContent='超时未获取到，试试下方“拉取最新 output (Raw)”';
+  setStatus('⌛ 仍未获取到：'+path);
 }
 
 async function loadOutputRaw(){
