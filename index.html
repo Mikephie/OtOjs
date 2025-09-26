@@ -112,22 +112,84 @@
 
 <script>
 const $=s=>document.querySelector(s);
-function setStatus(msg){ $('#status').innerHTML='<small>状态：'+msg+'</small>'; }
-function ghHeaders(){ const t=$('#token').value.trim(); if(!t) throw new Error('缺少 Token（需要 contents: rw）'); return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' }; }
-function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
-function pick(){ $('#file').click(); }
-$('#file').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入 '+f.name+' · '+txt.length+' 字符'); });
+function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 
+// ---- GitHub API ----
+function ghHeaders(){
+  const t=$('#token').value.trim();
+  if(!t) throw new Error('缺少 Token（需要 contents: read & write）');
+  return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' };
+}
+function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
+
+// 文件选择 / 远程加载 / 粘贴板 / 清空 —— 与之前一致
+function pick(){ $('#file').click(); }
+$('#file').addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
+});
 async function loadRemote(){
   let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
-  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){ u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/'); }
-  try{ const r=await fetch(u,{cache:'no-cache'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText); $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符'); }
-  catch(e){ setStatus('远程加载失败：'+e.message); }
+  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
+    u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
+  }
+  try{
+    const r=await fetch(u,{cache:'no-cache'}); const t=await r.text();
+    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
+    $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
+  }catch(e){ setStatus('远程加载失败：'+e.message); }
 }
-async function pasteFromClipboard(){ try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); } catch(e){ setStatus('粘贴失败：'+e.message); } }
+async function pasteFromClipboard(){
+  try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }
+  catch(e){ setStatus('粘贴失败：'+e.message); }
+}
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
 function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; setStatus('已清空输入与结果'); }
 
+// ---- 计时器（倒计时 + 进度条 + 最短展示 2s）----
+let aborter=null, rafId=0, secTimer=null;
+function showTimerUI(show){
+  const box=$('#timerBox'); if(!box) return;
+  box.style.display = show ? 'flex' : 'none';
+  $('#btnCancel').style.display = show ? 'inline-block' : 'none';
+}
+function startTimer(seconds){
+  cancelAnimationFrame(rafId); clearInterval(secTimer);
+  const arc=$('#arc'); const perimeter=176; // 2πr, r≈28
+  const sec=$('#sec'); const bar=$('#bar');
+  if(arc){ arc.setAttribute('stroke-dasharray', String(perimeter)); arc.setAttribute('stroke-dashoffset', String(perimeter)); }
+  if(bar){ bar.style.width='0%'; }
+  if(sec){ sec.textContent=seconds+'s'; }
+
+  const t0=performance.now();
+  function paint(){
+    const t=(performance.now()-t0)/1000;
+    const left=Math.max(0, seconds - t);
+    const p=Math.min(1, t/seconds);
+    if(arc) arc.setAttribute('stroke-dashoffset', String(perimeter*(1-p)));
+    if(sec) sec.textContent = Math.ceil(left)+'s';
+    if(bar) bar.style.width = (100*p)+'%';
+    if(p<1) rafId=requestAnimationFrame(paint);
+  }
+  rafId=requestAnimationFrame(paint);
+
+  // 文本兜底（极端情况下 SVG 不刷新时）
+  secTimer=setInterval(()=>{
+    const txt=sec?.textContent||'';
+    const n=parseInt(txt)||seconds;
+    const left=Math.max(0, n-1);
+    if(sec) sec.textContent=left+'s';
+  },1000);
+}
+function stopTimer(){ cancelAnimationFrame(rafId); clearInterval(secTimer); $('#btnCancel').style.display='none'; }
+function cancelPoll(){
+  if(aborter){ aborter.abort(); aborter=null; }
+  stopTimer(); showTimerUI(false);
+  setStatus('已取消');
+  const bar=$('#bar'); if(bar) bar.style.width='0%';
+}
+
+// ---- 提交 input.js（成功后自动开始轮询）----
 async function submitInput(){
   const path=$('#pathIn').value.trim()||'input.js';
   const api=`${repoBase()}/contents/${path}`;
@@ -136,84 +198,90 @@ async function submitInput(){
     let sha='';
     const head=await fetch(`${api}?ref=${$('#branch').value.trim()}`,{headers:ghHeaders()});
     if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
+    const body={ message: $('#commitMsg').value.trim()||'update via UI',
+      content: btoa(unescape(encodeURIComponent(code))),
+      branch: $('#branch').value.trim(), sha: sha||undefined };
     const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body) });
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
     setStatus('提交成功 · 已写入 '+path);
+    // ✅ 自动开始轮询 60s（提交成功立即启动）
+    pollOutput(60);
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
 
-/* ========== 轮询 + 计时动画 (SVG) ========== */
-let aborter=null, rafId=0;
-function cancelPoll(){ if(aborter){ aborter.abort(); aborter=null; } setStatus('已取消'); $('#btnCancel').style.display='none'; $('#timerBox').style.display='none'; $('#bar').style.width='0%'; cancelAnimationFrame(rafId); }
-
+// ---- 轮询 output（倒计时 + 最短展示 2s）----
 async function pollOutput(seconds){
   try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
   const path=$('#pathOut').value.trim()||'output/output.js';
   const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
 
-  // 显示计时器
-  $('#btnCancel').style.display='inline-block';
-  $('#timerBox').style.display='flex';
-  $('#bar').style.width='0%';
-
-  const arc=$('#arc'); const perimeter=176; // 2πr，r=28 => ≈175.9
-  const sec=$('#sec'); const tip=$('#timerTip');
-  const t0=performance.now();
-
-  function paint(){
-    const t=(performance.now()-t0)/1000;
-    const p=Math.min(1, t/seconds);
-    arc.setAttribute('stroke-dashoffset', String(perimeter*(1-p)));
-    sec.textContent=Math.floor(Math.min(t,seconds))+'s';
-    rafId=requestAnimationFrame(paint);
-  }
-  arc.setAttribute('stroke-dashoffset', String(perimeter));
-  rafId=requestAnimationFrame(paint);
-
+  showTimerUI(true); startTimer(seconds);
+  setStatus(`开始轮询 ${seconds}s：${path}`);
   aborter=new AbortController();
-  let last='';
 
+  const start=performance.now(); let lastNote='';
   for(let i=0;i<seconds;i++){
     try{
-      const r=await fetch(api,{headers:ghHeaders(),signal:aborter.signal}); const raw=await r.text();
+      const r=await fetch(api,{headers:ghHeaders(),signal:aborter.signal,cache:'no-cache'});
+      const raw=await r.text();
       if(r.ok){
-        const j=JSON.parse(raw); const b64=(j.content||'').replace(/\n/g,'');
+        const j=JSON.parse(raw);
+        const b64=(j.content||'').replace(/\n/g,'');
         const out=j.content?decodeURIComponent(escape(atob(b64))):'';
         if(out && out.trim()){
+          // 至少展示 2s 的动画
+          const elapsed=(performance.now()-start)/1000;
+          if(elapsed<2) await new Promise(r=>setTimeout(r, (2-elapsed)*1000));
           $('#codeOut').textContent=out;
           setStatus('✅ 已获取：'+path);
-          $('#bar').style.width='100%';
-          tip.textContent='已获取结果';
-          cancelAnimationFrame(rafId);
-          $('#btnCancel').style.display='none';
+          const bar=$('#bar'); if(bar) bar.style.width='100%';
+          stopTimer(); showTimerUI(false);
           return;
         }
-      }else{ last=r.status+' '+r.statusText }
-    }catch(e){ if(e.name==='AbortError') return; last=e.message; }
-    $('#bar').style.width=(100*(i+1)/seconds)+'%';
-    setStatus('等待中… '+(i+1)+'/'+seconds+'s'+(last?(' · 上次：'+last):''));    
+      }else{
+        lastNote=r.status+' '+r.statusText;
+      }
+    }catch(e){
+      if(e.name==='AbortError') return;
+      lastNote=e.message;
+    }
     await new Promise(r=>setTimeout(r,1000));
+    setStatus(`等待中… ${i+1}/${seconds}s` + (lastNote?` · 上次：${lastNote}`:''));
   }
-  cancelAnimationFrame(rafId);
-  $('#btnCancel').style.display='none';
-  tip.textContent='超时未获取到，试试下方“拉取最新 output (Raw)”';
-  setStatus('⌛ 仍未获取到：'+path);
+  stopTimer(); showTimerUI(false);
+  setStatus('⌛ 超时未获取：'+path+'，可点“拉取最新 output (Raw)”再看');
 }
 
+// ---- 拉取 / 下载 / 美化 / 复制（不变）----
 async function loadOutputRaw(){
   const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${$('#pathOut').value.trim()||'output/output.js'}`;
   try{ const r=await fetch(url,{cache:'no-cache'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText); $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符'); }
   catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
 }
-function downloadOutput(){ const t=$('#outputRaw').textContent||$('#codeOut').textContent||''; const b=new Blob([t],{type:'text/javascript;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href); }
+function downloadOutput(){
+  const t=$('#outputRaw').textContent||$('#codeOut').textContent||'';
+  const b=new Blob([t],{type:'text/javascript;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href);
+}
 
-/* Prettier 美化（保留） */
-async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return; const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js'; const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js'; document.body.appendChild(s1); await new Promise(r=>s1.onload=r); document.body.appendChild(s2); await new Promise(r=>s2.onload=r); }
-async function beautify(){ let s=$('#codeOut').textContent||$('#codeIn').value||''; if(!s){ setStatus('无待美化内容'); return } try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }catch(e){ setStatus('Prettier 失败：'+e.message); } }
-
-async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent='复制结果',1200); }catch(e){ setStatus('复制失败：'+e.message); } }
+async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
+  const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
+  const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
+  document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
+  document.body.appendChild(s2); await new Promise(r=>s2.onload=r);
+}
+async function beautify(){
+  let s=$('#codeOut').textContent||$('#codeIn').value||'';
+  if(!s){ setStatus('无待美化内容'); return }
+  try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }
+  catch(e){ setStatus('Prettier 失败：'+e.message); }
+}
+async function copySel(sel,btn){
+  try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t);
+    if(btn){ const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old||'复制',1200); }
+  }catch(e){ setStatus('复制失败：'+e.message); }
+}
 </script>
 </body>
 </html>
