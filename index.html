@@ -31,6 +31,23 @@
   .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
   .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:6px 10px;background:#0b1020}
   .hint{font-size:12px;color:var(--muted)}
+
+  /* ===== 横向卡片按钮（图二） ===== */
+  .btnbar{display:flex !important;flex-wrap:wrap !important;gap:12px !important;margin:6px 0 0 !important}
+  .btncard{flex:1 1 150px !important;min-width:130px !important;max-width:190px !important;
+    display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;
+    padding:14px 12px !important;border-radius:14px !important;background:rgba(255,255,255,.06) !important;
+    border:1px solid rgba(255,255,255,.18) !important;color:#fff !important;text-align:center !important;cursor:pointer !important;
+    user-select:none !important;transition:transform .18s,background .18s,box-shadow .18s !important}
+  .btncard:hover{background:rgba(255,255,255,.12) !important;transform:translateY(-2px) !important;box-shadow:0 6px 18px rgba(0,0,0,.25) !important}
+  .btncard:active{transform:none !important}
+  .btnicon{font-size:22px !important;line-height:1 !important;margin-bottom:6px !important}
+  .btntxt{font-size:14px !important;font-weight:600 !important;letter-spacing:.02em !important}
+  @media (max-width:420px){ .btncard{flex-basis:48% !important} }
+  @media (prefers-color-scheme: light){
+    .btncard{background:rgba(0,0,0,.04) !important;border-color:rgba(0,0,0,.08) !important;color:#111 !important}
+    .btncard:hover{background:rgba(0,0,0,.08) !important}
+  }
 </style>
 </head>
 <body>
@@ -88,19 +105,38 @@
 
   <div class="card">
     <small>把待解密脚本放到 <b>input.js</b> → 工作流自动跑 → 在你选择的输出文件中获取结果</small>
+
+    <!-- URL 单独一行 -->
     <div class="row">
-      <input type="file" id="file" accept=".js,.txt,.json" />
-      <button onclick="pick()">选择文件</button>
       <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
-      <button onclick="loadRemote()">远程加载</button>
-      <button onclick="pasteFromClipboard()">粘贴板</button>
-      <button class="err" onclick="clrIn()">清空输入</button>
     </div>
+
+    <!-- 隐藏的文件 input（由卡片触发） -->
+    <input type="file" id="file" accept=".js,.txt,.json" hidden />
+
+    <!-- 图二：横向方块按钮 -->
+    <div class="btnbar">
+      <label for="file" class="btncard" role="button" tabindex="0" aria-label="选择文件">
+        <span class="btnicon">📁</span><span class="btntxt">选择文件</span>
+      </label>
+      <button class="btncard" type="button" onclick="loadRemote()">
+        <span class="btnicon">🌐</span><span class="btntxt">远程加载</span>
+      </button>
+      <button class="btncard" type="button" onclick="pasteFromClipboard()">
+        <span class="btnicon">📋</span><span class="btntxt">粘贴板</span>
+      </button>
+      <button class="btncard" type="button" onclick="beautify()">
+        <span class="btnicon">🧹</span><span class="btntxt">清理代码</span>
+      </button>
+      <button class="btncard" type="button" onclick="clrIn()">
+        <span class="btnicon">🗑️</span><span class="btntxt">清空输入</span>
+      </button>
+    </div>
+
     <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
     <div class="row">
       <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
       <button class="warn" onclick="startAutoPoll()">② 开始自动轮询（根据选择的输出文件）</button>
-      <button onclick="beautify()">（可选）结果美化</button>
       <button onclick="copySel('#codeOut', this)">复制结果</button>
       <button class="err" onclick="clrAll()">清空输入与结果</button>
     </div>
@@ -143,8 +179,7 @@ function ghHeaders(){
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 function nowTs(){ return Date.now().toString() }
 
-// 本地文件
-function pick(){ $('#file').click(); }
+// 本地文件（由隐藏 input 触发）
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
@@ -196,7 +231,6 @@ async function submitInput(){
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
     setStatus('提交成功 · 工作流将自动开始');
-    // 提交成功后自动轮询当前选择的输出文件
     startAutoPoll(true);
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
@@ -214,14 +248,13 @@ async function startAutoPoll(){
   const interval=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
   const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
 
-  let lastSha=''; // 防止把旧内容当新内容
+  let lastSha=''; 
   let waited=0;
 
   setStatus('正在轮询：'+which);
   showBar();
   barTimer=setInterval(()=>{ const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; },5000);
 
-  // 先拉一次
   await tryFetch();
 
   pollingTimer=setInterval(async ()=>{
@@ -268,7 +301,7 @@ async function startAutoPoll(){
   }
 }
 
-// 手动拉取 Raw（两按钮分别拉两个路径）
+// 手动拉取 Raw
 async function loadOutputRaw(path){
   path = path || $('#whichOut').value;
   const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
@@ -283,7 +316,7 @@ async function loadOutputRaw(path){
   }
 }
 
-// 下载（优先 codeOut，其次 Raw）
+// 下载
 function downloadOutput(){
   const t=$('#codeOut').textContent||$('#outputRaw').textContent||'';
   const a=document.createElement('a');
