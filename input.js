@@ -1,14 +1,133 @@
-/***********************************************
-> 应用名称：墨鱼自用reddits去广告脚本999
-> 脚本作者：@ddgksf2013
-> 微信账号：墨鱼手记
-> 更新时间：2025-05-30
-> 通知频道：https://t.me/ddgksf2021
-> 贡献投稿：https://t.me/ddgksf2013_bot
-> 问题反馈：ddgksf2013@163.com
-> 特别提醒：如需转载请注明出处，谢谢合作！
-***********************************************/	
+/*
+吾爱破解签到脚本
 
-const version = 'V1.0.9';
+更新时间: 2022.6.18
+脚本兼容: QuantumultX, Surge, Loon, Node.js
+电报频道: @NobyDa
+问题反馈: @NobyDa_bot
 
-var _0xodH='jsjiami.com.v7';const _0xc3dd0a=_0x1e61;if(function(_0x297b99,_0x23f2e1,_0x6df70d,_0x3c23f,_0x377ebd,_0x2c90c8,_0x4be525){return _0x297b99=_0x297b99>>0x6,_0x2c90c8='hs',_0x4be525='hs',function(_0x2e8807,_0x4f615d,_0x39406d,_0x480882,_0x25520e){const _0x39cfbb=_0x1e61;_0x480882='tfi',_0x2c90c8=_0x480882+_0x2c90c8,_0x25520e='up',_0x4be525+=_0x25520e,_0x2c90c8=_0x39406d(_0x2c90c8),_0x4be525=_0x39406d(_0x4be525),_0x39406d=0x0;const _0x548169=_0x2e8807();while(!![]&&--_0x3c23f+_0x4f615d){try{_0x480882=-parseInt(_0x39cfbb(0xe7,'p4lg'))/0x1+parseInt(_0x39cfbb(0xe5,']WGR'))/0x2*(parseInt(_0x39cfbb(0xfd,'p6@A'))/0x3)+-parseInt(_0x39cfbb(0xf9,'bE)$'))/0x4+-parseInt(_0x39cfbb(0xe6,'L]@f'))/0x5+-parseInt(_0x39cfbb(0xf5,'ICP5'))/0x6*(parseInt(_0x39cfbb(0xfe,'Z5[j'))/0x7)+parseInt(_0x39cfbb(0xf8,')Hz#'))/0x8+parseInt(_0x39cfbb(0x10a,'d&Pb'))/0x9;}catch(_0x58ea56){_0x480882=_0x39406d;}finally{_0x25520e=_0x548169[_0x2c90c8]();if(_0x297b99<=_0x3c23f)_0x39406d?_0x377ebd?_0x480882=_0x25520e:_0x377ebd=_0x25520e:_0x39406d=_0x25520e;else{if(_0x39406d==_0x377ebd['replace'](/[kKlGUnbLWFYEOphRDPNdf=]/g,'')){if(_0x480882===_0x4f615d){_0x548169['un'+_0x2c90c8](_0x25520e);break;}_0x548169[_0x4be525](_0x25520e);}}}}}(_0x6df70d,_0x23f2e1,function(_0x3bf4d5,_0x51ea99,_0x4fa532,_0xb5ed0d,_0xee9e18,_0x219c74,_0x1ad289){return _0x51ea99='\x73\x70\x6c\x69\x74',_0x3bf4d5=arguments[0x0],_0x3bf4d5=_0x3bf4d5[_0x51ea99](''),_0x4fa532='\x72\x65\x76\x65\x72\x73\x65',_0x3bf4d5=_0x3bf4d5[_0x4fa532]('\x76'),_0xb5ed0d='\x6a\x6f\x69\x6e',(0x1a8866,_0x3bf4d5[_0xb5ed0d](''));});}(0x3340,0xc4ab3,_0x1715,0xcf),_0x1715){}const opName=$request?.[_0xc3dd0a(0xeb,'1D%(')]?.[_0xc3dd0a(0xe3,'r@dH')]||'';function _0x1e61(_0x37ad72,_0xa65d17){const _0x1715c6=_0x1715();return _0x1e61=function(_0x1e61ca,_0x1d9789){_0x1e61ca=_0x1e61ca-0xdd;let _0x2ce79b=_0x1715c6[_0x1e61ca];if(_0x1e61['BTKsgq']===undefined){var _0xa37233=function(_0x221d34){const _0x504cae='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';let _0x3f1826='',_0x3285c4='';for(let _0x2eb4f4=0x0,_0xa8b038,_0x41bc3d,_0x8e9071=0x0;_0x41bc3d=_0x221d34['charAt'](_0x8e9071++);~_0x41bc3d&&(_0xa8b038=_0x2eb4f4%0x4?_0xa8b038*0x40+_0x41bc3d:_0x41bc3d,_0x2eb4f4++%0x4)?_0x3f1826+=String['fromCharCode'](0xff&_0xa8b038>>(-0x2*_0x2eb4f4&0x6)):0x0){_0x41bc3d=_0x504cae['indexOf'](_0x41bc3d);}for(let _0x26ebf1=0x0,_0xe97a80=_0x3f1826['length'];_0x26ebf1<_0xe97a80;_0x26ebf1++){_0x3285c4+='%'+('00'+_0x3f1826['charCodeAt'](_0x26ebf1)['toString'](0x10))['slice'](-0x2);}return decodeURIComponent(_0x3285c4);};const _0xc89735=function(_0x1de514,_0x2bfde6){let _0x2c03d2=[],_0x53937e=0x0,_0x3ae814,_0x4a2cc3='';_0x1de514=_0xa37233(_0x1de514);let _0x192053;for(_0x192053=0x0;_0x192053<0x100;_0x192053++){_0x2c03d2[_0x192053]=_0x192053;}for(_0x192053=0x0;_0x192053<0x100;_0x192053++){_0x53937e=(_0x53937e+_0x2c03d2[_0x192053]+_0x2bfde6['charCodeAt'](_0x192053%_0x2bfde6['length']))%0x100,_0x3ae814=_0x2c03d2[_0x192053],_0x2c03d2[_0x192053]=_0x2c03d2[_0x53937e],_0x2c03d2[_0x53937e]=_0x3ae814;}_0x192053=0x0,_0x53937e=0x0;for(let _0x1a6904=0x0;_0x1a6904<_0x1de514['length'];_0x1a6904++){_0x192053=(_0x192053+0x1)%0x100,_0x53937e=(_0x53937e+_0x2c03d2[_0x192053])%0x100,_0x3ae814=_0x2c03d2[_0x192053],_0x2c03d2[_0x192053]=_0x2c03d2[_0x53937e],_0x2c03d2[_0x53937e]=_0x3ae814,_0x4a2cc3+=String['fromCharCode'](_0x1de514['charCodeAt'](_0x1a6904)^_0x2c03d2[(_0x2c03d2[_0x192053]+_0x2c03d2[_0x53937e])%0x100]);}return _0x4a2cc3;};_0x1e61['IEgssj']=_0xc89735,_0x37ad72=arguments,_0x1e61['BTKsgq']=!![];}const _0xf622=_0x1715c6[0x0],_0x46d550=_0x1e61ca+_0xf622,_0x4d7095=_0x37ad72[_0x46d550];return!_0x4d7095?(_0x1e61['fvMIXX']===undefined&&(_0x1e61['fvMIXX']=!![]),_0x2ce79b=_0x1e61['IEgssj'](_0x2ce79b,_0x1d9789),_0x37ad72[_0x46d550]=_0x2ce79b):_0x2ce79b=_0x4d7095,_0x2ce79b;},_0x1e61(_0x37ad72,_0xa65d17);}let body;if(/Ads/i[_0xc3dd0a(0xea,'lUu0')](opName))$done({'body':'{}'});else try{body=JSON[_0xc3dd0a(0x106,'Z5[j')]($response[_0xc3dd0a(0x10e,'Ludd')]['replace'](/"isObfuscated":true/g,'\x22isObfuscated\x22:false')['replace'](/"obfuscatedPath":"[^"]*"/g,'\x22obfuscatedPath\x22:null')[_0xc3dd0a(0xe1,'YRTb')](/"isNsfw":true/g,'\x22isNsfw\x22:false')['replace'](/"isAdPersonalizationAllowed":true/g,'\x22isAdPersonalizationAllowed\x22:false')[_0xc3dd0a(0xf2,']7tS')](/"isThirdPartyInfoAdPersonalizationAllowed":true/g,_0xc3dd0a(0xf3,'T[Av'))[_0xc3dd0a(0xf4,'Ludd')](/"isNsfwMediaBlocked":true/g,_0xc3dd0a(0xdf,'7Vi7'))[_0xc3dd0a(0xe0,'%9Ot')](/"isNsfwContentShown":true/g,_0xc3dd0a(0x103,'78t5'))[_0xc3dd0a(0xee,'p4lg')](/"isPremiumMember":false/g,_0xc3dd0a(0xdd,'r@dH'))[_0xc3dd0a(0xf1,'lUu0')](/"isEmployee":false/g,'\x22isEmployee\x22:true'));const data=body['data']??{};Object[_0xc3dd0a(0xe4,']cmg')](data)[_0xc3dd0a(0x102,'B(G3')](_0x264ed5=>{const _0x38539b=_0xc3dd0a,_0x227df7={'xGFfl':function(_0x380bd6,_0x1395e7){return _0x380bd6===_0x1395e7;},'QRZWk':_0x38539b(0x100,'r@dH'),'iYbEo':function(_0x5aaf97,_0x21896c){return _0x5aaf97===_0x21896c;},'Ojbez':_0x38539b(0x101,'qFlq')},_0xe804f6=data[_0x264ed5]?.[_0x38539b(0x104,'ICP5')]?.[_0x38539b(0xe2,'ICP5')];if(!Array[_0x38539b(0xff,'YRTb')](_0xe804f6))return;data[_0x264ed5][_0x38539b(0x109,'N8*j')][_0x38539b(0xfb,'L]@f')]=_0xe804f6[_0x38539b(0x107,'1D%(')](({node:_0x2d14e2})=>{const _0x5c395f=_0x38539b;if(_0x227df7[_0x5c395f(0x108,'d&Pb')](_0x227df7[_0x5c395f(0x105,'Kk@x')],'DxeQL')){if(!_0x2d14e2)return!![];if(_0x227df7[_0x5c395f(0x10d,'*5gs')](_0x2d14e2[_0x5c395f(0xf7,'p6@A')],_0x227df7[_0x5c395f(0x10b,'&c9p')]))return![];if(_0x2d14e2['adPayload'])return![];if(Array['isArray'](_0x2d14e2[_0x5c395f(0xf6,'*3VZ')]))return!_0x2d14e2['cells']['some'](_0x3835ab=>_0x3835ab?.['__typename']===_0x5c395f(0x10c,'Ludd'));return!![];}else _0x221d34({'body':'{}'});});}),body=JSON['stringify'](body);}catch(_0x2d423f){console[_0xc3dd0a(0xf0,'BSBF')](_0xc3dd0a(0xef,'gTpY'),_0x2d423f);}finally{$done(body?{'body':body}:{});}function _0x1715(){const _0x213a1a=(function(){return[_0xodH,'kWYjkUsfjLEiFahdPmLniYD.PcKobmkOG.pvRNl7==','WOrxWQ/dSdK0zmkXwtxcHmomW5m','WR7dPsJdPdHtWQBdGCk3WP3dTZi','E8o0rd/dLSksWRu','WORcRXjDWO0','qCoHA17cL8kh','WRHOECotWRVcNSo1','gXvsW4NcLSoTmmoRW6pdK8oPW5/cPZG8W4BcUYTeW7FcU8k+WQ0XcM8','W6ZdLSktoCkWWOVdUmov','WOxdLmkjWRxdJG','W7RcVwZcPwS','W7NcMSoflbNcUW','dqagr8kv','CddcPmo/e8orxGu','rhn2emoml8kZWOjYWPaaw3RcLG','zSk/mSosW5O','CCogiCo2xvNdRI7cPWhdNrdcImo9'].concat((function(){return['W6LoW5BdGZa','uSoncmoQ','W6ZcVGrCWRm5W69moaztEIGyWPBdQ8ooWPCXWRZcHqu','WPK7WQddT8orWQ/cGmoOmmoBW7L0pa','WRtcLKNdQ8opF27cVSoha8ozi8oTibFcQSkAWRNcLulcKmkJWPVdHSkbW6O','W5LPW6NcR8kcW7NdLW','ymoIDshdHCkqWQK','W6ZdNSkrmCkM','WPBdUJzCWO4qW45QycrowHC7WQFdKmkJW6nOWOdcSs1W','WQz9lSky','W7NdUgC4W5VdLHu','emkBnSkFzqKHWOX3ESoDWRRcSG','et5qct/cOW/dQK4AxwBcMG','WQNdHCo5gWBcN8oTBq','eCkDnCkAzaeJWQbGEmokWR/cQG','sCo+pMa','W7FcLSoipbNcU8or','W7OKcCoKW6XzgMmUWPBcIr/dQW'].concat((function(){return['WPfOWOpcHeZcI8oj','uM8tvw3dTvS','zSkWzXpdRNKUWPxdMbLUWPm','WPW/gW','t8o+pxHFW6bh','WOTEWQ7cQSk7WPRcPW','jvlcHCotrCoDWPZcImkTWP/dSSknW7nruCo9W5bNW5BcGmkjW5GQBLiRWRpcO0SwDCkQwmo0W75Ntmk9pHpcNCkwWQ7dPfRdPCk0W6q','qSohhmo/sfVdRW','WR/cJmkMf8kVWRpdG8oH','WQXWv8k7WQW','W68/W6RcV3TPomkBBHW','dSoQiCksWQ8rWOWkfGX5cCklWOK','WOBcNSkOvcz7asVcSf45afS','W7RdRKe+W7DPW7zghX5yta','qmooy8ojjq','CIBcQ0OEW4iTWQRdVCkqeYBcKr0'];}()));}()));}());_0x1715=function(){return _0x213a1a;};return _0x1715();};var version_ = 'jsjiami.com.v7';
+************************
+QX, Surge, Loon说明：
+************************
+手动登录 https://www.52pojie.cn/home.php 如通知成功获取cookie, 则可以使用此签到脚本.
+获取Cookie后, 请将Cookie脚本禁用并移除主机名, 以免产生不必要的MITM.
+脚本将在每天上午9点执行, 您可以修改执行时间.
+
+************************
+Node.js说明: 
+************************
+需自行安装"got"与"iconv-lite"模块. 例: npm install got iconv-lite -g
+
+抓取Cookie说明:
+浏览器打开 https://www.52pojie.cn/home.php 登录账号后, 开启抓包软件并刷新页面.
+抓取该URL请求头下的Cookie字段, 填入以下CookieWA的单引号内即可. */
+
+const CookieWA = '';
+
+//Bark APP 通知推送Key
+const barkKey = '';
+
+/***********************
+Surge 4.2.0+ 脚本配置:
+************************
+
+[Script]
+吾爱签到 = type=cron,cronexp=0 9 * * *,script-path=https://raw.githubusercontent.com/NobyDa/Script/master/52pojie-DailyBonus/52pojie.js
+
+吾爱获取Cookie = type=http-request,pattern=https:\/\/www\.52pojie\.cn\/home\.php\?,script-path=https://raw.githubusercontent.com/NobyDa/Script/master/52pojie-DailyBonus/52pojie.js
+
+[MITM] 
+hostname= www.52pojie.cn
+
+************************
+QuantumultX 远程脚本配置:
+************************
+
+[task_local]
+# 吾爱签到
+0 9 * * * https://raw.githubusercontent.com/NobyDa/Script/master/52pojie-DailyBonus/52pojie.js
+
+[rewrite_local]
+# 获取Cookie
+https:\/\/www\.52pojie\.cn\/home\.php\? url script-request-header https://raw.githubusercontent.com/NobyDa/Script/master/52pojie-DailyBonus/52pojie.js
+
+[mitm] 
+hostname= www.52pojie.cn
+
+************************
+Loon 2.1.0+ 脚本配置:
+************************
+
+[Script]
+# 吾爱签到
+cron "0 9 * * *" script-path=https://raw.githubusercontent.com/NobyDa/Script/master/52pojie-DailyBonus/52pojie.js
+
+# 获取Cookie
+http-request https:\/\/www\.52pojie\.cn\/home\.php\? script-path=https://raw.githubusercontent.com/NobyDa/Script/master/52pojie-DailyBonus/52pojie.js
+
+[Mitm] 
+hostname= www.52pojie.cn
+*/
+
+const $ = API('nobyda_52pojie');
+const date = new Date();
+const reqData = {
+  url: 'https://www.52pojie.cn/home.php?mod=task&do=apply&id=2',
+  headers: {
+    Cookie: CookieWA || $.read("COOKIE"),
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0",
+  }
+};
+if ($.env.isRequest) {
+  GetCookie()
+} else if (!reqData.headers.Cookie) {
+  $.notify('吾爱破解', ``, `未填写/未获取Cookie!`);
+} else if (!reqData.headers.Cookie.includes('_auth=')) {
+  $.notify('吾爱破解', ``, `Cookie关键授权字段缺失, 需重新获取!`);
+} else {
+  $.http.put(reqData)
+    .then((resp) => {
+      if (resp.body.match(/(ÒÑÍê³É|\u606d\u559c\u60a8|��̳΢�š��ᰮ�ƽ�)/)) {
+        $.msgBody = date.getMonth() + 1 + "月" + date.getDate() + "日, 签到成功 🎉"
+      } else if (resp.body.match(/(ÄúÒÑ|\u4e0b\u671f\u518d\u6765|>��Ǹ������)/)) {
+        $.msgBody = date.getMonth() + 1 + "月" + date.getDate() + "日, 已签过 ⚠️"
+      } else if (resp.body.match(/(ÏÈµÇÂ¼|\u9700\u8981\u5148\u767b\u5f55|�Ҫ�ȵ�¼���ܼ�)/)) {
+        $.msgBody = "签到失败, Cookie失效 ‼️‼️"
+      } else if (resp.statusCode == 403) {
+        $.msgBody = "服务器暂停签到 ⚠️"
+      } else {
+        $.msgBody = "脚本待更新 ‼️‼️"
+      }
+    })
+    .catch((err) => ($.msgBody = `签到失败 ‼️‼️\n${err || err.message}`))
+    .finally(async () => {
+      if (barkKey) {
+        await BarkNotify($, barkKey, '吾爱破解', $.msgBody);
+      }
+      $.notify('吾爱破解', ``, $.msgBody);
+      $.done();
+    })
+}
+
+function GetCookie() {
+  const TM = $.read("TIME");
+  const CK = $request.headers['Cookie'] || $request.headers['cookie'];
+  if (CK && CK.includes('_auth=')) {
+    $.write(CK, "COOKIE");
+    if (!TM || TM && (Date.now() - TM) / 1000 >= 21600) {
+      $.notify("吾爱破解", "", `写入Cookie成功 🎉`);
+      $.write(JSON.stringify(Date.now()), "TIME");
+    } else {
+      $.info(`吾爱破解\n写入Cookie成功 🎉`)
+    }
+  } else {
+    $.info(`吾爱破解\n写入Cookie失败, 关键值缺失`)
+  }
+  $.done()
+}
+
+//Bark APP notify
+async function BarkNotify(c, k, t, b) { for (let i = 0; i < 3; i++) { console.log(`🔷Bark notify >> Start push (${i + 1})`); const s = await new Promise((n) => { c.post({ url: 'https://api.day.app/push', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: t, body: b, device_key: k, ext_params: { group: t } }) }, (e, r, d) => r && r.status == 200 ? n(1) : n(d || e)) }); if (s === 1) { console.log('✅Push success!'); break } else { console.log(`❌Push failed! >> ${s.message || s}`) } } };
+
+//https://github.com/Peng-YM/QuanX/tree/master/Tools/OpenAPI
+function ENV() { const e = "function" == typeof require && "undefined" != typeof $jsbox; return { isQX: "undefined" != typeof $task, isLoon: "undefined" != typeof $loon, isSurge: "undefined" != typeof $httpClient && "undefined" == typeof $loon, isBrowser: "undefined" != typeof document, isNode: "function" == typeof require && !e, isJSBox: e, isRequest: "undefined" != typeof $request, isScriptable: "undefined" != typeof importModule } } function HTTP(e = { baseURL: "" }) { function t(t, a) { a = "string" == typeof a ? { url: a } : a; const h = e.baseURL; h && !d.test(a.url || "") && (a.url = h ? h + a.url : a.url), a.body && a.headers && !a.headers["Content-Type"] && (a.headers["Content-Type"] = "application/x-www-form-urlencoded"), a = { ...e, ...a }; const c = a.timeout, l = { onRequest: () => { }, onResponse: e => e, onTimeout: () => { }, ...a.events }; let f, y; if (l.onRequest(t, a), s) f = $task.fetch({ method: t, ...a }); else if (o || n) f = new Promise((e, s) => { $httpClient[t.toLowerCase()](a, (t, o, n) => { t ? s(t) : e({ statusCode: o.status || o.statusCode, headers: o.headers, body: n }) }) }); else if (r) { const e = require("got"), s = require("iconv-lite"); f = new Promise((o, n) => { e[t.toLowerCase()](a).then(e => o({ statusCode: e.statusCode, headers: e.headers, body: s.decode(e.rawBody, "utf-8") })).catch(n) }) } else if (i) { const e = new Request(a.url); e.method = t, e.headers = a.headers, e.body = a.body, f = new Promise((t, s) => { e.loadString().then(s => { t({ statusCode: e.response.statusCode, headers: e.response.headers, body: s }) }).catch(e => s(e)) }) } else u && (f = new Promise((e, s) => { fetch(a.url, { method: t, headers: a.headers, body: a.body }).then(e => e.json()).then(t => e({ statusCode: t.status, headers: t.headers, body: t.data })).catch(s) })); const p = c ? new Promise((e, s) => { y = setTimeout(() => (l.onTimeout(), s(`${t} URL: ${a.url} exceeds the timeout ${c} ms`)), c) }) : null; return (p ? Promise.race([p, f]).then(e => (clearTimeout(y), e)) : f).then(e => l.onResponse(e)) } const { isQX: s, isLoon: o, isSurge: n, isScriptable: i, isNode: r, isBrowser: u } = ENV(), a = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"], d = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/, h = {}; return a.forEach(e => h[e.toLowerCase()] = (s => t(e, s))), h } function API(e = "untitled", t = !1) { const { isQX: s, isLoon: o, isSurge: n, isNode: i, isJSBox: r, isScriptable: u } = ENV(); return new class { constructor(e, t) { this.name = e, this.debug = t, this.http = HTTP(), this.env = ENV(), this.node = (() => { if (i) { const e = require("fs"); return { fs: e } } return null })(), this.initCache(); const s = (e, t) => new Promise(function (s) { setTimeout(s.bind(null, t), e) }); Promise.prototype.delay = function (e) { return this.then(function (t) { return s(e, t) }) } } initCache() { if (s && (this.cache = JSON.parse($prefs.valueForKey(this.name) || "{}")), (o || n) && (this.cache = JSON.parse($persistentStore.read(this.name) || "{}")), i) { let e = "root.json"; this.node.fs.existsSync(e) || this.node.fs.writeFileSync(e, JSON.stringify({}), { flag: "wx" }, e => console.log(e)), this.root = {}, e = `${this.name}.json`, this.node.fs.existsSync(e) ? this.cache = JSON.parse(this.node.fs.readFileSync(`${this.name}.json`)) : (this.node.fs.writeFileSync(e, JSON.stringify({}), { flag: "wx" }, e => console.log(e)), this.cache = {}) } } persistCache() { const e = JSON.stringify(this.cache, null, 2); s && $prefs.setValueForKey(e, this.name), (o || n) && $persistentStore.write(e, this.name), i && (this.node.fs.writeFileSync(`${this.name}.json`, e, { flag: "w" }, e => console.log(e)), this.node.fs.writeFileSync("root.json", JSON.stringify(this.root, null, 2), { flag: "w" }, e => console.log(e))) } write(e, t) { if (this.log(`SET ${t}`), -1 !== t.indexOf("#")) { if (t = t.substr(1), n || o) return $persistentStore.write(e, t); if (s) return $prefs.setValueForKey(e, t); i && (this.root[t] = e) } else this.cache[t] = e; this.persistCache() } read(e) { return this.log(`READ ${e}`), -1 === e.indexOf("#") ? this.cache[e] : (e = e.substr(1), n || o ? $persistentStore.read(e) : s ? $prefs.valueForKey(e) : i ? this.root[e] : void 0) } delete(e) { if (this.log(`DELETE ${e}`), -1 !== e.indexOf("#")) { if (e = e.substr(1), n || o) return $persistentStore.write(null, e); if (s) return $prefs.removeValueForKey(e); i && delete this.root[e] } else delete this.cache[e]; this.persistCache() } notify(e, t = "", a = "", d = {}) { const h = d["open-url"], c = d["media-url"]; if (s && $notify(e, t, a, d), n && $notification.post(e, t, a + `${c ? "\n多媒体:" + c : ""}`, { url: h }), o) { let s = {}; h && (s.openUrl = h), c && (s.mediaUrl = c), "{}" === JSON.stringify(s) ? $notification.post(e, t, a) : $notification.post(e, t, a, s) } if (i || u) { const s = a + (h ? `\n点击跳转: ${h}` : "") + (c ? `\n多媒体: ${c}` : ""); if (r) { const o = require("push"); o.schedule({ title: e, body: (t ? t + "\n" : "") + s }) } else console.log(`${e}\n${t}\n${s}\n\n`) } } log(e) { this.debug && console.log(`[${this.name}] LOG: ${this.stringify(e)}`) } info(e) { console.log(`[${this.name}] INFO: ${this.stringify(e)}`) } error(e) { console.log(`[${this.name}] ERROR: ${this.stringify(e)}`) } wait(e) { return new Promise(t => setTimeout(t, e)) } done(e = {}) { s || o || n ? $done(e) : i && !r && "undefined" != typeof $context && ($context.headers = e.headers, $context.statusCode = e.statusCode, $context.body = e.body) } stringify(e) { if ("string" == typeof e || e instanceof String) return e; try { return JSON.stringify(e, null, 2) } catch (e) { return "[object Object]" } } }(e, t) }
