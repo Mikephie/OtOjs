@@ -3,41 +3,39 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 提交后自动轮询产物（双输出+防旧缓存）</title>
+<title>OtOjs · 提交后自动轮询（output 直取/可选 deob2）</title>
 <style>
-  :root{
-    --bg:#0b0f14; --card:#0f1621; --muted:#9db1c7; --fg:#e6eef7; --line:#1f2937; --field:#0f1a2b;
-    --btn:#152033; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --cyan:#67e8f9;
-    --bar:#1e293b; --bar-fill:#60a5fa;
-  }
+  :root{--bg:#0b0f14;--card:#0f1621;--ink:#e6eef7;--muted:#9db1c7;--edge:#1f2937;--edge2:#223046;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--sky:#67e8f9}
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--fg)}
-  a{color:var(--cyan);text-decoration:none}
-  .wrap{max-width:920px;margin:0 auto;padding:18px 14px 110px}
-  h1{margin:10px 0 6px;font-size:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+  a{color:var(--sky)}
+  .wrap{max-width:880px;margin:0 auto;padding:18px 14px 100px}
+  h1{margin:6px 0 10px;font-size:20px}
+  .card{background:var(--card);border:1px solid var(--edge);border-radius:12px;padding:12px;margin:10px 0}
   label{font-size:12px;color:var(--muted);margin-right:6px}
-  input,textarea,select{width:100%;background:var(--field);color:var(--fg);border:1px solid #223046;border-radius:10px;padding:10px;font-size:13px}
-  textarea{min-height:140px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  input,select,textarea{width:100%;background:#0f1a2b;color:var(--ink);border:1px solid var(--edge2);border-radius:10px;padding:10px;font-size:13px}
+  textarea{min-height:160px;font-family:ui-monospace,Consolas,Menlo,monospace}
   .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
   .row>*{flex:1 1 180px}
-  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:var(--btn);color:var(--fg);cursor:pointer;font-weight:600}
+  button{padding:10px 12px;border-radius:10px;border:1px solid var(--edge2);background:var(--btn);color:var(--ink);cursor:pointer;font-weight:600}
   .ok{border-color:var(--ok)}
   .warn{border-color:var(--warn)}
   .err{border-color:var(--err)}
-  pre{white-space:pre-wrap;background:#0b1020;border:1px solid #223046;border-radius:10px;padding:10px;font-size:12px;max-height:360px;overflow:auto}
+  pre{white-space:pre-wrap;background:#0b1020;border:1px solid var(--edge2);border-radius:10px;padding:10px;font-size:12px;max-height:420px;overflow:auto}
   small{color:var(--muted)}
-  .opts{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .radio{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #223046;border-radius:10px}
-  .bar{height:10px;background:var(--bar);border-radius:8px;overflow:hidden;border:1px solid #233348}
-  .bar>i{display:block;height:100%;width:0%;background:var(--bar-fill)}
-  .flex-between{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-  .dim{opacity:.7}
+  .meter{height:10px;background:#0c1422;border:1px solid var(--edge2);border-radius:999px;overflow:hidden}
+  .bar{height:100%;width:0%;background:linear-gradient(90deg,#267cff,#19d4ff);transition:width .2s ease}
+  .status{min-height:22px}
+  .caps{font-variant:all-small-caps;letter-spacing:.4px}
+  .pair{display:flex;gap:8px}
+  .pair>*{flex:1}
+  .right{display:flex;gap:8px;align-items:center}
+  .tag{border:1px solid var(--edge2);border-radius:8px;padding:4px 8px;font-size:12px;color:#a7b6c9}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>OtOjs · 提交后自动轮询产物（双输出 + 倒计时 + 防旧缓存）</h1>
+  <h1>OtOjs · 提交后自动轮询</h1>
 
   <div class="card">
     <div class="row">
@@ -50,40 +48,31 @@
         <input id="branch" value="main" />
       </div>
       <div>
-        <label>Token（contents: rw）</label>
+        <label>Token（contents: read+write）</label>
         <input id="token" type="password" placeholder="ghp_..." />
       </div>
     </div>
-
     <div class="row">
       <div>
         <label>input.js 路径</label>
         <input id="pathIn" value="input.js" />
       </div>
       <div>
+        <label>output 选择</label>
+        <select id="pathOutSel">
+          <option value="output/output.js">output/output.js（第一次解密）</option>
+          <option value="output/output.deob2.js">output/output.deob2.js（二次解密）</option>
+        </select>
+      </div>
+      <div>
         <label>提交信息</label>
         <input id="commitMsg" value="update: input.js via UI" />
       </div>
-      <div>
-        <label>自动监听 output（超时后继续 5s/次）</label>
-        <select id="autoListen">
-          <option value="on" selected>开启</option>
-          <option value="off">关闭</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="opts">
-      <span class="dim">选择输出：</span>
-      <label class="radio"><input type="radio" name="outPick" value="one" checked> output.js</label>
-      <input id="pathOut1" style="max-width:320px" value="output.js" />
-      <label class="radio"><input type="radio" name="outPick" value="two"> output.deob2.js</label>
-      <input id="pathOut2" style="max-width:320px" value="output/output.deob2.js" />
     </div>
   </div>
 
   <div class="card">
-    <small>把待解密脚本放到 <b>input.js</b> → 提交后自动开始 60s 轮询 → 仅当 <b>SHA 变化</b> 才显示输出，避免读取旧内容</small>
+    <small>把待解密脚本放到 <b>input.js</b> → 提交后会自动开始轮询（最长 60 秒） → 在你选择的 <b>output/...js</b> 显示。</small>
     <div class="row">
       <input type="file" id="file" accept=".js,.txt,.json" />
       <button onclick="pick()">选择文件</button>
@@ -95,31 +84,37 @@
 
     <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
 
-    <div class="flex-between">
-      <div class="row" style="flex: 1 1 auto">
-        <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT) 并开始轮询</button>
-        <button class="warn" onclick="startPollingManually()">② 手动开始轮询（60s）</button>
-        <button onclick="beautify()">（可选）结果美化</button>
-        <button onclick="copySel('#codeOut', this)">复制结果</button>
-        <button class="err" onclick="clrAll()">清空输入与结果</button>
-      </div>
-      <div style="min-width:200px;max-width:260px;flex:0 0 auto">
-        <div class="bar"><i id="barFill"></i></div>
-        <div class="flex-between">
-          <small id="timerTxt">00 / 60 s</small>
-          <small id="shaTxt" class="dim">SHA: -</small>
+    <div class="row">
+      <button class="ok" onclick="submitAndPoll()">① 提交到 input.js (PUT) 并开始轮询</button>
+      <button class="warn" onclick="manualPoll()">② 手动开始轮询（60s）</button>
+      <button onclick="beautify()">（可选）结果美化</button>
+      <button onclick="copySel('#codeOut', this)">复制结果</button>
+      <button class="err" onclick="clrAll()">清空输入与结果</button>
+    </div>
+
+    <div class="status" id="status"><small>状态：就绪</small></div>
+    <div class="pair">
+      <div class="tag" id="shaTag">SHA: -</div>
+      <div class="tag" id="ageTag">Age: -</div>
+    </div>
+
+    <div class="pair" style="margin:8px 0">
+      <div class="tag">选择的 output：<span id="chosenOut">output/output.js</span></div>
+      <div class="right">
+        <div style="width:100%">
+          <div class="meter"><div id="bar" class="bar"></div></div>
         </div>
+        <div class="tag caps" id="tick">00 / 60 s</div>
       </div>
     </div>
 
-    <div id="status"><small>状态：就绪</small></div>
     <pre id="codeOut" placeholder="结果将显示在这里"></pre>
   </div>
 
   <div class="card">
     <div class="row">
-      <button onclick="loadOutputRaw('one')">拉取 output.js (Raw)</button>
-      <button onclick="loadOutputRaw('two')">拉取 output.deob2.js (Raw)</button>
+      <button onclick="loadOutputRaw('output/output.js')">拉取 output.js (Raw)</button>
+      <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 output.deob2.js (Raw)</button>
       <button onclick="copySel('#outputRaw', this)">复制</button>
       <button onclick="downloadOutput()">下载 output.js</button>
     </div>
@@ -128,30 +123,34 @@
 </div>
 
 <script>
+/* ---------- 工具 ---------- */
 const $=s=>document.querySelector(s);
+const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+function nowISO(){ return new Date().toISOString(); }
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 function ghHeaders(){
   const t=$('#token').value.trim();
-  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
-  return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json', 'Cache-Control':'no-cache' };
+  if(!t) throw new Error('缺少 Token（需要 contents: read & write）');
+  return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' };
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
-function nowTs(){ return Date.now().toString() }
-
-// 文件选择/导入
+function rawUrl(path){ return `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}` }
 function pick(){ $('#file').click(); }
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
 });
+$('#pathOutSel').addEventListener('change', ()=>$('#chosenOut').textContent=$('#pathOutSel').value);
+
+/* ---------- 远程/剪贴板/清空 ---------- */
 async function loadRemote(){
   let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
   if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
     u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
   }
   try{
-    const r=await fetch(u+'?ts='+nowTs(),{cache:'no-store'}); const t=await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
+    const r=await fetch(u,{cache:'no-cache'}); const t=await r.text();
+    if(!r.ok) throw new Error(r.status+' '+r.statusText+' · '+t.slice(0,200));
     $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
   }catch(e){ setStatus('远程加载失败：'+e.message); }
 }
@@ -160,186 +159,143 @@ async function pasteFromClipboard(){
   catch(e){ setStatus('粘贴失败：'+e.message); }
 }
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
-function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; setStatus('已清空输入与结果'); }
+function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; setStatus('已清空输入与结果'); $('#shaTag').textContent='SHA: -'; $('#ageTag').textContent='Age: -'; }
 
-// 选择输出路径
-function getPickedPath(){
-  const pick = document.querySelector('input[name="outPick"]:checked')?.value || 'one';
-  return (pick === 'two') ? ($('#pathOut2').value.trim()||'output/output.deob2.js')
-                          : ($('#pathOut1').value.trim()||'output.js');
+/* ---------- GitHub API 基础 ---------- */
+async function getContent(path){
+  const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+  const r=await fetch(api,{headers:ghHeaders()});
+  const body=await r.text();
+  if(!r.ok) return { ok:false, status:r.status, statusText:r.statusText, body };
+  try{
+    const j=JSON.parse(body);
+    const b64=(j.content||'').replace(/\n/g,'');
+    const text=j.content?decodeURIComponent(escape(atob(b64))):'';
+    return { ok:true, sha:j.sha||'', text, raw:j, fetchedAt:Date.now() };
+  }catch(e){
+    return { ok:false, status:r.status, statusText:'JSON parse error', body:body.slice(0,200) };
+  }
 }
-
-// 倒计时与进度条
-let timer=null, startAt=0, totalSec=60, pollingAbort=null, autoWatchTimer=null, lastSha='';
-
-function resetTimersUI(){
-  $('#barFill').style.width='0%';
-  $('#timerTxt').textContent='00 / '+totalSec+' s';
-  $('#shaTxt').textContent='SHA: -';
-}
-function startTimer(){
-  stopTimer();
-  startAt=Date.now();
-  timer=setInterval(()=>{
-    const s = Math.min(totalSec, Math.floor((Date.now()-startAt)/1000));
-    $('#barFill').style.width = (s/totalSec*100)+'%';
-    $('#timerTxt').textContent = String(s).padStart(2,'0')+' / '+totalSec+' s';
-    if(s>=totalSec){ stopTimer(); }
-  }, 250);
-}
-function stopTimer(){ if(timer){ clearInterval(timer); timer=null; } }
-
-// 提交 input 并自动轮询
-async function submitInput(){
-  const path=$('#pathIn').value.trim()||'input.js';
+async function putContent(path, code, message){
   const api=`${repoBase()}/contents/${path}`;
+  // 先探测是否存在，拿 sha
+  let sha='';
+  try{
+    const head=await fetch(`${api}?ref=${$('#branch').value.trim()}`,{headers:ghHeaders()});
+    if(head.ok){ const j=await head.json(); sha=j.sha||''; }
+  }catch(_){}
+  const body={ message: message||('update via UI @ '+nowISO()), content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
+  const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body) });
+  const txt=await res.text();
+  if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} · ${txt.slice(0,200)}`);
+  const j=JSON.parse(txt);
+  return { sha: (j.content&&j.content.sha)||'-', commitSha: (j.commit&&j.commit.sha)||'-' };
+}
+
+/* ---------- 提交 + 自动轮询 ---------- */
+async function submitAndPoll(){
+  const inPath=$('#pathIn').value.trim()||'input.js';
+  const outPath=$('#pathOutSel').value;
   const code=$('#codeIn').value; if(!code){ setStatus('没有可上传的内容'); return }
   try{
-    let sha='';
-    const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&ts=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
-    if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
-    const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body), cache:'no-store' });
-    const txt=await res.text();
-    if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
-    setStatus('提交成功 · 已写入 '+path+' · 开始 60s 轮询输出');
-    resetTimersUI(); startTimer(); startPolling();   // 自动开始轮询
+    setStatus('上传中…');
+    const res=await putContent(inPath, code, $('#commitMsg').value.trim());
+    setStatus('提交成功，commit '+res.commitSha.slice(0,7)+' · 开始轮询 '+outPath);
+    $('#shaTag').textContent='SHA: '+res.sha.slice(0,7)+'…';
+    startPolling(outPath, 60);  // 自动开始轮询
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
+function manualPoll(){ startPolling($('#pathOutSel').value, 60); }
 
-// 手动开始轮询
-function startPollingManually(){ resetTimersUI(); startTimer(); startPolling(); }
+let pollingCtl = { stop:false };
+async function startPolling(path, seconds){
+  pollingCtl.stop=false;
+  $('#chosenOut').textContent=path;
+  const tick=$('#tick'), bar=$('#bar');
+  const t0=Date.now(); let lastMsg='', lastSha='', lastLen=0, lastTime=0;
 
-// 轮询输出（仅当 SHA 变化才显示）
-async function startPolling(){
-  stopAutoWatch(); // 重置后台监听
-  if(pollingAbort){ pollingAbort.abort(); }
-  const ac = new AbortController(); pollingAbort=ac;
+  for(let s=0; s<=seconds; s++){
+    if(pollingCtl.stop) return;
+    const pct=Math.min(100, Math.floor(s/seconds*100));
+    bar.style.width = pct + '%';
+    tick.textContent = String(s).padStart(2,'0')+' / '+seconds+' s';
 
-  const path=getPickedPath();
-  const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}&ts=${nowTs()}`;
-  const deadline = Date.now()+ totalSec*1000;
-  let lastStatus='';
-
-  setStatus('开始轮询 '+path+' · 60s …');
-
-  while(Date.now() < deadline && !ac.signal.aborted){
     try{
-      const r=await fetch(api,{headers:ghHeaders(),cache:'no-store',signal:ac.signal});
-      const raw=await r.text();
-      if(r.ok){
-        const j=JSON.parse(raw);
-        const sha = j.sha || '';
-        $('#shaTxt').textContent = 'SHA: ' + (sha ? sha.slice(0,7) : '-');
-        // 仅当 sha 发生变化才认定为新产物
-        if(sha && sha !== lastSha){
-          lastSha = sha;
-          const b64=(j.content||'').replace(/\n/g,'');
-          const out=j.content ? decodeURIComponent(escape(atob(b64))) : '';
-          if(out && out.trim()){
-            $('#codeOut').textContent=out;
-            stopTimer();
-            setStatus('✅ 已获取到新产物：'+path);
-            return;
-          }
+      const got=await getContent(path);
+      if(got.ok){
+        const len=got.text.length||0;
+        const changedSha = (got.raw.sha||'') !== lastSha;
+        const changedLen = len !== lastLen;
+        const changedTime = (got.raw?.sha) && (got.fetchedAt - lastTime > 0); // 仅用于记录
+
+        $('#shaTag').textContent='SHA: '+(got.raw.sha||'-').slice(0,7)+'…';
+        const ageSec = Math.max(0, Math.floor((Date.now() - new Date(got.raw?.sha ? got.raw.git_url?.time : Date.now()))/1000));
+        $('#ageTag').textContent='Age: '+Math.floor((Date.now()-got.fetchedAt)/1000)+'s';
+
+        // “非旧内容”判断：长度变化 或 sha 变化（只要有其一）
+        if((got.text && got.text.trim()) && (changedSha || changedLen)){
+          $('#codeOut').textContent=got.text;
+          setStatus('✅ 已获取到 '+path+' · 长度 '+len+' · '+(changedSha?'sha 变化':'内容变化'));
+          bar.style.width='100%'; tick.textContent=seconds+' / '+seconds+' s';
+          return;
+        }else{
+          lastSha = got.raw.sha||''; lastLen=len; lastTime=got.fetchedAt;
+          lastMsg = '未变化';
         }
       }else{
-        lastStatus=r.status+' '+r.statusText;
+        lastMsg = 'HTTP '+got.status+' '+got.statusText;
       }
     }catch(e){
-      if(ac.signal.aborted) break;
-      lastStatus=e.message;
+      lastMsg='异常：'+e.message;
     }
-    await new Promise(r=>setTimeout(r,2000));
-    const sec=Math.min(totalSec, Math.floor((Date.now()-startAt)/1000));
-    setStatus('等待中… '+sec+'/'+totalSec+'s'+(lastStatus?(' · 上次：'+lastStatus):''));
+
+    setStatus('等待中… '+s+'/'+seconds+'s · 目标 '+path+' · 上次：'+lastMsg);
+    await sleep(1000);
   }
 
-  // 超时处理
-  stopTimer();
-  setStatus('⌛ 60s 内未检测到新 SHA · 你可稍后再试或启用自动监听');
-  if($('#autoListen').value==='on'){
-    autoWatch(path);
-  }
+  setStatus('⌛ 超时 '+seconds+'s，仍未检测到新内容（可稍后再点“拉取 Raw”或延长等待）');
 }
 
-// 超时后自动监听（5s/次，直到拿到新 SHA）
-function autoWatch(path){
-  stopAutoWatch();
-  setStatus('⌛ 已进入自动监听（每 5s 检查 '+path+' 是否有新 SHA）');
-  autoWatchTimer = setInterval(async ()=>{
-    try{
-      const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}&ts=${nowTs()}`;
-      const r=await fetch(api,{headers:ghHeaders(),cache:'no-store'});
-      const raw=await r.text();
-      if(r.ok){
-        const j=JSON.parse(raw);
-        const sha=j.sha||'';
-        $('#shaTxt').textContent = 'SHA: ' + (sha ? sha.slice(0,7) : '-');
-        if(sha && sha !== lastSha){
-          lastSha=sha;
-          const b64=(j.content||'').replace(/\n/g,'');
-          const out=j.content ? decodeURIComponent(escape(atob(b64))) : '';
-          if(out && out.trim()){
-            $('#codeOut').textContent=out;
-            stopAutoWatch();
-            setStatus('✅ 自动监听捕获到新产物：'+path);
-          }
-        }
-      }
-    }catch(_){}
-  }, 5000);
-}
-function stopAutoWatch(){ if(autoWatchTimer){ clearInterval(autoWatchTimer); autoWatchTimer=null; } }
-
-// 拉 raw（两个按钮按需取其中一个，不判断有没有二次解密）
-async function loadOutputRaw(which){
-  const path = (which==='two') ? ($('#pathOut2').value.trim()||'output/output.deob2.js')
-                               : ($('#pathOut1').value.trim()||'output.js');
-  const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?ts=${nowTs()}`;
+/* ---------- Raw 拉取/下载/复制 ---------- */
+async function loadOutputRaw(path){
   try{
-    const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
+    const r=await fetch(rawUrl(path),{cache:'no-cache'});
+    const t=await r.text();
     if(!r.ok) throw new Error(r.status+' '+r.statusText);
     $('#outputRaw').textContent=t;
-    setStatus('已拉取 Raw：'+path+' · '+t.length+' 字符');
-  }catch(e){
-    $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url;
-    setStatus('拉取失败');
-  }
+    setStatus('已拉取 '+path+' Raw · '+t.length+' 字符');
+  }catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+rawUrl(path); setStatus('Raw 拉取失败'); }
 }
 function downloadOutput(){
   const t=$('#outputRaw').textContent||$('#codeOut').textContent||'';
-  const b=new Blob([t],{type:'text/javascript;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'}));
+  a.download='output.js'; a.click(); URL.revokeObjectURL(a.href);
+}
+async function copySel(sel,btn){
+  try{
+    const el=$(sel); const t=el?(el.value??el.textContent??''):'';
+    await navigator.clipboard.writeText(t);
+    const txt=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=txt,1200);
+  }catch(e){ setStatus('复制失败：'+e.message); }
 }
 
-// Prettier 美化（可选）
+/* ---------- 美化 ---------- */
 async function ensurePrettier(){
-  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
+  if(window.prettier && window.prettierPlugins?.babel) return;
   const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
   const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
   document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
   document.body.appendChild(s2); await new Promise(r=>s2.onload=r);
 }
 async function beautify(){
-  let s=$('#codeOut').textContent||$('#codeIn').value||'';
+  let s=$('#codeOut').textContent || $('#codeIn').value || '';
   if(!s){ setStatus('无待美化内容'); return }
   try{
     await ensurePrettier();
     const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]});
-    $('#codeOut').textContent=out;
-    setStatus('已用 Prettier 美化');
+    $('#codeOut').textContent=out; setStatus('已用 Prettier 美化');
   }catch(e){ setStatus('Prettier 失败：'+e.message); }
-}
-
-// 通用复制
-async function copySel(sel,btn){
-  try{
-    const el=$(sel);
-    const t=el?(el.value??el.textContent??''):'';
-    await navigator.clipboard.writeText(t);
-    const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
-  }catch(e){ setStatus('复制失败：'+e.message); }
 }
 </script>
 </body>
