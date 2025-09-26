@@ -3,64 +3,77 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · Output 双选项 + 60s 计时动画（SVG）</title>
+<title>OtOjs · 最简稳定版（含双输出选择 & 防旧产物）</title>
 <style>
-  :root{--bg:#0b0f14;--card:#0f1621;--b:#1f2937;--ink:#e6eef7;--mut:#9db1c7;--pri:#3b82f6;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
+  :root{--bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--fg:#e6eef7;--line:#1f2937;--input:#0f1a2b;--accent:#67e8f9}
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-  .wrap{max-width:860px;margin:0 auto;padding:18px 14px 80px}
-  h1{margin:10px 0 6px;font-size:20px}
-  .card{background:var(--card);border:1px solid var(--b);border-radius:12px;padding:12px;margin:10px 0}
-  label{font-size:12px;color:var(--mut);margin-right:6px}
-  input,textarea,select{width:100%;background:#0f1a2b;color:var(--ink);border:1px solid #223046;border-radius:10px;padding:10px;font-size:13px}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--fg)}
+  a{color:var(--accent)}
+  .wrap{max-width:920px;margin:0 auto;padding:18px 14px 96px}
+  h1{margin:8px 0 6px;font-size:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+  label{font-size:12px;color:var(--muted);margin-right:6px}
+  input,select,textarea{width:100%;background:var(--input);color:var(--fg);border:1px solid #223046;border-radius:10px;padding:10px;font-size:13px}
   textarea{min-height:140px;font-family:ui-monospace,Consolas,Menlo,monospace}
   .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
   .row>*{flex:1 1 180px}
-  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:#152033;color:var(--ink);cursor:pointer;font-weight:600}
-  .ok{border-color:var(--ok)}
-  .warn{border-color:var(--warn)}
-  .err{border-color:var(--err)}
+  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:#152033;color:var(--fg);cursor:pointer;font-weight:600}
+  button.ok{border-color:#10b981}
+  button.warn{border-color:#f59e0b}
+  button.err{border-color:#ef4444}
   pre{white-space:pre-wrap;background:#0b1020;border:1px solid #223046;border-radius:10px;padding:10px;font-size:12px;max-height:360px;overflow:auto}
-  small{color:var(--mut)}
-  /* 线性进度条 */
-  .progress{margin-top:8px;height:10px;background:#101827;border:1px solid #223046;border-radius:6px;overflow:hidden}
-  .bar{height:100%;width:0;background:var(--pri);transition:width 1s linear}
-  /* SVG 计时器 */
-  .timer-wrap{display:none;align-items:center;gap:12px;margin:8px 0}
-  .svgbox{position:relative;width:64px;height:64px}
-  .svgbox svg{transform:rotate(-90deg)}
-  .svgbox .sec{
-    position:absolute;inset:0;display:grid;place-items:center;
-    font-weight:800;font-size:14px
-  }
-  .mut{color:var(--mut)}
-  .row-right{display:flex;gap:8px;flex-wrap:wrap}
+  small{color:var(--muted)}
+  .status{min-height:22px}
+  /* 计时 UI */
+  .timer{display:none;align-items:center;gap:10px;margin-top:8px}
+  .ring{width:54px;height:54px;border-radius:50%;border:6px solid #223046;position:relative;display:grid;place-items:center}
+  .ring::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:6px solid transparent;border-top-color:#4da3ff;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .secs{font-weight:700}
+  .barWrap{height:8px;background:#0a1322;border:1px solid #1b2a44;border-radius:999px;overflow:hidden}
+  .bar{height:100%;width:0%;background:#4da3ff;transition:width .2s}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>OtOjs · Output 双选项 + 60s 计时动画（SVG）</h1>
+  <h1>OtOjs · 最简稳定版</h1>
 
   <div class="card">
     <div class="row">
-      <div style="flex:2"><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
-      <div><label>BRANCH</label><input id="branch" value="main" /></div>
-      <div><label>Token（contents: rw）</label><input id="token" type="password" placeholder="ghp_..." /></div>
+      <div style="flex:2">
+        <label>REPO</label>
+        <input id="repo" value="Mikephie/OtOjs" />
+      </div>
+      <div style="max-width:160px">
+        <label>BRANCH</label>
+        <input id="branch" value="main" />
+      </div>
+      <div>
+        <label>Token（contents: rw）</label>
+        <input id="token" type="password" placeholder="ghp_..." />
+      </div>
     </div>
     <div class="row">
-      <div><label>input.js 路径</label><input id="pathIn" value="input.js" /></div>
-      <div><label>output 路径选择</label>
+      <div>
+        <label>input.js 路径</label>
+        <input id="pathIn" value="input.js" />
+      </div>
+      <div>
+        <label>output 路径选择</label>
         <select id="pathOut">
-          <option value="output/output.js">output/output.js</option>
+          <option value="output/output.js" selected>output/output.js</option>
           <option value="output/output.deob2.js">output/output.deob2.js</option>
         </select>
       </div>
-      <div><label>提交信息</label><input id="commitMsg" value="update: input.js via UI" /></div>
+      <div>
+        <label>提交信息</label>
+        <input id="commitMsg" value="update: input.js via UI" />
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <small>把待解密脚本放到 <b>input.js</b> → 等约 60s → 在选定的 <b>output/…</b> 查看</small>
+    <small>把待解密脚本放到 <b>input.js</b> → 等约 60s → 在上方选择的 <b>output/…</b> 查看（若提前获取会立刻显示）。</small>
     <div class="row">
       <input type="file" id="file" accept=".js,.txt,.json" />
       <button onclick="pick()">选择文件</button>
@@ -69,33 +82,27 @@
       <button onclick="pasteFromClipboard()">粘贴板</button>
       <button class="err" onclick="clrIn()">清空输入</button>
     </div>
+
     <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
+
     <div class="row">
-      <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
-      <div class="row-right">
-        <button class="warn" onclick="pollOutput(60)">② 等待并轮询选定的 output (60s)</button>
-        <button id="btnCancel" class="err" style="display:none" onclick="cancelPoll()">取消</button>
-      </div>
+      <button class="ok"   onclick="submitInput()">① 提交到 input.js (PUT)</button>
+      <button class="warn" onclick="pollOutput(60)">② 等待并轮询选定的 output (60s)</button>
       <button onclick="beautify()">（可选）结果美化</button>
       <button onclick="copySel('#codeOut', this)">复制结果</button>
       <button class="err" onclick="clrAll()">清空输入与结果</button>
     </div>
 
-    <div id="status"><small>状态：就绪</small></div>
+    <div id="status" class="status"><small>状态：就绪</small></div>
 
-    <!-- 计时器（SVG 圆环 + 大号秒数） -->
-    <div id="timerBox" class="timer-wrap">
-      <div class="svgbox">
-        <svg width="64" height="64" viewBox="0 0 64 64">
-          <circle cx="32" cy="32" r="28" stroke="#223046" stroke-width="6" fill="none"/>
-          <circle id="arc" cx="32" cy="32" r="28" stroke="#3b82f6" stroke-width="6" fill="none"
-                  stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="176"/>
-        </svg>
-        <div class="sec" id="sec">0s</div>
+    <!-- 计时/动画 -->
+    <div id="timer" class="timer">
+      <div class="ring"><span id="secs" class="secs">0s</span></div>
+      <div style="flex:1">
+        <div class="barWrap"><div id="bar" class="bar"></div></div>
       </div>
-      <div class="mut" id="timerTip">正在获取… 最多 60 秒。提前拿到会立刻结束并显示结果。</div>
+      <button class="err" onclick="cancelPoll()">取消</button>
     </div>
-    <div class="progress"><div class="bar" id="bar"></div></div>
 
     <pre id="codeOut" placeholder="结果将显示在这里"></pre>
   </div>
@@ -113,21 +120,18 @@
 <script>
 const $=s=>document.querySelector(s);
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
-
-// ---- GitHub API ----
 function ghHeaders(){
   const t=$('#token').value.trim();
-  if(!t) throw new Error('缺少 Token（需要 contents: read & write）');
+  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
   return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' };
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
-
-// 文件选择 / 远程加载 / 粘贴板 / 清空 —— 与之前一致
 function pick(){ $('#file').click(); }
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
 });
+
 async function loadRemote(){
   let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
   if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
@@ -139,57 +143,55 @@ async function loadRemote(){
     $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
   }catch(e){ setStatus('远程加载失败：'+e.message); }
 }
+
 async function pasteFromClipboard(){
   try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }
   catch(e){ setStatus('粘贴失败：'+e.message); }
 }
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
 function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; setStatus('已清空输入与结果'); }
+async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent='复制结果',1200); }catch(e){ setStatus('复制失败：'+e.message); } }
 
-// ---- 计时器（倒计时 + 进度条 + 最短展示 2s）----
 let aborter=null, rafId=0, secTimer=null;
+let baselineSha = '';         // 轮询开始时的 sha 快照
+let pollStartTs = 0;          // 轮询开始的时间戳（兜底）
+
 function showTimerUI(show){
-  const box=$('#timerBox'); if(!box) return;
-  box.style.display = show ? 'flex' : 'none';
-  $('#btnCancel').style.display = show ? 'inline-block' : 'none';
+  $('#timer').style.display = show ? 'flex' : 'none';
 }
-function startTimer(seconds){
-  cancelAnimationFrame(rafId); clearInterval(secTimer);
-  const arc=$('#arc'); const perimeter=176; // 2πr, r≈28
-  const sec=$('#sec'); const bar=$('#bar');
-  if(arc){ arc.setAttribute('stroke-dasharray', String(perimeter)); arc.setAttribute('stroke-dashoffset', String(perimeter)); }
-  if(bar){ bar.style.width='0%'; }
-  if(sec){ sec.textContent=seconds+'s'; }
-
-  const t0=performance.now();
-  function paint(){
-    const t=(performance.now()-t0)/1000;
-    const left=Math.max(0, seconds - t);
-    const p=Math.min(1, t/seconds);
-    if(arc) arc.setAttribute('stroke-dashoffset', String(perimeter*(1-p)));
-    if(sec) sec.textContent = Math.ceil(left)+'s';
-    if(bar) bar.style.width = (100*p)+'%';
-    if(p<1) rafId=requestAnimationFrame(paint);
-  }
-  rafId=requestAnimationFrame(paint);
-
-  // 文本兜底（极端情况下 SVG 不刷新时）
-  secTimer=setInterval(()=>{
-    const txt=sec?.textContent||'';
-    const n=parseInt(txt)||seconds;
-    const left=Math.max(0, n-1);
-    if(sec) sec.textContent=left+'s';
-  },1000);
+function startTimer(totalSec){
+  const start = performance.now();
+  $('#secs').textContent='0s';
+  const loop = ()=>{
+    const t = (performance.now()-start)/1000;
+    const left = Math.max(0, Math.ceil(totalSec - t));
+    $('#secs').textContent = left+'s';
+    const pct = Math.min(100, Math.max(0, (t/totalSec)*100));
+    $('#bar').style.width = pct+'%';
+    rafId = requestAnimationFrame(loop);
+  };
+  cancelAnimationFrame(rafId);
+  loop();
 }
-function stopTimer(){ cancelAnimationFrame(rafId); clearInterval(secTimer); $('#btnCancel').style.display='none'; }
+function stopTimer(){
+  cancelAnimationFrame(rafId);
+  $('#bar').style.width='100%';
+}
 function cancelPoll(){
   if(aborter){ aborter.abort(); aborter=null; }
-  stopTimer(); showTimerUI(false);
-  setStatus('已取消');
-  const bar=$('#bar'); if(bar) bar.style.width='0%';
+  stopTimer(); showTimerUI(false); setStatus('已取消轮询');
 }
 
-// ---- 提交 input.js（成功后自动开始轮询）----
+// 读取输出文件的头信息
+async function getOutputHead(path){
+  const api = `${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+  const r = await fetch(api,{headers:ghHeaders(),cache:'no-cache'});
+  const txt = await r.text();
+  if(!r.ok) return { ok:false, status:r.status, text:txt };
+  const j = JSON.parse(txt);
+  return { ok:true, sha:j.sha||'', raw:j };
+}
+
 async function submitInput(){
   const path=$('#pathIn').value.trim()||'input.js';
   const api=`${repoBase()}/contents/${path}`;
@@ -198,66 +200,87 @@ async function submitInput(){
     let sha='';
     const head=await fetch(`${api}?ref=${$('#branch').value.trim()}`,{headers:ghHeaders()});
     if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={ message: $('#commitMsg').value.trim()||'update via UI',
-      content: btoa(unescape(encodeURIComponent(code))),
-      branch: $('#branch').value.trim(), sha: sha||undefined };
+    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
     const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body) });
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
-    setStatus('提交成功 · 已写入 '+path);
-    // ✅ 自动开始轮询 60s（提交成功立即启动）
+    setStatus('提交成功 · 已写入 '+path+'，自动开始轮询 60s');
+    // 自动开始轮询 60 秒
     pollOutput(60);
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
 
-// ---- 轮询 output（倒计时 + 最短展示 2s）----
 async function pollOutput(seconds){
   try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
-  const path=$('#pathOut').value.trim()||'output/output.js';
-  const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+
+  const path = $('#pathOut').value.trim() || 'output/output.js';
+  const api  = `${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+
+  // 建立基线 sha
+  pollStartTs = Date.now();
+  baselineSha = '';
+  try{
+    const head = await getOutputHead(path);
+    if(head.ok) baselineSha = head.sha || '';
+  }catch(_){}
 
   showTimerUI(true); startTimer(seconds);
   setStatus(`开始轮询 ${seconds}s：${path}`);
-  aborter=new AbortController();
+  aborter = new AbortController();
 
-  const start=performance.now(); let lastNote='';
+  const tStart = performance.now();
+  let lastNote = '';
+
   for(let i=0;i<seconds;i++){
     try{
-      const r=await fetch(api,{headers:ghHeaders(),signal:aborter.signal,cache:'no-cache'});
-      const raw=await r.text();
+      const r   = await fetch(api,{headers:ghHeaders(),signal:aborter.signal,cache:'no-cache'});
+      const raw = await r.text();
+
       if(r.ok){
-        const j=JSON.parse(raw);
-        const b64=(j.content||'').replace(/\n/g,'');
-        const out=j.content?decodeURIComponent(escape(atob(b64))):'';
-        if(out && out.trim()){
-          // 至少展示 2s 的动画
-          const elapsed=(performance.now()-start)/1000;
-          if(elapsed<2) await new Promise(r=>setTimeout(r, (2-elapsed)*1000));
-          $('#codeOut').textContent=out;
-          setStatus('✅ 已获取：'+path);
-          const bar=$('#bar'); if(bar) bar.style.width='100%';
+        const j   = JSON.parse(raw);
+        const sha = j.sha || '';
+        const b64 = (j.content||'').replace(/\n/g,'');
+        const out = j.content ? decodeURIComponent(escape(atob(b64))) : '';
+
+        const isNew = (!!sha && sha !== baselineSha); // 关键：sha 必须变化
+        if(out.trim() && isNew){
+          // 至少显示 2s 动画
+          const elapsed = (performance.now()-tStart)/1000;
+          if(elapsed < 2) await new Promise(r=>setTimeout(r,(2-elapsed)*1000));
+          $('#codeOut').textContent = out;
+          setStatus('✅ 已获取（新产物）：'+path);
+          $('#bar').style.width='100%';
           stopTimer(); showTimerUI(false);
           return;
         }
+        lastNote = isNew ? '内容为空' : 'sha 未变化（仍是旧文件）';
       }else{
-        lastNote=r.status+' '+r.statusText;
+        lastNote = r.status+' '+r.statusText;
       }
     }catch(e){
       if(e.name==='AbortError') return;
-      lastNote=e.message;
+      lastNote = e.message;
     }
+
     await new Promise(r=>setTimeout(r,1000));
     setStatus(`等待中… ${i+1}/${seconds}s` + (lastNote?` · 上次：${lastNote}`:''));
   }
+
   stopTimer(); showTimerUI(false);
-  setStatus('⌛ 超时未获取：'+path+'，可点“拉取最新 output (Raw)”再看');
+  setStatus('⌛ 超时未获取到新文件：'+path+'，可点“拉取最新 output (Raw)”再看');
 }
 
-// ---- 拉取 / 下载 / 美化 / 复制（不变）----
 async function loadOutputRaw(){
-  const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${$('#pathOut').value.trim()||'output/output.js'}`;
-  try{ const r=await fetch(url,{cache:'no-cache'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText); $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符'); }
-  catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
+  const path = $('#pathOut').value.trim() || 'output/output.js';
+  const url  = `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}`;
+  try{
+    const r=await fetch(url,{cache:'no-cache'}); const t=await r.text();
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符 · '+path);
+  }catch(e){
+    $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url;
+    setStatus('拉取失败');
+  }
 }
 function downloadOutput(){
   const t=$('#outputRaw').textContent||$('#codeOut').textContent||'';
@@ -265,7 +288,9 @@ function downloadOutput(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href);
 }
 
-async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
+/* Prettier（在线） */
+async function ensurePrettier(){
+  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
   const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
   const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
   document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
@@ -274,13 +299,11 @@ async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&win
 async function beautify(){
   let s=$('#codeOut').textContent||$('#codeIn').value||'';
   if(!s){ setStatus('无待美化内容'); return }
-  try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }
-  catch(e){ setStatus('Prettier 失败：'+e.message); }
-}
-async function copySel(sel,btn){
-  try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t);
-    if(btn){ const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old||'复制',1200); }
-  }catch(e){ setStatus('复制失败：'+e.message); }
+  try{
+    await ensurePrettier();
+    const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]});
+    $('#codeOut').textContent=out; setStatus('已用 Prettier 美化');
+  }catch(e){ setStatus('Prettier 失败：'+e.message); }
 }
 </script>
 </body>
