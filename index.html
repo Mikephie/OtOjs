@@ -3,53 +3,55 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 最简稳定版（含双输出选择 & 防旧产物）</title>
+<title>OtOjs · 最简稳定版（带倒计时与自动监听）</title>
 <style>
-  :root{--bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--fg:#e6eef7;--line:#1f2937;--input:#0f1a2b;--accent:#67e8f9}
+  :root{
+    --bg:#0b0f14;--panel:#0f1621;--muted:#9db1c7;--fg:#e6eef7;
+    --border:#1f2937;--input:#0f1a2b;--bar:#2dd4bf;--barbg:#0b1020;
+  }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--fg)}
-  a{color:var(--accent)}
-  .wrap{max-width:920px;margin:0 auto;padding:18px 14px 96px}
-  h1{margin:8px 0 6px;font-size:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
-  label{font-size:12px;color:var(--muted);margin-right:6px}
+  a{color:#67e8f9}
+  .wrap{max-width:920px;margin:0 auto;padding:18px 14px 100px}
+  h1{margin:10px 0 6px;font-size:20px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0}
+  label{font-size:12px;color:var(--muted);margin-right:6px;display:block;margin-bottom:4px}
   input,select,textarea{width:100%;background:var(--input);color:var(--fg);border:1px solid #223046;border-radius:10px;padding:10px;font-size:13px}
-  textarea{min-height:140px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
-  .row>*{flex:1 1 180px}
+  textarea{min-height:160px;font-family:ui-monospace,Consolas,Menlo,monospace}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+  .row>*{flex:1 1 200px}
   button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:#152033;color:var(--fg);cursor:pointer;font-weight:600}
   button.ok{border-color:#10b981}
   button.warn{border-color:#f59e0b}
   button.err{border-color:#ef4444}
-  pre{white-space:pre-wrap;background:#0b1020;border:1px solid #223046;border-radius:10px;padding:10px;font-size:12px;max-height:360px;overflow:auto}
+  pre{white-space:pre-wrap;background:var(--barbg);border:1px solid #223046;border-radius:10px;padding:10px;font-size:12px;max-height:420px;overflow:auto}
   small{color:var(--muted)}
-  .status{min-height:22px}
-  /* 计时 UI */
-  .timer{display:none;align-items:center;gap:10px;margin-top:8px}
-  .ring{width:54px;height:54px;border-radius:50%;border:6px solid #223046;position:relative;display:grid;place-items:center}
-  .ring::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:6px solid transparent;border-top-color:#4da3ff;animation:spin 1s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .secs{font-weight:700}
-  .barWrap{height:8px;background:#0a1322;border:1px solid #1b2a44;border-radius:999px;overflow:hidden}
-  .bar{height:100%;width:0%;background:#4da3ff;transition:width .2s}
+  .timer{display:flex;align-items:center;gap:14px;margin-top:8px}
+  .ring{width:64px;height:64px;border-radius:50%;border:6px solid #0e1a2a;border-top-color:var(--bar);display:flex;align-items:center;justify-content:center;font-weight:700}
+  .barWrap{flex:1;height:10px;background:#0e1630;border-radius:999px;overflow:hidden;border:1px solid #223046}
+  .bar{height:100%;width:0;background:var(--bar);transition:width .08s linear}
+  .status{min-height:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>OtOjs · 最简稳定版</h1>
+  <h1>OtOjs · 最简稳定版（带倒计时 + 自动监听）</h1>
 
+  <!-- 基本配置 -->
   <div class="card">
     <div class="row">
       <div style="flex:2">
         <label>REPO</label>
         <input id="repo" value="Mikephie/OtOjs" />
       </div>
-      <div style="max-width:160px">
+      <div>
         <label>BRANCH</label>
         <input id="branch" value="main" />
       </div>
       <div>
-        <label>Token（contents: rw）</label>
+        <label>Token（需要 contents: read & write）</label>
         <input id="token" type="password" placeholder="ghp_..." />
       </div>
     </div>
@@ -59,11 +61,17 @@
         <input id="pathIn" value="input.js" />
       </div>
       <div>
-        <label>output 路径选择</label>
-        <select id="pathOut">
-          <option value="output/output.js" selected>output/output.js</option>
-          <option value="output/output.deob2.js">output/output.deob2.js</option>
-        </select>
+        <label>output 路径选择（自定义优先）</label>
+        <div class="grid2">
+          <select id="pathOut">
+            <option value="output/output.js">output/output.js</option>
+            <option value="output/output.deob2.js">output/output.deob2.js</option>
+          </select>
+          <div>
+            <label style="margin:0 0 6px 0">自动监听 output（每 5s 检查 sha）</label>
+            <input id="autoWatch" type="checkbox" checked />
+          </div>
+        </div>
       </div>
       <div>
         <label>提交信息</label>
@@ -72,8 +80,10 @@
     </div>
   </div>
 
+  <!-- 提交与获取 -->
   <div class="card">
-    <small>把待解密脚本放到 <b>input.js</b> → 等约 60s → 在上方选择的 <b>output/…</b> 查看（若提前获取会立刻显示）。</small>
+    <small>把待解密脚本放到 <b>input.js</b> → 等约 60 秒 → 在选定的 <b>output/…</b> 查看（提前获取会立刻结束动画）</small>
+
     <div class="row">
       <input type="file" id="file" accept=".js,.txt,.json" />
       <button onclick="pick()">选择文件</button>
@@ -93,20 +103,18 @@
       <button class="err" onclick="clrAll()">清空输入与结果</button>
     </div>
 
-    <div id="status" class="status"><small>状态：就绪</small></div>
-
-    <!-- 计时/动画 -->
-    <div id="timer" class="timer">
-      <div class="ring"><span id="secs" class="secs">0s</span></div>
-      <div style="flex:1">
-        <div class="barWrap"><div id="bar" class="bar"></div></div>
-      </div>
-      <button class="err" onclick="cancelPoll()">取消</button>
+    <!-- 倒计时 + 进度条（同帧同步） -->
+    <div class="timer">
+      <div class="ring"><span id="secs">0s</span></div>
+      <div class="barWrap"><div id="bar" class="bar"></div></div>
+      <button id="cancelBtn" onclick="cancelPolling()" style="min-width:90px">取消</button>
     </div>
 
+    <div id="status" class="status"><small>状态：就绪</small></div>
     <pre id="codeOut" placeholder="结果将显示在这里"></pre>
   </div>
 
+  <!-- Raw 拉取 / 复制 / 下载 -->
   <div class="card">
     <div class="row">
       <button onclick="loadOutputRaw()">拉取最新 output (Raw)</button>
@@ -118,14 +126,17 @@
 </div>
 
 <script>
+/* ============ 工具 ============ */
 const $=s=>document.querySelector(s);
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 function ghHeaders(){
   const t=$('#token').value.trim();
-  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
+  if(!t) throw new Error('缺少 Token（需要 contents: read & write）');
   return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' };
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
+function rawUrl(path){ return `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}` }
+
 function pick(){ $('#file').click(); }
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
@@ -143,60 +154,95 @@ async function loadRemote(){
     $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
   }catch(e){ setStatus('远程加载失败：'+e.message); }
 }
-
 async function pasteFromClipboard(){
   try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }
   catch(e){ setStatus('粘贴失败：'+e.message); }
 }
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
 function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; setStatus('已清空输入与结果'); }
-async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent='复制结果',1200); }catch(e){ setStatus('复制失败：'+e.message); } }
 
-let aborter=null, rafId=0, secTimer=null;
-let baselineSha = '';         // 轮询开始时的 sha 快照
-let pollStartTs = 0;          // 轮询开始的时间戳（兜底）
-
-function showTimerUI(show){
-  $('#timer').style.display = show ? 'flex' : 'none';
-}
+/* ============ 同帧同步计时 ============ */
+let rafId=0, pollingAbort=false;
 function startTimer(totalSec){
   const start = performance.now();
-  $('#secs').textContent='0s';
-  const loop = ()=>{
-    const t = (performance.now()-start)/1000;
-    const left = Math.max(0, Math.ceil(totalSec - t));
-    $('#secs').textContent = left+'s';
-    const pct = Math.min(100, Math.max(0, (t/totalSec)*100));
-    $('#bar').style.width = pct+'%';
-    rafId = requestAnimationFrame(loop);
-  };
   cancelAnimationFrame(rafId);
-  loop();
+
+  const frame = ()=>{
+    const t = (performance.now() - start) / 1000;          // 已过秒
+    const left = Math.max(0, totalSec - t);                 // 剩余秒（浮点）
+    const leftInt = Math.ceil(left);                        // 倒数显示（向上取整）
+    const pct = Math.min(100, Math.max(0, (t/totalSec)*100));
+
+    $('#secs').textContent = leftInt + 's';
+    $('#bar').style.width = pct + '%';
+
+    if (!pollingAbort && left > 0) rafId = requestAnimationFrame(frame);
+  };
+  pollingAbort=false;
+  frame();
 }
 function stopTimer(){
   cancelAnimationFrame(rafId);
-  $('#bar').style.width='100%';
+  $('#bar').style.width = '100%';
 }
-function cancelPoll(){
-  if(aborter){ aborter.abort(); aborter=null; }
-  stopTimer(); showTimerUI(false); setStatus('已取消轮询');
-}
-
-// 读取输出文件的头信息
-async function getOutputHead(path){
-  const api = `${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
-  const r = await fetch(api,{headers:ghHeaders(),cache:'no-cache'});
-  const txt = await r.text();
-  if(!r.ok) return { ok:false, status:r.status, text:txt };
-  const j = JSON.parse(txt);
-  return { ok:true, sha:j.sha||'', raw:j };
+function cancelPolling(){
+  pollingAbort=true;
+  stopTimer();
+  setStatus('已取消轮询');
 }
 
+/* ============ 自动监听：sha 变更即拉取 ============ */
+let watchTimer = null;
+let lastSha = '';      // 最近一次看到的 sha
+async function fetchOutputOnce(showStatus=true){
+  const path = $('#pathOut').value.trim() || 'output/output.js';
+  const api  = `${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+  try{
+    const r = await fetch(api, { headers: ghHeaders(), cache:'no-cache' });
+    const raw = await r.text();
+    if(!r.ok) { if(showStatus) setStatus(`监听：${r.status} ${r.statusText}`); return false; }
+    const j = JSON.parse(raw);
+    const sha = j.sha || '';
+    if(sha && sha !== lastSha){
+      lastSha = sha;
+      const b64 = (j.content||'').replace(/\n/g,'');
+      const out = j.content ? decodeURIComponent(escape(atob(b64))) : '';
+      if(out.trim()){
+        $('#codeOut').textContent = out;
+        setStatus('🔔 监听到新产物并已显示：' + path);
+        return true;
+      }
+    }
+  }catch(e){
+    if(showStatus) setStatus('监听异常：' + e.message);
+  }
+  return false;
+}
+function startWatch(intervalMs=5000){
+  if(!$('#autoWatch').checked) return;
+  clearInterval(watchTimer);
+  // 先抓一次（可能刚好已经产出）
+  fetchOutputOnce(false);
+  watchTimer = setInterval(()=>fetchOutputOnce(false), intervalMs);
+  setStatus('已开启自动监听（每 5s 检查）');
+}
+function stopWatch(){
+  clearInterval(watchTimer);
+  watchTimer = null;
+  setStatus('已停止自动监听');
+}
+$('#autoWatch').addEventListener('change', e=>{
+  if(e.target.checked) startWatch(); else stopWatch();
+});
+$('#pathOut').addEventListener('change', ()=>{ lastSha=''; if($('#autoWatch').checked){ startWatch(); }});
+
+/* ============ 提交 input.js ============ */
 async function submitInput(){
   const path=$('#pathIn').value.trim()||'input.js';
   const api=`${repoBase()}/contents/${path}`;
   const code=$('#codeIn').value; if(!code){ setStatus('没有可上传的内容'); return }
   try{
+    ghHeaders(); // 校验 token
     let sha='';
     const head=await fetch(`${api}?ref=${$('#branch').value.trim()}`,{headers:ghHeaders()});
     if(head.ok){ const j=await head.json(); sha=j.sha||''; }
@@ -205,92 +251,62 @@ async function submitInput(){
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
     setStatus('提交成功 · 已写入 '+path+'，自动开始轮询 60s');
-    // 自动开始轮询 60 秒
-    pollOutput(60);
+    pollOutput(60);     // 立即轮询一次（带倒计时动画）
+    startWatch();       // 后续继续后台监听，sha 变就自动显示
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
 
+/* ============ 轮询 60s：同帧计时 + 提前结束 ============ */
 async function pollOutput(seconds){
   try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
+  const path=$('#pathOut').value.trim()||'output/output.js';
+  const api =`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+  const t0 = Date.now();
+  let last='';
 
-  const path = $('#pathOut').value.trim() || 'output/output.js';
-  const api  = `${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
+  startTimer(seconds);
+  setStatus('开始轮询 '+seconds+'s… 如提前拿到会立刻结束并显示结果');
 
-  // 建立基线 sha
-  pollStartTs = Date.now();
-  baselineSha = '';
-  try{
-    const head = await getOutputHead(path);
-    if(head.ok) baselineSha = head.sha || '';
-  }catch(_){}
-
-  showTimerUI(true); startTimer(seconds);
-  setStatus(`开始轮询 ${seconds}s：${path}`);
-  aborter = new AbortController();
-
-  const tStart = performance.now();
-  let lastNote = '';
-
-  for(let i=0;i<seconds;i++){
+  while(!pollingAbort && (Date.now()-t0)/1000 < seconds){
     try{
-      const r   = await fetch(api,{headers:ghHeaders(),signal:aborter.signal,cache:'no-cache'});
-      const raw = await r.text();
-
+      const r=await fetch(api,{headers:ghHeaders(),cache:'no-cache'}); 
+      const raw=await r.text();
       if(r.ok){
-        const j   = JSON.parse(raw);
-        const sha = j.sha || '';
-        const b64 = (j.content||'').replace(/\n/g,'');
-        const out = j.content ? decodeURIComponent(escape(atob(b64))) : '';
-
-        const isNew = (!!sha && sha !== baselineSha); // 关键：sha 必须变化
-        if(out.trim() && isNew){
-          // 至少显示 2s 动画
-          const elapsed = (performance.now()-tStart)/1000;
-          if(elapsed < 2) await new Promise(r=>setTimeout(r,(2-elapsed)*1000));
-          $('#codeOut').textContent = out;
-          setStatus('✅ 已获取（新产物）：'+path);
-          $('#bar').style.width='100%';
-          stopTimer(); showTimerUI(false);
+        const j=JSON.parse(raw);
+        const b64=(j.content||'').replace(/\n/g,'');
+        const out=j.content?decodeURIComponent(escape(atob(b64))):'';
+        if(out && out.trim()){
+          $('#codeOut').textContent=out;
+          lastSha = j.sha || lastSha;
+          stopTimer();
+          setStatus('✅ 已获取到：'+path);
           return;
         }
-        lastNote = isNew ? '内容为空' : 'sha 未变化（仍是旧文件）';
       }else{
-        lastNote = r.status+' '+r.statusText;
+        last=r.status+' '+r.statusText;
       }
-    }catch(e){
-      if(e.name==='AbortError') return;
-      lastNote = e.message;
-    }
+    }catch(e){ last=e.message }
 
-    await new Promise(r=>setTimeout(r,1000));
-    setStatus(`等待中… ${i+1}/${seconds}s` + (lastNote?` · 上次：${lastNote}`:''));
+    // 间隔 5s
+    await new Promise(r=>setTimeout(r,5000));
+    const spent=Math.floor((Date.now()-t0)/1000);
+    setStatus('等待中… '+spent+'/'+seconds+'s'+(last?(' · 上次：'+last):''));
   }
-
-  stopTimer(); showTimerUI(false);
-  setStatus('⌛ 超时未获取到新文件：'+path+'，可点“拉取最新 output (Raw)”再看');
+  stopTimer();
+  setStatus('⌛ 仍未获取到 '+path+'，将继续在后台监听（选中自动监听则会自动显示）');
 }
 
+/* ============ Raw / 下载 / 美化 / 复制 ============ */
 async function loadOutputRaw(){
-  const path = $('#pathOut').value.trim() || 'output/output.js';
-  const url  = `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}`;
-  try{
-    const r=await fetch(url,{cache:'no-cache'}); const t=await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText);
-    $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符 · '+path);
-  }catch(e){
-    $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url;
-    setStatus('拉取失败');
-  }
+  const path=$('#pathOut').value.trim()||'output/output.js';
+  const url=rawUrl(path);
+  try{ const r=await fetch(url,{cache:'no-cache'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText); $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符'); }
+  catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
 }
-function downloadOutput(){
-  const t=$('#outputRaw').textContent||$('#codeOut').textContent||'';
-  const b=new Blob([t],{type:'text/javascript;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href);
-}
+function downloadOutput(){ const t=$('#outputRaw').textContent||$('#codeOut').textContent||''; const b=new Blob([t],{type:'text/javascript;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href); }
 
-/* Prettier（在线） */
 async function ensurePrettier(){
-  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
+  if(window.prettier && window.prettierPlugins && window.prettierPlugins.babel) return;
   const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
   const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
   document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
@@ -305,6 +321,13 @@ async function beautify(){
     $('#codeOut').textContent=out; setStatus('已用 Prettier 美化');
   }catch(e){ setStatus('Prettier 失败：'+e.message); }
 }
+async function copySel(sel,btn){
+  try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent='复制结果',1200); }
+  catch(e){ setStatus('复制失败：'+e.message); }
+}
+
+/* 初始：若勾选则启动监听 */
+window.addEventListener('load', ()=>{ if($('#autoWatch').checked) startWatch(); });
 </script>
 </body>
 </html>
