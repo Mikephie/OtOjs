@@ -1,133 +1,1121 @@
-const version = 'V1.0.9';
-var _0xodH = 'jsjiami.com.v7';
-const _0xc3dd0a = _0x1e61;
-if (function (_0x297b99, _0x23f2e1, _0x6df70d, _0x3c23f, _0x377ebd, _0x2c90c8, _0x4be525) {
-  return _0x297b99 = _0x297b99 >> 0x6, _0x2c90c8 = 'hs', _0x4be525 = 'hs', function (_0x2e8807, _0x4f615d, _0x39406d, _0x480882, _0x25520e) {
-    const _0x39cfbb = _0x1e61;
-    _0x480882 = 'tfi', _0x2c90c8 = _0x480882 + _0x2c90c8, _0x25520e = 'up', _0x4be525 += _0x25520e, _0x2c90c8 = _0x39406d(_0x2c90c8), _0x4be525 = _0x39406d(_0x4be525), _0x39406d = 0x0;
-    const _0x548169 = _0x2e8807();
-    while (true && --_0x3c23f + _0x4f615d) {
-      try {
-        _0x480882 = -parseInt(_0x39cfbb(0xe7, 'p4lg')) / 0x1 + parseInt(_0x39cfbb(0xe5, ']WGR')) / 0x2 * (parseInt(_0x39cfbb(0xfd, 'p6@A')) / 0x3) + -parseInt(_0x39cfbb(0xf9, 'bE)$')) / 0x4 + -parseInt(_0x39cfbb(0xe6, 'L]@f')) / 0x5 + -parseInt(_0x39cfbb(0xf5, 'ICP5')) / 0x6 * (parseInt(_0x39cfbb(0xfe, 'Z5[j')) / 0x7) + parseInt(_0x39cfbb(0xf8, ')Hz#')) / 0x8 + parseInt(_0x39cfbb(0x10a, 'd&Pb')) / 0x9;
-      } catch (_0x58ea56) {
-        _0x480882 = _0x39406d;
-      } finally {
-        _0x25520e = _0x548169[_0x2c90c8]();
-        if (_0x297b99 <= _0x3c23f) _0x39406d ? _0x377ebd ? _0x480882 = _0x25520e : _0x377ebd = _0x25520e : _0x39406d = _0x25520e;else {
-          if (_0x39406d == _0x377ebd['replace'](/[kKlGUnbLWFYEOphRDPNdf=]/g, '')) {
-            if (_0x480882 === _0x4f615d) {
-              _0x548169['un' + _0x2c90c8](_0x25520e);
-              break;
+(() => {
+  function g(H, I) {
+    {
+      var K = "undefined" != typeof Symbol && H[Symbol.iterator] || H["@@iterator"];
+      if (!K) {
+        {
+          if (Array.isArray(H) || (K = function (R, S) {
+            {
+              if (R) {
+                {
+                  if ("string" == typeof R) {
+                    return j(R, S);
+                  }
+                  var T = {}.toString.call(R).slice(8, -1);
+                  "Object" === T && R.constructor && (T = R.constructor.name);
+                  return "Map" === T || "Set" === T ? Array.from(R) : "Arguments" === T || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(T) ? j(R, S) : undefined;
+                }
+              }
             }
-            _0x548169[_0x4be525](_0x25520e);
+          }(H)) || I && H && "number" == typeof H.length) {
+            {
+              K && (H = K);
+              var L = 0;
+              var M = function () {};
+              return {
+                s: M,
+                n: function () {
+                  {
+                    var T = {
+                      done: true
+                    };
+                    return L >= H.length ? T : {
+                      done: false,
+                      value: H[L++]
+                    };
+                  }
+                },
+                e: function (S) {
+                  {
+                    throw S;
+                  }
+                },
+                f: M
+              };
+            }
+          }
+          throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+        }
+      }
+      var N;
+      var O = true;
+      var P = false;
+      return {
+        s: function () {
+          {
+            K = K.call(H);
+          }
+        },
+        n: function () {
+          {
+            var S = K.next();
+            O = S.done;
+            return S;
+          }
+        },
+        e: function (S) {
+          {
+            P = true;
+            N = S;
+          }
+        },
+        f: function () {
+          {
+            try {
+              {
+                O || null == K.return || K.return();
+              }
+            } finally {
+              {
+                if (P) {
+                  throw N;
+                }
+              }
+            }
+          }
+        }
+      };
+    }
+  }
+  function j(H, I) {
+    {
+      (null == I || I > H.length) && (I = H.length);
+      for (var K = 0, L = Array(I); K < I; K++) {
+        L[K] = H[K];
+      }
+      return L;
+    }
+  }
+  function k() {
+    "use strict";
+
+    var H = {
+      gMAmG: function (ak, al) {
+        return ak < al;
+      },
+      GUgzv: function (ak, al) {
+        return ak === al;
+      },
+      pgARc: "YEdsc",
+      oZWBk: "[object Generator]",
+      tHvDF: function (ak, al, am, an, ao) {
+        return ak(al, am, an, ao);
+      },
+      PBZJf: "Wvdxi",
+      wYInB: "zRsuE",
+      HIRyg: function (ak, al) {
+        return ak == al;
+      },
+      RYGge: function (ak, al) {
+        return ak in al;
+      },
+      RLOYy: "function",
+      GIGRW: function (ak, al) {
+        return ak !== al;
+      },
+      NNqbU: "XOBvf",
+      tMyHS: "acYMV",
+      cVzjX: "normal",
+      NgCVK: "CcvxZ",
+      IILxu: "throw",
+      cKVOX: "catchLoc",
+      FZChq: "finallyLoc",
+      BnTGI: function (ak, al, am) {
+        return ak(al, am);
+      },
+      diKyv: function (ak, al) {
+        return ak(al);
+      },
+      idlqZ: "try statement without catch or finally",
+      QKGFK: function (ak, al) {
+        return ak === al;
+      },
+      CNGPb: "ioNVF",
+      uPqsS: function (ak, al) {
+        return ak === al;
+      },
+      hVanZ: "qgisx",
+      QHFPY: "uHFCG",
+      FgzLj: "cVcow",
+      iBRLl: "wvppV",
+      tbYgE: function (ak) {
+        return ak();
+      },
+      EtmUz: function (ak, al) {
+        return ak(al);
+      },
+      ZdhlW: "string",
+      bpPqS: "Set",
+      llXZV: "kvXdA",
+      RKWje: "aslWV",
+      bgYlI: function (ak, al, am, an, ao) {
+        return ak(al, am, an, ao);
+      },
+      Pggcv: "fvVdC",
+      YUxmb: function (ak, al) {
+        return ak !== al;
+      },
+      hSLfR: "zxzrU",
+      PBevf: function (ak, al, am, an) {
+        return ak(al, am, an);
+      },
+      tZYUb: function (ak, al) {
+        return ak == al;
+      },
+      HRkrm: "__await",
+      ICpkc: "object",
+      VqpHI: function (ak, al) {
+        return ak(al);
+      },
+      xOByZ: function (ak, al) {
+        return ak(al);
+      },
+      JNFfN: "nJpjW",
+      evhWn: "CBwTG",
+      rlhUt: "_invoke",
+      blSvA: function (ak, al) {
+        return ak(al);
+      },
+      gCPGV: "LcneI",
+      EFdBz: "qqYbY",
+      QszHx: "Generator is already running",
+      VGoiQ: function (ak, al) {
+        return ak === al;
+      },
+      yZcQe: function (ak, al) {
+        return ak === al;
+      },
+      gFoAW: "Eqkdv",
+      KdLCm: function (ak, al) {
+        return ak === al;
+      },
+      uiuEi: "JAYeW",
+      telWp: function (ak, al) {
+        return ak === al;
+      },
+      hJVxP: "nuGMs",
+      egMyu: function (ak, al) {
+        return ak === al;
+      },
+      kGZuq: "CJYle",
+      kGvQW: "pIZEt",
+      QcOlK: function (ak, al) {
+        return ak === al;
+      },
+      CgAWC: "next",
+      eYlrk: function (ak, al) {
+        return ak === al;
+      },
+      Ogttl: function (ak, al) {
+        return ak !== al;
+      },
+      jqXQI: "slneY",
+      WBjko: "oSyor",
+      HPxzo: "return",
+      xMPWX: function (ak, al) {
+        return ak === al;
+      },
+      NNOFX: function (ak, al) {
+        return ak === al;
+      },
+      uViyG: "aCzcZ",
+      GalBX: "UnHxl",
+      sEoUT: function (ak, al) {
+        return ak === al;
+      },
+      QhNQV: function (ak, al, am, an, ao) {
+        return ak(al, am, an, ao);
+      },
+      PuVgV: function (ak, al) {
+        return ak !== al;
+      },
+      ZbBRG: "xlfXJ",
+      qXOqm: function (ak, al) {
+        return ak in al;
+      },
+      SmfQV: function (ak, al) {
+        return ak in al;
+      },
+      oWpOU: "dWKTt",
+      wYSMn: "root",
+      lVgPv: function (ak, al) {
+        return ak in al;
+      },
+      VVJNR: "video",
+      Grtux: ".m3u8",
+      WhBte: "rBSHi",
+      nFTMl: "KZZEu",
+      XHWEy: "KlOJB",
+      xtQZG: function (ak, al) {
+        return ak == al;
+      },
+      AXiPi: function (ak, al) {
+        return ak(al);
+      },
+      mGlLC: "tAwEB",
+      VpDkX: "sXBGP",
+      hwhuF: " is not iterable",
+      bXLEZ: function (ak, al) {
+        return ak === al;
+      },
+      aFILT: function (ak, al) {
+        return ak == al;
+      },
+      LLAXb: "symbol",
+      zmJIA: function (ak, al) {
+        return ak(al);
+      },
+      GjVHr: function (ak, al) {
+        return ak !== al;
+      },
+      XZGon: "ejnTa",
+      ksZKj: "qFeXx",
+      tnTUH: function (ak, al) {
+        return ak === al;
+      },
+      OEkNZ: "GeneratorFunction",
+      SCpyb: function (ak, al) {
+        return ak === al;
+      },
+      XIUak: "Map",
+      vQnDK: function (ak, al) {
+        return ak !== al;
+      },
+      uxKKP: "vNvJE",
+      FhuJQ: function (ak, al) {
+        return ak === al;
+      },
+      eMQRZ: "TAarb",
+      qhcux: "zzBEx",
+      BvsNy: function (ak, al) {
+        return ak === al;
+      },
+      zFved: "OWhsU",
+      zfgfJ: function (ak, al) {
+        return ak === al;
+      },
+      CHmuB: function (ak, al) {
+        return ak(al);
+      },
+      YxxYN: function (ak, al) {
+        return ak(al);
+      },
+      lVruf: function (ak, al) {
+        return ak !== al;
+      },
+      gAdvj: "is_buy",
+      oQkDv: "buy_index",
+      TGRro: "IhGtO",
+      knLrU: function (ak, al) {
+        return ak === al;
+      },
+      WOMxz: "dxpwP",
+      UYbfh: function (ak, al) {
+        return ak(al);
+      },
+      GvavX: function (ak, al) {
+        return ak(al);
+      },
+      RIsmw: "vopzK",
+      ztUiC: function (ak, al) {
+        return ak - al;
+      },
+      FzRId: function (ak, al) {
+        return ak === al;
+      },
+      iZKRD: function (ak, al) {
+        return ak <= al;
+      },
+      yiPsN: function (ak, al) {
+        return ak !== al;
+      },
+      kjAUX: "SrYAT",
+      NQDWI: "JqNLO",
+      VwvUA: "break",
+      HfJQd: function (ak, al) {
+        return ak === al;
+      },
+      qKNTl: function (ak, al) {
+        return ak <= al;
+      },
+      dfzfx: function (ak, al) {
+        return ak(al);
+      }
+    };
+    k = function () {
+      {
+        return K;
+      }
+    };
+    var J;
+    var K = {};
+    var M = Object.prototype;
+    var Q = M.hasOwnProperty;
+    var R = Object.defineProperty || function (ak, al, am) {
+      {
+        ak[al] = am.value;
+      }
+    };
+    var T = "function" == typeof Symbol ? Symbol : {};
+    var U = T.iterator || "@@iterator";
+    var V = T.asyncIterator || "@@asyncIterator";
+    var W = T.toStringTag || "@@toStringTag";
+    function X(ak, al, am) {
+      {
+        var an = {
+          value: am,
+          enumerable: true,
+          configurable: true,
+          writable: true
+        };
+        Object.defineProperty(ak, al, an);
+        return ak[al];
+      }
+    }
+    try {
+      X({}, "");
+    } catch (al) {
+      {
+        X = function (an, ao, ap) {
+          {
+            return an[ao] = ap;
+          }
+        };
+      }
+    }
+    function Y(an, ao, ap, aq) {
+      {
+        var as = ao && ao.prototype instanceof a5 ? ao : a5;
+        var at = Object.create(as.prototype);
+        var au = new ai(aq || []);
+        R(at, "_invoke", {
+          value: ae(an, ap, au)
+        });
+        return at;
+      }
+    }
+    function Z(an, ao, ap) {
+      {
+        try {
+          {
+            return {
+              type: "normal",
+              arg: an.call(ao, ap)
+            };
+          }
+        } catch (au) {
+          {
+            var ar = {
+              type: "throw",
+              arg: au
+            };
+            return ar;
           }
         }
       }
     }
-  }(_0x6df70d, _0x23f2e1, function (_0x3bf4d5, _0x51ea99, _0x4fa532, _0xb5ed0d, _0xee9e18, _0x219c74, _0x1ad289) {
-    return _0x3bf4d5 = arguments[0x0], _0x3bf4d5 = _0x3bf4d5['\x73\x70\x6c\x69\x74'](''), _0x3bf4d5 = _0x3bf4d5['\x72\x65\x76\x65\x72\x73\x65']('\x76'), 0x1a8866, _0x3bf4d5['\x6a\x6f\x69\x6e']('');
-  });
-}(0x3340, 0xc4ab3, _0x1715, 0xcf), _0x1715) {}
-const opName = $request?.[_0xc3dd0a(0xeb, '1D%(')]?.[_0xc3dd0a(0xe3, 'r@dH')] || '';
-function _0x1e61(_0x37ad72, _0xa65d17) {
-  const _0x1715c6 = _0x1715();
-  return _0x1e61 = function (_0x1e61ca, _0x1d9789) {
-    _0x1e61ca = _0x1e61ca - 0xdd;
-    let _0x2ce79b = _0x1715c6[_0x1e61ca];
-    if (_0x1e61['BTKsgq'] === undefined) {
-      var _0xa37233 = function (_0x221d34) {
-        const _0x504cae = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';
-        let _0x3f1826 = '',
-          _0x3285c4 = '';
-        for (let _0x2eb4f4 = 0x0, _0xa8b038, _0x41bc3d, _0x8e9071 = 0x0; _0x41bc3d = _0x221d34['charAt'](_0x8e9071++); ~_0x41bc3d && (_0xa8b038 = _0x2eb4f4 % 0x4 ? _0xa8b038 * 0x40 + _0x41bc3d : _0x41bc3d, _0x2eb4f4++ % 0x4) ? _0x3f1826 += String['fromCharCode'](0xff & _0xa8b038 >> (-0x2 * _0x2eb4f4 & 0x6)) : 0x0) {
-          _0x41bc3d = _0x504cae['indexOf'](_0x41bc3d);
-        }
-        for (let _0x26ebf1 = 0x0, _0xe97a80 = _0x3f1826['length']; _0x26ebf1 < _0xe97a80; _0x26ebf1++) {
-          _0x3285c4 += '%' + ('00' + _0x3f1826['charCodeAt'](_0x26ebf1)['toString'](0x10))['slice'](-0x2);
-        }
-        return decodeURIComponent(_0x3285c4);
-      };
-      const _0xc89735 = function (_0x1de514, _0x2bfde6) {
-        let _0x2c03d2 = [],
-          _0x53937e = 0x0,
-          _0x3ae814,
-          _0x4a2cc3 = '';
-        _0x1de514 = _0xa37233(_0x1de514);
-        let _0x192053;
-        for (_0x192053 = 0x0; _0x192053 < 0x100; _0x192053++) {
-          _0x2c03d2[_0x192053] = _0x192053;
-        }
-        for (_0x192053 = 0x0; _0x192053 < 0x100; _0x192053++) {
-          _0x53937e = (_0x53937e + _0x2c03d2[_0x192053] + _0x2bfde6['charCodeAt'](_0x192053 % _0x2bfde6['length'])) % 0x100, _0x3ae814 = _0x2c03d2[_0x192053], _0x2c03d2[_0x192053] = _0x2c03d2[_0x53937e], _0x2c03d2[_0x53937e] = _0x3ae814;
-        }
-        _0x192053 = 0x0, _0x53937e = 0x0;
-        for (let _0x1a6904 = 0x0; _0x1a6904 < _0x1de514['length']; _0x1a6904++) {
-          _0x192053 = (_0x192053 + 0x1) % 0x100, _0x53937e = (_0x53937e + _0x2c03d2[_0x192053]) % 0x100, _0x3ae814 = _0x2c03d2[_0x192053], _0x2c03d2[_0x192053] = _0x2c03d2[_0x53937e], _0x2c03d2[_0x53937e] = _0x3ae814, _0x4a2cc3 += String['fromCharCode'](_0x1de514['charCodeAt'](_0x1a6904) ^ _0x2c03d2[(_0x2c03d2[_0x192053] + _0x2c03d2[_0x53937e]) % 0x100]);
-        }
-        return _0x4a2cc3;
-      };
-      _0x1e61['IEgssj'] = _0xc89735, _0x37ad72 = arguments, _0x1e61['BTKsgq'] = true;
+    K.wrap = Y;
+    var a0 = "suspendedStart";
+    var a1 = "suspendedYield";
+    var a2 = "executing";
+    var a3 = "completed";
+    var a4 = {};
+    function a5() {}
+    function a6() {}
+    function a7() {}
+    var a8 = {};
+    X(a8, U, function () {
+      {
+        return this;
+      }
+    });
+    var a9 = Object.getPrototypeOf;
+    var aa = a9 && a9(a9(aj([])));
+    aa && aa !== M && Q.call(aa, U) && (a8 = aa);
+    a7.prototype = a5.prototype = Object.create(a8);
+    var ab = a7.prototype;
+    function ac(an) {
+      {
+        ["next", "throw", "return"].forEach(function (aq) {
+          {
+            X(an, aq, function (at) {
+              {
+                return this._invoke(aq, at);
+              }
+            });
+          }
+        });
+      }
     }
-    const _0xf622 = _0x1715c6[0x0],
-      _0x46d550 = _0x1e61ca + _0xf622,
-      _0x4d7095 = _0x37ad72[_0x46d550];
-    return !_0x4d7095 ? (_0x1e61['fvMIXX'] === undefined && (_0x1e61['fvMIXX'] = true), _0x2ce79b = _0x1e61['IEgssj'](_0x2ce79b, _0x1d9789), _0x37ad72[_0x46d550] = _0x2ce79b) : _0x2ce79b = _0x4d7095, _0x2ce79b;
-  }, _0x1e61(_0x37ad72, _0xa65d17);
-}
-let body;
-if (/Ads/i[_0xc3dd0a(0xea, 'lUu0')](opName)) $done({
-  'body': '{}'
-});else try {
-  body = JSON[_0xc3dd0a(0x106, 'Z5[j')]($response[_0xc3dd0a(0x10e, 'Ludd')]['replace'](/"isObfuscated":false/g, '\x22isObfuscated\x22:false')['replace'](/"obfuscatedPath":null]*"/g, '\x22obfuscatedPath\x22:null')[_0xc3dd0a(0xe1, 'YRTb')](/"isNsfw":false/g, '\x22isNsfw\x22:false')['replace'](/"isAdPersonalizationAllowed":false/g, '\x22isAdPersonalizationAllowed\x22:false')[_0xc3dd0a(0xf2, ']7tS')](/"isThirdPartyInfoAdPersonalizationAllowed":false/g, _0xc3dd0a(0xf3, 'T[Av'))[_0xc3dd0a(0xf4, 'Ludd')](/"isNsfwMediaBlocked":false/g, _0xc3dd0a(0xdf, '7Vi7'))[_0xc3dd0a(0xe0, '%9Ot')](/"isNsfwContentShown":false/g, _0xc3dd0a(0x103, '78t5'))[_0xc3dd0a(0xee, 'p4lg')](/"isPremiumMember":true/g, _0xc3dd0a(0xdd, 'r@dH'))[_0xc3dd0a(0xf1, 'lUu0')](/"isEmployee":true/g, '\x22isEmployee\x22:true'));
-  const data = body['data'] ?? {};
-  Object[_0xc3dd0a(0xe4, ']cmg')](data)[_0xc3dd0a(0x102, 'B(G3')](_0x264ed5 => {
-    const _0x38539b = _0xc3dd0a,
-      _0x227df7 = {
-        'xGFfl': function (_0x380bd6, _0x1395e7) {
-          return _0x380bd6 === _0x1395e7;
-        },
-        'QRZWk': _0x38539b(0x100, 'r@dH'),
-        'iYbEo': function (_0x5aaf97, _0x21896c) {
-          return _0x5aaf97 === _0x21896c;
-        },
-        'Ojbez': _0x38539b(0x101, 'qFlq')
+    function ad(an, ao) {
+      function ar(as, at, au, av) {
+        var ax = Z(an[as], an, at);
+        if ("throw" !== ax.type) {
+          {
+            var ay = ax.arg;
+            var az = ay.value;
+            return az && "object" == m(az) && Q.call(az, "__await") ? ao.resolve(az.__await).then(function (aC) {
+              {
+                ar("next", aC, au, av);
+              }
+            }, function (aC) {
+              ar("throw", aC, au, av);
+            }) : ao.resolve(az).then(function (aC) {
+              {
+                ay.value = aC;
+                au(ay);
+              }
+            }, function (aC) {
+              {
+                return ar("throw", aC, au, av);
+              }
+            });
+          }
+        }
+        av(ax.arg);
+      }
+      var aq;
+      R(this, "_invoke", {
+        value: function (as, at) {
+          {
+            function aw() {
+              {
+                return new ao(function (az, aA) {
+                  ar(as, at, az, aA);
+                });
+              }
+            }
+            return aq = aq ? aq.then(aw, aw) : aw();
+          }
+        }
+      });
+    }
+    function ae(an, ao, ap) {
+      {
+        var ar = a0;
+        return function (at, au) {
+          {
+            if (ar === a2) {
+              throw Error("Generator is already running");
+            }
+            if (ar === a3) {
+              {
+                if ("throw" === at) {
+                  throw au;
+                }
+                var aw = {
+                  value: J,
+                  done: true
+                };
+                return aw;
+              }
+            }
+            for (ap.method = at, ap.arg = au;;) {
+              {
+                var ax = ap.delegate;
+                if (ax) {
+                  {
+                    var ay = af(ax, ap);
+                    if (ay) {
+                      {
+                        if (ay === a4) {
+                          continue;
+                        }
+                        return ay;
+                      }
+                    }
+                  }
+                }
+                if ("next" === ap.method) {
+                  ap.sent = ap._sent = ap.arg;
+                } else {
+                  if ("throw" === ap.method) {
+                    {
+                      if (ar === a0) {
+                        throw ar = a3, ap.arg;
+                      }
+                      ap.dispatchException(ap.arg);
+                    }
+                  } else {
+                    "return" === ap.method && ap.abrupt("return", ap.arg);
+                  }
+                }
+                ar = a2;
+                var az = Z(an, ao, ap);
+                if ("normal" === az.type) {
+                  {
+                    if (ar = ap.done ? a3 : a1, az.arg === a4) {
+                      continue;
+                    }
+                    var aA = {
+                      value: az.arg,
+                      done: ap.done
+                    };
+                    return aA;
+                  }
+                }
+                "throw" === az.type && (ar = a3, ap.method = "throw", ap.arg = az.arg);
+              }
+            }
+          }
+        };
+      }
+    }
+    function af(an, ao) {
+      {
+        var av = ao.method;
+        var aw = an.iterator[av];
+        if (aw === J) {
+          ao.delegate = null;
+          "throw" === av && an.iterator.return && (ao.method = "return", ao.arg = J, af(an, ao), "throw" === ao.method) || "return" !== av && (ao.method = "throw", ao.arg = new TypeError("The iterator does not provide a '" + av + "' method"));
+          return a4;
+        }
+        var au = Z(aw, an.iterator, ao.arg);
+        if ("throw" === au.type) {
+          ao.method = "throw";
+          ao.arg = au.arg;
+          ao.delegate = null;
+          return a4;
+        }
+        var at = au.arg;
+        return at ? at.done ? (ao[an.resultName] = at.value, ao.next = an.nextLoc, "return" !== ao.method && (ao.method = "next", ao.arg = J), ao.delegate = null, a4) : at : (ao.method = "throw", ao.arg = new TypeError("iterator result is not an object"), ao.delegate = null, a4);
+      }
+    }
+    function ag(an) {
+      {
+        var aq = {
+          tryLoc: an[0]
+        };
+        1 in an && (aq.catchLoc = an[1]);
+        2 in an && (aq.finallyLoc = an[2], aq.afterLoc = an[3]);
+        this.tryEntries.push(aq);
+      }
+    }
+    function ah(an) {
+      {
+        var ao = an.completion || {};
+        ao.type = "normal";
+        delete ao.arg;
+        an.completion = ao;
+      }
+    }
+    function ai(an) {
+      {
+        var ap = {
+          tryLoc: "root"
+        };
+        this.tryEntries = [ap];
+        an.forEach(ag, this);
+        this.reset(true);
+      }
+    }
+    function aj(an) {
+      {
+        if (an || "" === an) {
+          {
+            var ap = an[U];
+            if (ap) {
+              return ap.call(an);
+            }
+            if ("function" == typeof an.next) {
+              return an;
+            }
+            if (!isNaN(an.length)) {
+              {
+                var aq = -1;
+                var ar = function av() {
+                  {
+                    for (; ++aq < an.length;) {
+                      if (Q.call(an, aq)) {
+                        av.value = an[aq];
+                        av.done = false;
+                        return av;
+                      }
+                    }
+                    av.value = J;
+                    av.done = true;
+                    return av;
+                  }
+                };
+                return ar.next = ar;
+              }
+            }
+          }
+        }
+        throw new TypeError(m(an) + " is not iterable");
+      }
+    }
+    a6.prototype = a7;
+    R(ab, "constructor", {
+      value: a7,
+      configurable: true
+    });
+    R(a7, "constructor", {
+      value: a6,
+      configurable: true
+    });
+    a6.displayName = X(a7, W, "GeneratorFunction");
+    K.isGeneratorFunction = function (an) {
+      {
+        var ap = "function" == typeof an && an.constructor;
+        return !!ap && (ap === a6 || "GeneratorFunction" === (ap.displayName || ap.name));
+      }
+    };
+    K.mark = function (an) {
+      {
+        Object.setPrototypeOf ? Object.setPrototypeOf(an, a7) : (an.__proto__ = a7, X(an, W, "GeneratorFunction"));
+        an.prototype = Object.create(ab);
+        return an;
+      }
+    };
+    K.awrap = function (an) {
+      {
+        var ao = {
+          __await: an
+        };
+        return ao;
+      }
+    };
+    ac(ad.prototype);
+    X(ad.prototype, V, function () {
+      {
+        return this;
+      }
+    });
+    K.AsyncIterator = ad;
+    K.async = function (an, ao, ap, aq, ar) {
+      {
+        undefined === ar && (ar = Promise);
+        var as = new ad(Y(an, ao, ap, aq), ar);
+        return K.isGeneratorFunction(ao) ? as : as.next().then(function (at) {
+          {
+            return at.done ? at.value : as.next();
+          }
+        });
+      }
+    };
+    ac(ab);
+    X(ab, W, "Generator");
+    X(ab, U, function () {
+      {
+        return this;
+      }
+    });
+    X(ab, "toString", function () {
+      {
+        return "[object Generator]";
+      }
+    });
+    K.keys = function (an) {
+      {
+        var ap = Object(an);
+        var aq = [];
+        for (var ar in ap) aq.push(ar);
+        aq.reverse();
+        return function as() {
+          {
+            for (; aq.length;) {
+              {
+                var at = aq.pop();
+                if (at in ap) {
+                  as.value = at;
+                  as.done = false;
+                  return as;
+                }
+              }
+            }
+            as.done = true;
+            return as;
+          }
+        };
+      }
+    };
+    K.values = aj;
+    ai.prototype = {
+      constructor: ai,
+      reset: function (an) {
+        {
+          if (this.prev = 0, this.next = 0, this.sent = this._sent = J, this.done = false, this.delegate = null, this.method = "next", this.arg = J, this.tryEntries.forEach(ah), !an) {
+            for (var ao in this) "t" === ao.charAt(0) && Q.call(this, ao) && !isNaN(+ao.slice(1)) && (this[ao] = J);
+          }
+        }
       },
-      _0xe804f6 = data[_0x264ed5]?.[_0x38539b(0x104, 'ICP5')]?.[_0x38539b(0xe2, 'ICP5')];
-    if (!Array[_0x38539b(0xff, 'YRTb')](_0xe804f6)) return;
-    data[_0x264ed5][_0x38539b(0x109, 'N8*j')][_0x38539b(0xfb, 'L]@f')] = _0xe804f6[_0x38539b(0x107, '1D%(')](({
-      node: _0x2d14e2
-    }) => {
-      const _0x5c395f = _0x38539b;
-      if (_0x227df7[_0x5c395f(0x108, 'd&Pb')](_0x227df7[_0x5c395f(0x105, 'Kk@x')], 'DxeQL')) {
-        if (!_0x2d14e2) return true;
-        if (_0x227df7[_0x5c395f(0x10d, '*5gs')](_0x2d14e2[_0x5c395f(0xf7, 'p6@A')], _0x227df7[_0x5c395f(0x10b, '&c9p')])) return false;
-        if (_0x2d14e2['adPayload']) return false;
-        if (Array['isArray'](_0x2d14e2[_0x5c395f(0xf6, '*3VZ')])) return !_0x2d14e2['cells']['some'](_0x3835ab => _0x3835ab?.['__typename'] === _0x5c395f(0x10c, 'Ludd'));
-        return true;
-      } else _0x221d34({
-        'body': '{}'
+      stop: function () {
+        {
+          this.done = true;
+          var an = this.tryEntries[0].completion;
+          if ("throw" === an.type) {
+            throw an.arg;
+          }
+          return this.rval;
+        }
+      },
+      dispatchException: function (an) {
+        {
+          if (this.done) {
+            throw an;
+          }
+          var ap = this;
+          function av(aw, ax) {
+            as.type = "throw";
+            as.arg = an;
+            ap.next = aw;
+            ax && (ap.method = "next", ap.arg = J);
+            return !!ax;
+          }
+          for (var aq = this.tryEntries.length - 1; aq >= 0; --aq) {
+            {
+              var ar = this.tryEntries[aq];
+              var as = ar.completion;
+              if ("root" === ar.tryLoc) {
+                return av("end");
+              }
+              if (ar.tryLoc <= this.prev) {
+                {
+                  var at = Q.call(ar, "catchLoc");
+                  var au = Q.call(ar, "finallyLoc");
+                  if (at && au) {
+                    {
+                      if (this.prev < ar.catchLoc) {
+                        return av(ar.catchLoc, true);
+                      }
+                      if (this.prev < ar.finallyLoc) {
+                        return av(ar.finallyLoc);
+                      }
+                    }
+                  } else {
+                    if (at) {
+                      {
+                        if (this.prev < ar.catchLoc) {
+                          return av(ar.catchLoc, true);
+                        }
+                      }
+                    } else {
+                      {
+                        if (!au) {
+                          throw Error("try statement without catch or finally");
+                        }
+                        if (this.prev < ar.finallyLoc) {
+                          return av(ar.finallyLoc);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      abrupt: function (an, ao) {
+        {
+          for (var aq = this.tryEntries.length - 1; aq >= 0; --aq) {
+            {
+              var ar = this.tryEntries[aq];
+              if (ar.tryLoc <= this.prev && Q.call(ar, "finallyLoc") && this.prev < ar.finallyLoc) {
+                {
+                  var as = ar;
+                  break;
+                }
+              }
+            }
+          }
+          as && ("break" === an || "continue" === an) && as.tryLoc <= ao && ao <= as.finallyLoc && (as = null);
+          var at = as ? as.completion : {};
+          at.type = an;
+          at.arg = ao;
+          return as ? (this.method = "next", this.next = as.finallyLoc, a4) : this.complete(at);
+        }
+      },
+      complete: function (an, ao) {
+        {
+          if ("throw" === an.type) {
+            throw an.arg;
+          }
+          "break" === an.type || "continue" === an.type ? this.next = an.arg : "return" === an.type ? (this.rval = this.arg = an.arg, this.method = "return", this.next = "end") : "normal" === an.type && ao && (this.next = ao);
+          return a4;
+        }
+      },
+      finish: function (an) {
+        {
+          for (var ao = this.tryEntries.length - 1; ao >= 0; --ao) {
+            {
+              var ap = this.tryEntries[ao];
+              if (ap.finallyLoc === an) {
+                this.complete(ap.completion, ap.afterLoc);
+                ah(ap);
+                return a4;
+              }
+            }
+          }
+        }
+      },
+      catch: function (an) {
+        {
+          for (var ap = this.tryEntries.length - 1; ap >= 0; --ap) {
+            {
+              var aq = this.tryEntries[ap];
+              if (aq.tryLoc === an) {
+                {
+                  var ar = aq.completion;
+                  if ("throw" === ar.type) {
+                    {
+                      var as = ar.arg;
+                      ah(aq);
+                    }
+                  }
+                  return as;
+                }
+              }
+            }
+          }
+          throw Error("illegal catch attempt");
+        }
+      },
+      delegateYield: function (an, ao, ap) {
+        {
+          this.delegate = {
+            iterator: aj(an),
+            resultName: ao,
+            nextLoc: ap
+          };
+          "next" === this.method && (this.arg = J);
+          return a4;
+        }
+      }
+    };
+    return K;
+  }
+  function m(H) {
+    {
+      m = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (K) {
+        {
+          return typeof K;
+        }
+      } : function (K) {
+        {
+          return K && "function" == typeof Symbol && K.constructor === Symbol && K !== Symbol.prototype ? "symbol" : typeof K;
+        }
+      };
+      return m(H);
+    }
+  }
+  function q(H, I, J, K, L, M, N) {
+    try {
+      var O = H[M](N);
+      var P = O.value;
+    } catch (Q) {
+      return void J(Q);
+    }
+    O.done ? I(P) : Promise.resolve(P).then(K, L);
+  }
+  function v(H) {
+    return function () {
+      var K = this;
+      var L = arguments;
+      return new Promise(function (M, N) {
+        var Q = H.apply(K, L);
+        function R(T) {
+          q(Q, M, N, R, S, "next", T);
+        }
+        function S(T) {
+          q(Q, M, N, R, S, "throw", T);
+        }
+        R(undefined);
+      });
+    };
+  }
+  var w;
+  var x = $response.body;
+  var z = "undefined" != typeof $httpClient;
+  var A = "undefined" != typeof $task;
+  var B = $request.url;
+  function C(H) {
+    return new Promise(function (J, K) {
+      z ? $httpClient.get(H, function (M, N, O) {
+        M ? K(M) : J(O);
+      }) : A && $task.fetch(H).then(function (M) {
+        return J(M.body);
+      }, function (M) {
+        return K(M);
       });
     });
-  }), body = JSON['stringify'](body);
-} catch (_0x2d423f) {
-  console[_0xc3dd0a(0xf0, 'BSBF')](_0xc3dd0a(0xef, 'gTpY'), _0x2d423f);
-} finally {
-  $done(body ? {
-    'body': body
-  } : {});
-}
-function _0x1715() {
-  const _0x213a1a = function () {
-    return [_0xodH, 'kWYjkUsfjLEiFahdPmLniYD.PcKobmkOG.pvRNl7==', 'WOrxWQ/dSdK0zmkXwtxcHmomW5m', 'WR7dPsJdPdHtWQBdGCk3WP3dTZi', 'E8o0rd/dLSksWRu', 'WORcRXjDWO0', 'qCoHA17cL8kh', 'WRHOECotWRVcNSo1', 'gXvsW4NcLSoTmmoRW6pdK8oPW5/cPZG8W4BcUYTeW7FcU8k+WQ0XcM8', 'W6ZdLSktoCkWWOVdUmov', 'WOxdLmkjWRxdJG', 'W7RcVwZcPwS', 'W7NcMSoflbNcUW', 'dqagr8kv', 'CddcPmo/e8orxGu', 'rhn2emoml8kZWOjYWPaaw3RcLG', 'zSk/mSosW5O', 'CCogiCo2xvNdRI7cPWhdNrdcImo9'].concat(function () {
-      return ['W6LoW5BdGZa', 'uSoncmoQ', 'W6ZcVGrCWRm5W69moaztEIGyWPBdQ8ooWPCXWRZcHqu', 'WPK7WQddT8orWQ/cGmoOmmoBW7L0pa', 'WRtcLKNdQ8opF27cVSoha8ozi8oTibFcQSkAWRNcLulcKmkJWPVdHSkbW6O', 'W5LPW6NcR8kcW7NdLW', 'ymoIDshdHCkqWQK', 'W6ZdNSkrmCkM', 'WPBdUJzCWO4qW45QycrowHC7WQFdKmkJW6nOWOdcSs1W', 'WQz9lSky', 'W7NdUgC4W5VdLHu', 'emkBnSkFzqKHWOX3ESoDWRRcSG', 'et5qct/cOW/dQK4AxwBcMG', 'WQNdHCo5gWBcN8oTBq', 'eCkDnCkAzaeJWQbGEmokWR/cQG', 'sCo+pMa', 'W7FcLSoipbNcU8or', 'W7OKcCoKW6XzgMmUWPBcIr/dQW'].concat(function () {
-        return ['WPfOWOpcHeZcI8oj', 'uM8tvw3dTvS', 'zSkWzXpdRNKUWPxdMbLUWPm', 'WPW/gW', 't8o+pxHFW6bh', 'WOTEWQ7cQSk7WPRcPW', 'jvlcHCotrCoDWPZcImkTWP/dSSknW7nruCo9W5bNW5BcGmkjW5GQBLiRWRpcO0SwDCkQwmo0W75Ntmk9pHpcNCkwWQ7dPfRdPCk0W6q', 'qSohhmo/sfVdRW', 'WR/cJmkMf8kVWRpdG8oH', 'WQXWv8k7WQW', 'W68/W6RcV3TPomkBBHW', 'dSoQiCksWQ8rWOWkfGX5cCklWOK', 'WOBcNSkOvcz7asVcSf45afS', 'W7RdRKe+W7DPW7zghX5yta', 'qmooy8ojjq', 'CIBcQ0OEW4iTWQRdVCkqeYBcKr0'];
-      }());
-    }());
-  }();
-  _0x1715 = function () {
-    return _0x213a1a;
-  };
-  return _0x1715();
-}
-;
-var version_ = 'jsjiami.com.v7';
+  }
+  function D(H) {
+    return decodeURIComponent(escape(atob(H)));
+  }
+  function E(H) {
+    return btoa(unescape(encodeURIComponent(H)));
+  }
+  function F(H) {
+    return G.apply(this, arguments);
+  }
+  function G() {
+    G = v(k().mark(function I(J) {
+      var L;
+      var M;
+      var N;
+      var O;
+      var P;
+      var Q;
+      var R;
+      var S;
+      var T;
+      var U;
+      return k().wrap(function (V) {
+        for (;;) {
+          switch (V.prev = V.next) {
+            case 0:
+              var W = {
+                url: J
+              };
+              V.prev = 0;
+              V.next = 3;
+              return C(W);
+            case 3:
+              L = V.sent;
+              M = L.split("\n");
+              N = null;
+              O = g(M);
+              V.prev = 7;
+              O.s();
+            case 9:
+              if ((P = O.n()).done) {
+                V.next = 16;
+                break;
+              }
+              if (Q = P.value, !Q || Q.startsWith("#") || !Q.includes(".ts")) {
+                V.next = 14;
+                break;
+              }
+              N = Q.trim();
+              return V.abrupt("break", 16);
+            case 14:
+              V.next = 9;
+              break;
+            case 16:
+              V.next = 21;
+              break;
+            case 18:
+              V.prev = 18;
+              V.t0 = V.catch(7);
+              O.e(V.t0);
+            case 21:
+              V.prev = 21;
+              O.f();
+              return V.finish(21);
+            case 24:
+              if (N) {
+                V.next = 26;
+                break;
+              }
+              return V.abrupt("return", null);
+            case 26:
+              R = new URL(J);
+              S = R.origin + R.pathname.substring(0, R.pathname.lastIndexOf("/") + 1);
+              T = N.includes("/") ? N.substring(N.lastIndexOf("/") + 1) : N;
+              U = T.replace(/_i\d+\.ts$/, "");
+              return V.abrupt("return", S + U + "_i.m3u8");
+            case 33:
+              V.prev = 33;
+              V.t1 = V.catch(0);
+              console.log("处理预览URL时出错: " + V.t1.message);
+              return V.abrupt("return", null);
+            case 37:
+            case "end":
+              return V.stop();
+          }
+        }
+      }, I, null, [[0, 33], [7, 18, 21, 24]]);
+    }));
+    return G.apply(this, arguments);
+  }
+  v(k().mark(function H() {
+    var J;
+    var K;
+    var M;
+    var N;
+    var O;
+    var P;
+    var Q;
+    var R;
+    var S;
+    var T;
+    var U;
+    var V;
+    var W;
+    var X;
+    return k().wrap(function (Y) {
+      for (;;) {
+        switch (Y.prev = Y.next) {
+          case 0:
+            if (Y.prev = 0, w = JSON.parse(x), !B || !B.includes("/api/banner/banner_list")) {
+              Y.next = 7;
+              break;
+            }
+            w.data = "WW01V2MySkJQVDA9";
+            x = JSON.stringify(w);
+            $done({
+              body: x
+            });
+            return Y.abrupt("return");
+          case 7:
+            if (!w.data) {
+              Y.next = 30;
+              break;
+            }
+            if (J = function (a1) {
+              "object" === m(a1) && null !== a1 && ("is_buy" in a1 && (a1.is_buy = true), "buy_index" in a1 && (a1.buy_index = 9999), "vipLimit" in a1 && (a1.vipLimit = 0), Array.isArray(a1) ? a1.forEach(function (a3) {
+                return J(a3);
+              }) : Object.keys(a1).forEach(function (a3) {
+                "object" === m(a1[a3]) && null !== a1[a3] && J(a1[a3]);
+              }));
+            }, K = w.data, M = D(K), N = D(M), O = D(N), P = JSON.parse(O), J(P), P.sale && (P.sale.is_buy = true, P.sale.buy_index = 9999), Q = null, P.attachments && Array.isArray(P.attachments) && (Q = P.attachments.find(function (a1) {
+              return "video" === a1.category && a1.remoteUrl && a1.remoteUrl.includes(".m3u8") && a1.video_time_length;
+            })), !Q) {
+              Y.next = 24;
+              break;
+            }
+            R = Q.remoteUrl;
+            Y.next = 22;
+            return F(R);
+          case 22:
+            S = Y.sent;
+            S && (T = "\n<div style=\"float:right; width:140px; text-align:center; margin:0 0 15px 15px; padding:10px; background-color:#f0f8ff; border-radius:8px; border:1px solid #d0e3ff;\">\n  <a href=\"https://t.me/Jsforbaby\" target=\"_blank\">\n    <img src=\"https://dongfanglong-pic.oss-cn-hangzhou.aliyuncs.com/profilepic/50187dfc-a90b-4888-93f3-a492067aefc9.jpeg\" style=\"width:100px; height:100px; border-radius:50%; margin-bottom:10px; border:3px solid #0066cc;\">\n    <div style=\"font-size:12px; color:#666; margin-top:3px;\">点头像加入作者频道</div>\n  </a>\n  <a href=\"".concat(S, "\" style=\"display:block; margin-top:10px; background-color:#0066cc; color:white; padding:8px 0; border-radius:6px; text-decoration:none; font-weight:bold;\">\n    解析视频\n  </a>\n</div>"), P.content.includes("<body>") ? P.content = P.content.replace("<body>", "<body>" + T) : P.content.includes("<p>") ? P.content = P.content.replace(/(<p>.*?<\/p>)/, "$1" + T) : P.content = T + P.content, P.content = P.content.replace(/<span class="sell-btn"[^>]*>[^]*?<\/span><\/span>/g, "<a href=\"".concat(S, "\" style=\"display:inline-block; background-color:#0066cc; color:white; padding:8px 16px; border-radius:4px; text-decoration:none; margin:10px 0;\">点击观看完整视频</a>")));
+          case 24:
+            U = JSON.stringify(P);
+            V = E(U);
+            W = E(V);
+            X = E(W);
+            w.data = X;
+            x = JSON.stringify(w);
+          case 30:
+            var a0 = {
+              body: x
+            };
+            $done(a0);
+            Y.next = 37;
+            break;
+          case 33:
+            Y.prev = 33;
+            Y.t0 = Y.catch(0);
+            console.log("处理响应数据时发生错误: " + Y.t0.message);
+            $done({});
+          case 37:
+          case "end":
+            return Y.stop();
+        }
+      }
+    }, H, null, [[0, 33]]);
+  }))();
+})();
