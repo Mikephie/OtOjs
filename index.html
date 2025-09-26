@@ -1,178 +1,185 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 最简稳定版（基于最初版精简改）</title>
-<style>
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#0b0f14;color:#e6eef7}
-  a{color:#67e8f9}
-  .wrap{max-width:860px;margin:0 auto;padding:18px 14px 80px}
-  h1{margin:10px 0 6px;font-size:20px}
-  .card{background:#0f1621;border:1px solid #1f2937;border-radius:12px;padding:12px;margin:10px 0}
-  label{font-size:12px;color:#9db1c7;margin-right:6px}
-  input,textarea{width:100%;box-sizing:border-box;background:#0f1a2b;color:#e6eef7;border:1px solid #223046;border-radius:10px;padding:10px;font-size:13px}
-  textarea{min-height:140px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
-  .row>*{flex:1 1 180px}
-  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:#152033;color:#e6eef7;cursor:pointer;font-weight:600}
-  .ok{border-color:#10b981}
-  .warn{border-color:#f59e0b}
-  .err{border-color:#ef4444}
-  pre{white-space:pre-wrap;background:#0b1020;border:1px solid #223046;border-radius:10px;padding:10px;font-size:12px;max-height:360px;overflow:auto}
-  small{color:#9db1c7}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Deobf Outputs Viewer</title>
+  <style>
+    :root { --accent: #6c9cff; --bg:#0b0f14; --panel:#111824; --text:#e8eef7; --muted:#9bb0c9; }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:32px auto;padding:0 16px}
+    .card{background:var(--panel);border:1px solid #1d2636;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .head{padding:18px 20px;border-bottom:1px solid #1a2231}
+    .body{padding:18px 20px}
+    select,button,.path{height:40px;border-radius:10px;border:1px solid #2a3850;background:#0e1521;color:var(--text);padding:0 12px}
+    select:focus,button:focus,.path:focus{outline:2px solid var(--accent)}
+    button{background:var(--accent);border-color:transparent;font-weight:600;cursor:pointer}
+    button.secondary{background:#1b2a42}
+    .muted{color:var(--muted)}
+    .log{white-space:pre-wrap;background:#0a111c;border:1px solid #1a2231;border-radius:10px;padding:14px;max-height:60vh;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .tools{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .hidden{display:none}
+
+    /* 圆环进度条 */
+    .ring{position:relative;width:86px;height:86px}
+    .ring svg{transform:rotate(-90deg);width:86px;height:86px}
+    .ring circle.track{stroke:#1f2a3f;stroke-width:8;fill:none}
+    .ring circle.progress{stroke:var(--accent);stroke-width:8;fill:none;stroke-linecap:round;stroke-dasharray:251.2; /* 2πr r=40 */ stroke-dashoffset:251.2; transition:stroke-dashoffset .2s linear}
+    .ring .txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700}
+    .status{display:flex;align-items:center;gap:14px}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>OtOjs · 最简稳定版（按你的最初版风格）</h1>
-  <div class="card">
-    <div class="row">
-      <div style="flex:2">
-        <label>REPO</label>
-        <input id="repo" value="Mikephie/OtOjs" />
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <h2 style="margin:0">🧩 Deobf Outputs</h2>
+          <span class="muted">选择输出文件 → 获取（带 60 秒动画）</span>
+        </div>
       </div>
-      <div>
-        <label>BRANCH</label>
-        <input id="branch" value="main" />
-      </div>
-      <div>
-        <label>Token（contents: rw）</label>
-        <input id="token" type="password" placeholder="ghp_..." />
-      </div>
-    </div>
-    <div class="row">
-      <div>
-        <label>input.js 路径</label>
-        <input id="pathIn" value="input.js" />
-      </div>
-      <div>
-        <label>output.js 路径</label>
-        <input id="pathOut" value="output.js" />
-      </div>
-      <div>
-        <label>提交信息</label>
-        <input id="commitMsg" value="update: input.js via UI" />
+      <div class="body">
+        <div class="row">
+          <select id="path">
+            <option value="output/output.js">output/output.js</option>
+            <option value="output/output.deob2.js">output/output.deob2.js</option>
+          </select>
+          <input id="custom" class="path" placeholder="或自定义相对路径（可选）"/>
+          <button id="fetchBtn">获取文件</button>
+          <button class="secondary" id="cancelBtn">取消</button>
+        </div>
+
+        <div id="progressBlock" class="row hidden" style="margin-top:14px;align-items:center">
+          <div class="status">
+            <div class="ring">
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle class="track" cx="50" cy="50" r="40"></circle>
+                <circle class="progress" id="ringProgress" cx="50" cy="50" r="40"></circle>
+              </svg>
+              <div class="txt"><span id="count">60</span>s</div>
+            </div>
+            <div>
+              <div id="stateText">正在获取…（最多 60 秒）</div>
+              <div class="muted" id="smallHint">若提前获取到内容，会立即结束动画并显示结果</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tools">
+          <button class="secondary" id="copyBtn" title="复制到剪贴板">复制</button>
+          <button class="secondary" id="downloadBtn" title="下载文件">下载</button>
+        </div>
+
+        <div id="log" class="log" style="margin-top:10px;">📄 等待获取…</div>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <small>把待解密脚本放到 <b>input.js</b> → 等约 60s → 在 <b>output.js</b> 查看</small>
-    <div class="row">
-      <input type="file" id="file" accept=".js,.txt,.json" />
-      <button onclick="pick()">选择文件</button>
-      <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
-      <button onclick="loadRemote()">远程加载</button>
-      <button onclick="pasteFromClipboard()">粘贴板</button>
-      <button class="err" onclick="clrIn()">清空输入</button>
-    </div>
-    <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
-    <div class="row">
-      <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
-      <button class="warn" onclick="pollOutput(60)">② 等待并轮询 output.js (60s)</button>
-      <button onclick="beautify()">（可选）结果美化</button>
-      <button onclick="copySel('#codeOut', this)">复制结果</button>
-      <button class="err" onclick="clrAll()">清空输入与结果</button>
-    </div>
-    <div id="status"><small>状态：就绪</small></div>
-    <pre id="codeOut" placeholder="结果将显示在这里"></pre>
-  </div>
+  <script>
+  (() => {
+    const $ = sel => document.querySelector(sel);
+    const pathSel = $('#path');
+    const custom = $('#custom');
+    const fetchBtn = $('#fetchBtn');
+    const cancelBtn = $('#cancelBtn');
+    const log = $('#log');
+    const ring = $('#ringProgress');
+    const count = $('#count');
+    const progressBlock = $('#progressBlock');
+    const stateText = $('#stateText');
+    const copyBtn = $('#copyBtn');
+    const downloadBtn = $('#downloadBtn');
 
-  <div class="card">
-    <div class="row">
-      <button onclick="loadOutputRaw()">拉取最新 output.js (Raw)</button>
-      <button onclick="copySel('#outputRaw', this)">复制</button>
-      <button onclick="downloadOutput()">下载 output.js</button>
-    </div>
-    <pre id="outputRaw"></pre>
-  </div>
-</div>
+    let ctrl = null;           // AbortController
+    let timer = null;          // 倒计时 setInterval
+    let left = 60;             // 秒
+    const full = 2 * Math.PI * 40; // 周长 2πr
 
-<script>
-const $=s=>document.querySelector(s);
-function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
+    function currentPath() {
+      const c = custom.value.trim();
+      return c ? c : pathSel.value;
+    }
 
-function ghHeaders(){
-  const t=$('#token').value.trim();
-  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
-  return { 'Authorization':'Bearer '+t, 'Accept':'application/vnd.github+json' };
-}
-function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
+    function setProgress(secLeft) {
+      count.textContent = secLeft;
+      const ratio = (60 - secLeft) / 60; // 0..1
+      ring.style.strokeDashoffset = String(full * (1 - ratio));
+    }
 
-function pick(){ $('#file').click(); }
-$('#file').addEventListener('change', async (e)=>{
-  const f=e.target.files?.[0]; if(!f) return;
-  const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
-});
+    function startAnim() {
+      left = 60;
+      setProgress(left);
+      progressBlock.classList.remove('hidden');
+      stateText.textContent = '正在获取…（最多 60 秒）';
+      timer = setInterval(() => {
+        left = Math.max(0, left - 1);
+        setProgress(left);
+        if (left === 0) {
+          stateText.textContent = '仍在获取中…如无响应可取消重试';
+          // 不强制中断 fetch；仅提示
+          clearInterval(timer);
+          timer = null;
+        }
+      }, 1000);
+    }
 
-async function loadRemote(){
-  let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
-  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
-    u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
-  }
-  try{
-    const r=await fetch(u,{cache:'no-cache'}); const t=await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
-    $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
-  }catch(e){ setStatus('远程加载失败：'+e.message); }
-}
+    function stopAnim() {
+      if (timer) { clearInterval(timer); timer = null; }
+      progressBlock.classList.add('hidden');
+    }
 
-async function pasteFromClipboard(){
-  try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }
-  catch(e){ setStatus('粘贴失败：'+e.message); }
-}
-function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
-function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; setStatus('已清空输入与结果'); }
+    async function doFetch() {
+      const p = currentPath();
+      if (ctrl) { ctrl.abort(); }
+      ctrl = new AbortController();
 
-async function submitInput(){
-  const path=$('#pathIn').value.trim()||'input.js';
-  const api=`${repoBase()}/contents/${path}`;
-  const code=$('#codeIn').value; if(!code){ setStatus('没有可上传的内容'); return }
-  try{
-    let sha='';
-    const head=await fetch(`${api}?ref=${$('#branch').value.trim()}`,{headers:ghHeaders()});
-    if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
-    const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, body: JSON.stringify(body) });
-    const txt=await res.text();
-    if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
-    setStatus('提交成功 · 已写入 '+path);
-  }catch(e){ setStatus('提交失败：'+e.message); }
-}
+      startAnim();
+      log.textContent = `📡 GET ${p}\n`;
+      try {
+        const res = await fetch(p, { signal: ctrl.signal, cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        stopAnim();
+        stateText.textContent = '已完成';
+        log.textContent = text || '（空文件）';
+        // 进度直接填满
+        ring.style.strokeDashoffset = '0';
+        count.textContent = '0';
+      } catch (err) {
+        stopAnim();
+        log.textContent = `❌ 获取失败：${err.message}\n路径：${p}\n提示：请确认该文件已被工作流产出并提交到仓库；或试试另一个选项/自定义路径。`;
+      }
+    }
 
-async function pollOutput(seconds){
-  try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
-  const path=$('#pathOut').value.trim()||'output.js';
-  const api=`${repoBase()}/contents/${path}?ref=${$('#branch').value.trim()}`;
-  const t0=Date.now(); let last='';
-  setStatus('开始轮询 '+seconds+'s …');
-  while((Date.now()-t0)/1000 < seconds){
-    try{
-      const r=await fetch(api,{headers:ghHeaders()}); const raw=await r.text();
-      if(r.ok){
-        const j=JSON.parse(raw); const b64=(j.content||'').replace(/\n/g,'');
-        const out=j.content?decodeURIComponent(escape(atob(b64))):'';
-        if(out && out.trim()){ $('#codeOut').textContent=out; setStatus('✅ 已获取到 output.js'); return }
-      }else{ last=r.status+' '+r.statusText }
-    }catch(e){ last=e.message }
-    await new Promise(r=>setTimeout(r,5000));
-    setStatus('等待中… '+Math.floor((Date.now()-t0)/1000)+'/'+seconds+'s'+(last?(' · 上次：'+last):''));
-  }
-  setStatus('⌛ 仍未获取到 output.js，可再等一会儿或点击下方“拉取最新 output.js”');
-}
+    fetchBtn.addEventListener('click', doFetch);
+    cancelBtn.addEventListener('click', () => {
+      if (ctrl) ctrl.abort();
+      stopAnim();
+      log.textContent = '⏹️ 已取消';
+    });
 
-async function loadOutputRaw(){
-  const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${$('#pathOut').value.trim()||'output.js'}`;
-  try{ const r=await fetch(url,{cache:'no-cache'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText); $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+t.length+' 字符'); }
-  catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
-}
-function downloadOutput(){ const t=$('#outputRaw').textContent||$('#codeOut').textContent||''; const b=new Blob([t],{type:'text/javascript;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='output.js'; a.click(); URL.revokeObjectURL(a.href); }
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(log.textContent);
+        copyBtn.textContent = '已复制 ✓';
+        setTimeout(()=>copyBtn.textContent='复制', 1200);
+      } catch { copyBtn.textContent = '复制失败'; setTimeout(()=>copyBtn.textContent='复制', 1200); }
+    });
 
-async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return; const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js'; const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js'; document.body.appendChild(s1); await new Promise(r=>s1.onload=r); document.body.appendChild(s2); await new Promise(r=>s2.onload=r); }
-async function beautify(){ let s=$('#codeOut').textContent||$('#codeIn').value||''; if(!s){ setStatus('无待美化内容'); return } try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }catch(e){ setStatus('Prettier 失败：'+e.message); } }
+    downloadBtn.addEventListener('click', () => {
+      const blob = new Blob([log.textContent], { type: 'text/javascript;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const name = currentPath().split('/').pop() || 'output.js';
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
 
-async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent='复制结果',1200); }catch(e){ setStatus('复制失败：'+e.message); } }
-</script>
+    // 初始默认不自动拉取；如需自动拉取，可解除下一行注释
+    // doFetch();
+  })();
+  </script>
 </body>
 </html>
