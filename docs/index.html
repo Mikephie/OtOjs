@@ -1,82 +1,111 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OtOjs 前端解密器</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- 引入 CodeMirror 编辑器样式 -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css"
+  />
+  <style>
+    body {
+      font-family: "JetBrains Mono", monospace;
+      margin: 0;
+      padding: 0;
+      background: #0a0a0a;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 10px;
+      background: #111;
+      text-align: center;
+      font-size: 1.2rem;
+      border-bottom: 1px solid #333;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      padding: 10px;
+      gap: 10px;
+    }
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .editor-label {
+      font-weight: bold;
+      color: #aaa;
+    }
+    .CodeMirror {
+      height: 200px;
+      font-size: 14px;
+      border: 1px solid #333;
+      border-radius: 6px;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    button {
+      background: #1e1e1e;
+      border: 1px solid #444;
+      padding: 6px 12px;
+      color: #eee;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #333;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #0f0;
+    }
+  </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
+  <header>⚡ OtOjs 前端解密器 ⚡</header>
 
-    <!-- 基础配置 -->
-    <div class="card">
-      <div class="row">
-        <div style="flex:2">
-          <label>REPO</label>
-          <input id="repo" value="Mikephie/OtOjs" />
-        </div>
-        <div>
-          <label>BRANCH</label>
-          <input id="branch" value="main" />
-        </div>
-        <div>
-          <label>Token（contents:rw）</label>
-          <input id="token" type="password" placeholder="ghp_..." />
-        </div>
-      </div>
+  <div class="container">
+    <div class="editor-container">
+      <div class="editor-label">输入代码</div>
+      <textarea id="input"></textarea>
     </div>
 
-    <!-- 输入 -->
-    <div class="card">
-      <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
-      <div class="row compact">
-        <input type="file" id="file" accept=".js,.txt,.json" />
-        <button onclick="pick()">文件</button>
-        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
-        <button onclick="loadRemote()">远程</button>
-        <button onclick="pasteFromClipboard()">粘贴</button>
-        <button class="err" onclick="clrIn()">清空</button>
-      </div>
-      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
-      <div class="row compact">
-        <button class="ok" onclick="submitInput()">提交</button>
-        <button class="warn" onclick="startAutoPoll()">轮询</button>
-        <button onclick="beautify()">美化</button>
-        <button onclick="copySel('#codeOut', this)">复制</button>
-        <button class="err" onclick="clrAll()">清空全部</button>
-      </div>
-      <div class="options">
-        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
-        <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
-      </div>
-      <div id="status"><small>状态：就绪</small></div>
-      <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+    <div class="button-group">
+      <input type="file" id="fileInput" />
+      <button id="decodeBtn">解密</button>
+      <button id="copyBtn">复制结果</button>
+      <button id="clearBtn">清空输入</button>
     </div>
 
-    <!-- 输出 -->
-    <div class="card">
-      <div class="row compact">
-        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
-        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
-        <button onclick="copySel('#outputRaw', this)">复制结果</button>
-        <button onclick="downloadOutput()">下载</button>
-      </div>
-      <pre id="outputRaw"></pre>
+    <div class="editor-container">
+      <div class="editor-label">输出结果</div>
+      <textarea id="output"></textarea>
     </div>
+
+    <div id="status">✅ 就绪</div>
   </div>
 
-  <!-- 顺序非常重要：先插件，再主逻辑 -->
-  <script src="decode-all.js"></script>
-  <script src="app.js"></script>
+  <!-- 依赖库 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
 
-  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
-  <!--
-  <script src="prettier.min.js"></script>
-  <script src="parser-babel.min.js"></script>
-  -->
+  <!-- 解码插件集合 -->
+  <script src="decode-all.js"></script>
+  <!-- 前端逻辑 -->
+  <script src="app.js"></script>
 </body>
 </html>
