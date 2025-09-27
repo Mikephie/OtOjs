@@ -24,3 +24,10 @@ small{color:var(--muted)}
 .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
 .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
 .options{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+
+/* 隐藏原生文件输入（用按钮触发） */
+#file {
+  position:absolute !important;
+  width:1px; height:1px;
+  opacity:0; pointer-events:none;
+}
