@@ -70,34 +70,58 @@
   </div>
 
   <!-- Prettier 依赖 -->
-<script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
-<script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
-<script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
 
-<!-- 顺序非常重要：先插件，再主逻辑 -->
-<script src="decode-all.js"></script>
-<script src="app.js"></script>
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
+  <script src="decode-all.js"></script>
+  <script src="app.js"></script>
 
-  <!-- 页面初始化时自动触发解密 -->
+  <!-- 复制按钮修复 -->
   <script>
-    window.addEventListener('load', async () => {
-      const codeIn = document.querySelector('#codeIn').value.trim();
-      if (codeIn && typeof window.smartDecodePipeline === 'function') {
-        const decoded = await smartDecodePipeline(codeIn);
-        if (decoded) {
-          document.querySelector('#codeOut').textContent = decoded;
-          if (document.querySelector('#autoBeautify').checked) {
-            try { await beautify(); } catch {}
-          }
-        }
+  async function copySel(sel, btn) {
+    try {
+      const el = document.querySelector(sel);
+      const t = el ? (el.value ?? el.textContent ?? '') : '';
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(t);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = t;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
       }
-    });
+      const old = btn.textContent;
+      btn.textContent = '✅ 已复制';
+      setTimeout(() => btn.textContent = old, 1200);
+    } catch (e) {
+      alert('复制失败：' + e.message);
+    }
+  }
   </script>
 
-  <!-- 可选：本地化 Prettier -->
-  <!--
-  <script src="prettier.min.js" defer></script>
-  <script src="parser-babel.min.js" defer></script>
-  -->
+  <!-- 页面初始化时自动触发智能解密 + 美化 -->
+  <script>
+  async function autoDecodeIfNeeded() {
+    if (!document.querySelector('#autoDecode').checked) return;
+    if (typeof window.smartDecodePipeline !== 'function') return;
+
+    let code = document.querySelector('#codeIn').value || '';
+    if (!code.trim()) return;
+
+    let decoded = await smartDecodePipeline(code);
+    if (decoded) {
+      document.querySelector('#codeOut').textContent = decoded;
+      if (document.querySelector('#autoBeautify').checked) {
+        try { await beautify(); } catch {}
+      }
+    }
+  }
+
+  window.addEventListener('load', autoDecodeIfNeeded);
+  </script>
 </body>
 </html>
