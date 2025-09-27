@@ -278,17 +278,16 @@ window.DecodePlugins = window.DecodePlugins || {};
   };
 })();
 
-// ===== 轻量美化（无依赖）：分号/花括号换行 + 基础缩进 =====
+// ===== 轻量美化（零依赖） =====
 function simpleFormat(src) {
   try {
     let out = "", indent = 0;
     const lines = String(src)
       .replace(/\r/g, "")
-      .replace(/;/g, ";\n")       // 分号后换行
-      .replace(/\{/g, "{\n")      // 左花括号后换行
-      .replace(/\}/g, "\n}\n")    // 右花括号前后换行
+      .replace(/;/g, ";\n")
+      .replace(/\{/g, "{\n")
+      .replace(/\}/g, "\n}\n")
       .split("\n");
-
     for (let raw of lines) {
       let line = raw.trim();
       if (!line) continue;
@@ -313,13 +312,12 @@ async function smartDecodePipeline(code) {
         if (res && res !== out) {
           out = res;
           changed = true;
+          break;                // ★ 成功后立刻换轮
         }
       }
     }
   }
-  // ★ 新增：解包完成后做一次轻量美化，输出按行显示
-  out = simpleFormat(out);
-  return out;
+  return simpleFormat(out);     // ★ 输出前分行
 }
 
 // 暴露到全局
