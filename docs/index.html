@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
-  <style>pre{white-space:pre-wrap;word-break:break-word}</style>
+  <style>
+    pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
 </head>
 <body>
   <div class="wrap">
@@ -50,12 +52,12 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoBeautify" checked /> 自动美化（Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word" placeholder="结果将显示在这里"></pre>
+      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
 
     <!-- 输出 -->
@@ -66,131 +68,78 @@
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
       </div>
-      <pre id="outputRaw" style="white-space:pre-wrap;word-break:break-word"></pre>
+      <pre id="outputRaw"></pre>
     </div>
   </div>
 
-  <!-- 解码插件 & 主逻辑 -->
+  <!-- Prettier 三件套 -->
+  <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
+  <script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
+
+  <!-- 顺序：先插件，再主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 复制按钮（全局） -->
+  <!-- 全局复制函数 -->
   <script>
     async function copySel(sel, btn){
       try{
-        const el = document.querySelector(sel);
-        const t = el ? (el.value ?? el.textContent ?? '') : '';
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(t);
-        else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-        const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
+        const el=document.querySelector(sel);
+        const t=el?(el.value??el.textContent??''):'';
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(t);
+        } else {
+          const ta=document.createElement('textarea');
+          ta.value=t; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy'); ta.remove();
+        }
+        const old=btn.textContent; btn.textContent='✅ 已复制';
+        setTimeout(()=>btn.textContent=old,1200);
       }catch(e){ alert('复制失败：'+e.message); }
     }
   </script>
 
-  <!-- Prettier（babel + estree） -->
-  <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
-  <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
-  <script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
+  <!-- 秒解兜底监视器 -->
   <script>
-    async function beautify(){
-      const s=document.querySelector('#codeOut').textContent || document.querySelector('#codeIn').value || '';
-      if(!s.trim()){ document.getElementById('status').innerHTML='<small>无待美化内容</small>'; return; }
-      try{
-        const out = prettier.format(String(s), { parser:'babel', plugins:[prettierPlugins.babel, prettierPlugins.estree] });
-        document.querySelector('#codeOut').textContent = out;
-        document.getElementById('status').innerHTML = '<small>已用 Prettier 美化</small>';
-      }catch(e){
-        document.getElementById('status').innerHTML = '<small>Prettier 失败：'+e.message+'</small>';
-      }
-    }
-  </script>
-
-  <!-- 秒解“胶水层”：确保粘贴/导入/远程后立刻解密；若解密器未就绪则动态补载后重试 -->
-  <script>
-    // 等 smartDecodePipeline，就绪直接用；否则补载 decode-all.js
-    async function smartDecodeNow(code){
-      if (typeof window.smartDecodePipeline !== 'function') {
-        await new Promise((resolve)=> {
-          const s=document.createElement('script');
-          s.src='decode-all.js?t=' + Date.now();
-          s.onload=resolve; s.onerror=resolve;
-          document.head.appendChild(s);
-        });
-      }
-      if (typeof window.smartDecodePipeline === 'function'){
-        try { return await window.smartDecodePipeline(code); }
-        catch(_) { return null; }
-      }
+  async function smartDecodeNow(code){
+    if (typeof window.smartDecodePipeline !== 'function') {
       return null;
     }
-
-    // 轻量本地排版（长度 > 200k 不处理，避免卡顿）
-    const FORMAT_MAX = 200000;
-    function expandEscaped(s){
-      if (typeof s!=='string'||s.length>FORMAT_MAX) return s;
-      if (!/\\[nrt"\\]/.test(s)) return s;
-      try{ const w='"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"'; return JSON.parse(w); }
-      catch{
-        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\r/g,'\r').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
-      }
-    }
-    function tryPrettyJSON(s){ if(typeof s!=='string'||s.length>FORMAT_MAX) return null; try{ return JSON.stringify(JSON.parse(s),null,2); }catch{return null;} }
-    function simplePretty(s){
-      if(typeof s!=='string'||s.length>FORMAT_MAX) return s;
-      let out='',indent=0,inStr=false,q='',esc=false; const tab=()=>'  '.repeat(Math.max(0,indent));
-      for(let i=0;i<s.length;i++){
-        const ch=s[i];
-        if(inStr){ out+=ch; if(esc)esc=false; else if(ch==='\\')esc=true; else if(ch===q) inStr=false; continue; }
-        if(ch==='\"'||ch==="'"||ch==='`'){ inStr=true;q=ch;esc=false;out+=ch;continue; }
-        if(ch==='{'||ch==='['){ out+=ch+'\n'; indent++; out+=tab(); continue; }
-        if(ch==='}'||ch===']'){ out+='\n'; indent--; out+=tab()+ch; continue; }
-        if(ch===','||ch===';'){ out+=ch+'\n'+tab(); continue; }
-        if(ch==='\n'){ out+='\n'+tab(); continue; }
-        out+=ch;
-      }
-      return out.replace(/\n{3,}/g,'\n\n').trim()+'\n';
-    }
-    function localFormat(s){ const e=expandEscaped(s); return tryPrettyJSON(e) || simplePretty(e); }
-
-    // 粘贴/文件/远程完成后“立刻秒解” + 可选美化
-    function autoDecodeGlue(){
-      const input = document.querySelector('#codeIn');
-      const out   = document.querySelector('#codeOut');
-      const status= document.getElementById('status');
-      let last = '';
-
-      const run = async () => {
-        const enable = document.querySelector('#autoDecode')?.checked;
-        const code = input.value || '';
-        if (!enable || !code || code===last) return;
-        last = code;
-
-        // 先跑本地快速排版，提升可读性
-        out.textContent = localFormat(code);
-
-        const decoded = await smartDecodeNow(code);
-        if (typeof decoded === 'string' && decoded && decoded !== code){
-          out.textContent = localFormat(decoded);
-          // 若勾选自动美化，再交给 Prettier（失败不影响展示）
-          if (document.querySelector('#autoBeautify')?.checked) {
-            try {
-              const pretty = prettier.format(String(out.textContent), { parser:'babel', plugins:[prettierPlugins.babel, prettierPlugins.estree] });
-              out.textContent = pretty;
-            } catch(_) {}
+    try { return await window.smartDecodePipeline(code); } catch { return null; }
+  }
+  function localFormat(s){
+    if(typeof s!=='string') return s;
+    return s.replace(/;\s*/g,';\n').replace(/\}\s*/g,'}\n').trim();
+  }
+  (function(){
+    const input=document.querySelector('#codeIn');
+    const out=document.querySelector('#codeOut');
+    const status=document.getElementById('status');
+    if(!input||!out) return;
+    let lastVal=input.value;
+    setInterval(async ()=>{
+      const enable=document.querySelector('#autoDecode')?.checked;
+      const val=input.value;
+      if(!enable){ lastVal=val; return; }
+      if(val && val!==lastVal){
+        lastVal=val;
+        out.textContent=localFormat(val);
+        const decoded=await smartDecodeNow(val);
+        if(decoded && decoded!==val){
+          out.textContent=localFormat(decoded);
+          if(document.querySelector('#autoBeautify')?.checked && window.prettier){
+            try{
+              out.textContent=prettier.format(out.textContent,{parser:'babel',plugins:[prettierPlugins.babel,prettierPlugins.estree]});
+            }catch{}
           }
-          status.innerHTML = '<small>✅ 本地秒解完成</small>';
-        } else {
-          status.innerHTML = '<small>ℹ️ 已载入（未检测到可解密层或已是明文）</small>';
+          status.innerHTML='<small>✅ 秒解完成</small>';
+        }else{
+          status.innerHTML='<small>ℹ️ 已载入（无可解层）</small>';
         }
-      };
-
-      const debounce = (fn, ms)=>{ let t=null; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); } };
-
-      // 监听输入框变化（粘贴/远程/文件赋值都会触发 input 事件）
-      input.addEventListener('input', debounce(run, 200));
-    }
-
-    window.addEventListener('load', autoDecodeGlue);
+      }
+    },400);
+  })();
   </script>
 </body>
 </html>
