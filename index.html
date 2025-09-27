@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 解密前端（智能解密 + 后台恢复 + 设置持久化）</title>
+<title>OtOjs · 解密前端（智能解密 + 后台恢复 + Raw 面板 + 设置持久化）</title>
 <style>
   :root{
     --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
@@ -55,6 +55,9 @@
 
   /* 简洁开关：复选框 + 文案 */
   .switch{margin-right:12px;font-size:12px}
+
+  /* Raw 面板 */
+  #outputRaw{white-space:pre;max-height:240px}
 </style>
 </head>
 <body>
@@ -141,6 +144,21 @@
     <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
     <pre id="codeOut" placeholder="结果将显示在这里"></pre>
   </div>
+
+  <!-- Raw 面板 -->
+  <div class="card" id="panel-raw">
+    <div class="row" style="align-items:center">
+      <div style="flex:2 1 auto">
+        <small id="rawMeta" style="color:#9db1c7">Raw：尚未拉取</small>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="btn-raw" onclick="loadOutputRaw()">拉取 Raw</button>
+        <button onclick="downloadOutput()">下载结果</button>
+        <a id="rawLink" href="javascript:;" target="_blank" style="align-self:center;color:#67e8f9">打开 Raw</a>
+      </div>
+    </div>
+    <pre id="outputRaw" placeholder="Raw 内容将显示在这里"></pre>
+  </div>
 </div>
 
 <!-- ========= 基础工具 ========= -->
@@ -159,6 +177,12 @@ function ghHeaders(){
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 function nowTs(){ return Date.now().toString() }
 function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))) }catch{ return atob(b64) } }
+async function copySel(sel,btn){
+  try{ const el=$(sel); const t=el?(el.value??el.textContent??''):'';
+    await navigator.clipboard.writeText(t);
+    const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
+  }catch(e){ setStatus('复制失败：'+e.message); }
+}
 </script>
 
 <!-- ========= Prettier ========= -->
@@ -194,7 +218,6 @@ $('#file').addEventListener('change', async (e)=>{
 });
 
 async function loadRemote(){
-  // 从弹窗 hidden input 取值
   let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
   if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
     u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
@@ -211,7 +234,7 @@ async function pasteFromClipboard(){
   catch(e){ setStatus('粘贴失败：'+e.message); }
 }
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
-function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
+function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
 
 /* 远程弹窗交互 */
 (function(){
@@ -229,6 +252,38 @@ function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; hideBar(
   $('#btn-clean').addEventListener('click', e=>{ e.preventDefault(); beautify(); });
   $('#btn-clear').addEventListener('click', e=>{ e.preventDefault(); clrIn(); });
 })();
+</script>
+
+<!-- ========= Raw 面板函数 ========= -->
+<script>
+function rawUrl(path){
+  return `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path||$('#whichOut').value}?t=${Date.now()}`;
+}
+async function loadOutputRaw(path){
+  const url = rawUrl(path);
+  try{
+    const r = await fetch(url,{cache:'no-store'});
+    const t = await r.text();
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    $('#outputRaw').textContent = t;
+    $('#rawLink').href = url;
+    $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${$('#whichOut').value}</span> · ${t.length} 字符`;
+    setStatus('已拉取 Raw');
+  }catch(e){
+    $('#outputRaw').textContent = '拉取失败：'+e.message+'\n'+url;
+    $('#rawLink').href = url;
+    $('#rawMeta').textContent = 'Raw：拉取失败';
+  }
+}
+function downloadOutput(){
+  const t = $('#codeOut').textContent || $('#outputRaw').textContent || '';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'}));
+  const which = ($('#whichOut').value||'output/output.js').split('/').pop();
+  a.download = which;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 </script>
 
 <!-- ========= GitHub 提交 & 轮询（含后台恢复） ========= -->
@@ -277,7 +332,7 @@ async function startAutoPoll(){
   const branch=$('#branch').value.trim();
   const api=`${repoBase()}/contents/${which}?ref=${branch}`;
   const short=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
-  const long=Math.min(30000, short*3); // 后台慢一些
+  const long=Math.min(30000, short*3);
   const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
 
   let lastSha=''; let waited=0;
@@ -311,10 +366,14 @@ async function startAutoPoll(){
       const out=j.content?b64ToUtf8(b64):'';
       if(out && out.trim()){
         lastSha=sha||nowTs();
+        // 智能解密 + 美化
         const dec = trySmartDecode(out);
         const final = await maybeBeautify(dec);
         $('#codeOut').textContent=final;
         setStatus( dec!==out ? '✅ 已获取并本地智能解密'+(final!==dec?'（已美化）':'') : '✅ 已获取到最新 '+which );
+        // 同步 Raw 元信息与链接（不额外请求）
+        $('#rawLink').href = rawUrl();
+        $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${which}</span> · ${out.length} 字符`;
         return true;
       }else{
         setStatus('等待中… '+which+'（文件为空或未生成）'); return false;
@@ -367,7 +426,7 @@ async function startAutoPoll(){
 
 // Packer
 (function () {
-  const P_RE=/^\s*eval\(function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{/;
+  const P_RE=/^\s*eval\(function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\)\s*\{/;
   function isPacked(code){ return P_RE.test(code); }
   function unpackOnce(source){
     if(!isPacked(source)) return null;
@@ -407,6 +466,8 @@ async function trySmartDecodeAndShow(src,label){
     const pretty = await maybeBeautify(decoded);
     $('#codeOut').textContent = pretty;
     setStatus(`✅ ${label} · 本地智能解密完成${pretty!==decoded?'（已美化）':''}`);
+    // 更新 Raw 面板的链接（如果用户想开新页看）
+    $('#rawLink').href = rawUrl();
   }
 }
 </script>
@@ -433,6 +494,9 @@ async function pollOutputOnce(job,state){
     const final = await maybeBeautify(finalDecoded);
     $('#codeOut').textContent = final;
     setStatus( finalDecoded!==raw ? `✅ 本地智能解密完成${final!==finalDecoded?'（已美化）':''}` : `✅ 已获取到最新 ${job.whichOut}` );
+    // Raw 面板元信息更新
+    $('#rawLink').href = rawUrl(job.whichOut);
+    $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${job.whichOut}</span> · ${raw.length} 字符`;
     return {done:true, etag, sha};
   }
   setStatus('等待中…（文件为空或未生成）'); return {done:false, etag, sha};
@@ -515,7 +579,7 @@ function bindPersist(){
 window.addEventListener('load',()=>{ loadSettingsToUI(); bindPersist(); });
 </script>
 
-<!-- 占位：隐藏文件 input 在上面 -->
+<!-- 单个隐藏文件 input（避免重复） -->
 <input type="file" id="file" accept=".js,.txt,.json" hidden />
 </body>
 </html>
