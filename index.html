@@ -29,47 +29,33 @@
   small{color:var(--muted)}
   .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
   .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
-  .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:6px 10px;background:#0b1020}
-  .hint{font-size:12px;color:var(--muted)}
 
-  /* 一排小按钮（文件 / 远程 / 粘贴 / 格式 / 清空） */
-  .btnbar{
-    display:grid; grid-template-columns:repeat(5,1fr);
-    gap:6px; margin-top:8px; position:relative; z-index:1;
-  }
-  .btncard{
-    min-width:0; padding:10px 6px; border-radius:10px;
-    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18); color:#fff;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    cursor:pointer; transition:transform .15s,background .15s,box-shadow .15s;
-  }
-  .btncard:hover{background:rgba(255,255,255,.12); transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,.2)}
+  /* 一排小按钮 */
+  .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+  .btncard{min-width:0;padding:10px 6px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .btncard:hover{background:rgba(255,255,255,.12)}
   .btnicon{font-size:16px}
-  .btntxt{font-size:11px; font-weight:600; margin-top:2px}
+  .btntxt{font-size:11px;font-weight:600;margin-top:2px}
 
   /* 远程弹窗（悬浮） */
-  .remote-pop{
-    position:fixed; left:0; top:0; width:min(92vw,360px);
-    background:#0f1621; border:1px solid var(--line2); border-radius:12px;
-    padding:10px; box-shadow:0 12px 28px rgba(0,0,0,.35);
-    display:none; z-index:9999;
-  }
-  .remote-pop.show{display:block;}
-  .remote-pop .pop-row{display:flex; gap:8px; margin-top:6px}
-  .remote-pop input[type="url"]{
-    flex:1 1 auto; min-width:0; background:#0f1a2b; border:1px solid var(--line2);
-    border-radius:10px; padding:10px; color:var(--text); font-size:13px;
-  }
-  .remote-pop .pop-btn{ white-space:nowrap; padding:8px 12px; border-radius:10px; border:1px solid #2b3b54; background:var(--btn); color:var(--text) }
-  .remote-pop .pop-btn.ok{ border-color:var(--ok) }
-  .remote-pop .pop-btn.cancel{ border-color:var(--err) }
+  .remote-pop{position:fixed;left:0;top:0;width:min(92vw,360px);background:#0f1621;border:1px solid var(--line2);border-radius:12px;padding:10px;box-shadow:0 12px 28px rgba(0,0,0,.35);display:none;z-index:9999}
+  .remote-pop.show{display:block}
+  .remote-pop .pop-row{display:flex;gap:8px;margin-top:6px}
+  .remote-pop input[type="url"]{flex:1 1 auto;min-width:0;background:#0f1a2b;border:1px solid var(--line2);border-radius:10px;padding:10px;color:var(--text);font-size:13px}
+  .remote-pop .pop-btn{padding:8px 12px;border-radius:10px;border:1px solid #2b3b54;background:var(--btn);color:var(--text)}
+  .remote-pop .pop-btn.ok{border-color:var(--ok)}
+  .remote-pop .pop-btn.cancel{border-color:var(--err)}
 
-  /* 折叠的高级设置 */
-  details.setting{ margin-top:8px }
-  details.setting summary{ cursor:pointer; color:var(--muted); user-select:none }
-  details.setting summary::-webkit-details-marker{ display:none }
-  details.setting summary::before{ content:"▸ "; }
-  details.setting[open] summary::before{ content:"▾ "; }
+  /* 折叠 */
+  details.setting{margin-top:8px}
+  details.setting summary{cursor:pointer;color:var(--muted);user-select:none}
+  details.setting summary::-webkit-details-marker{display:none}
+  details.setting summary::before{content:"▸ "}
+  details.setting[open] summary::before{content:"▾ "}
+
+  /* 小开关：普通复选框 + 文案，简洁不突兀 */
+  .switch{display:flex;align-items:center;gap:8px}
+  .switch input{width:auto}
 </style>
 </head>
 <body>
@@ -77,15 +63,17 @@
   <h1>OtOjs · 解密前端</h1>
 
   <div class="card">
-    <!-- 全部搬进高级设置 -->
+    <!-- 只保留 repo/branch/token 在外面 -->
+    <div class="row">
+      <div><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
+      <div><label>BRANCH</label><input id="branch" value="main" /></div>
+      <div><label>Token（contents:rw）</label><input id="token" type="password" placeholder="ghp_..." /></div>
+    </div>
+
+    <!-- 其他全部折叠 -->
     <details class="setting">
       <summary>高级设置</summary>
       <div class="row" style="margin-top:8px">
-        <div><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
-        <div><label>BRANCH</label><input id="branch" value="main" /></div>
-        <div><label>Token（contents:rw）</label><input id="token" type="password" placeholder="ghp_..." /></div>
-      </div>
-      <div class="row">
         <div><label>input.js 路径</label><input id="pathIn" value="input.js" /></div>
         <div><label>提交信息</label><input id="commitMsg" value="update: input.js via UI" /></div>
         <div>
@@ -99,15 +87,13 @@
       <div class="row">
         <div><label>轮询间隔（秒）</label><input id="pollSec" type="number" value="5" /></div>
         <div><label>最大等待（秒）</label><input id="maxWait" type="number" value="150" /></div>
-        <div class="pill" title="前端将自动尝试 Packer/Eval/AADecode 解密">
-          <input id="autoSmart" type="checkbox" checked /> <span>自动智能解密</span>
-        </div>
       </div>
-      <div class="pill" style="margin-top:6px">
-        <input id="autoResume" type="checkbox" checked />
-        <span>提交后允许后台执行，回到页面自动拉取</span>
+      <div class="row">
+        <label class="switch"><input id="autoSmart" type="checkbox" checked />自动智能解密（Packer→Eval→AA）</label>
+        <label class="switch"><input id="autoResume" type="checkbox" checked />提交后允许后台执行并自动恢复拉取</label>
       </div>
     </details>
+
     <div class="hint">提交后可后台执行；页面回到前台会自动恢复拉取并尝试本地智能解密。</div>
   </div>
 
@@ -153,7 +139,7 @@
 
   <div class="card">
     <div class="row">
-      <div class="pill">
+      <div style="display:flex;align-items:center;gap:8px">
         <span>快速拉取 Raw：</span>
         <button onclick="loadOutputRaw('output/output.js')">output/output.js</button>
         <button onclick="loadOutputRaw('output/output.deob2.js')">output/output.deob2.js</button>
@@ -295,23 +281,19 @@ async function loadOutputRaw(path){
 function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').textContent||''; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'})); const which=$('#whichOut').value.split('/').pop()||'output.js'; a.download=which; a.click(); URL.revokeObjectURL(a.href); }
 </script>
 
-<!-- ====== AADecode 插件（前端） ====== -->
+<!-- ====== AADecode（前端） ====== -->
 <script>
 (function () {
   const module = { exports: {} };
-  function extractHeader(code) {
-    const i = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
-    if (i > 0) return { header: code.substring(0, i).trim(), encodedPart: code.substring(i) };
-    return { header: "", encodedPart: code };
-  }
-  function plugin(code) {
-    try {
+  function extractHeader(code){ const i=code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/); if(i>0) return {header:code.substring(0,i).trim(),encodedPart:code.substring(i)}; return {header:"",encodedPart:code}; }
+  function plugin(code){
+    try{
       const { header, encodedPart } = extractHeader(code);
-      if (!(encodedPart.includes("ﾟДﾟ") || encodedPart.includes("(ﾟΘﾟ)") || encodedPart.includes("ﾟωﾟﾉ") || encodedPart.includes("ﾟдﾟ"))) return null;
-      let s = encodedPart.replace(") ('_')","").replace("(ﾟДﾟ) ['_'] (","return ");
-      const x = new Function(s); const out = x();
-      return header ? `${header}\n\n${out}` : out;
-    } catch (e) { console.error("AADecode解码错误:", e); return null; }
+      if(!(/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(encodedPart))) return null;
+      let s=encodedPart.replace(") ('_')","").replace("(ﾟДﾟ) ['_'] (","return ");
+      const x=new Function(s); const out=x();
+      return header?`${header}\n\n${out}`:out;
+    }catch(e){ console.error("AADecode解码错误:",e); return null; }
   }
   module.exports = plugin;
   window.DecodePlugins = window.DecodePlugins || {};
@@ -323,21 +305,17 @@ function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').te
 <script>
 (function () {
   const module = { exports: {} };
-  function plugin(code) {
-    try {
-      if (!/eval\s*\(/.test(code)) return null;
-      let m = code.replace(/eval\s*\(/g, "(function(x){return x;})(");
+  function plugin(code){
+    try{
+      if(!/eval\s*\(/.test(code)) return null;
+      let safe=code.replace(/\beval\s*\(/g,'(function(__x){return __x;})(');
       try{
-        const env = { window:{}, document:{}, navigator:{userAgent:"Mozilla/5.0"}, location:{} };
-        const res = Function("window","document","navigator","location",`return ${m}`)(env.window,env.document,env.navigator,env.location);
-        if (typeof res === "string") return /eval\s*\(/.test(res) ? plugin(res) : res;
-        return String(res);
-      }catch{
-        try{ return code.replace(/eval\s*\(/g, "("); }catch{ return null; }
-      }
-    } catch (e) { console.error("Eval 解包错误:", e); return null; }
+        const out=Function('"use strict";return ('+safe+')')();
+        return (typeof out==='string')? out : String(out);
+      }catch{ return null; }
+    }catch(e){ console.error("Eval 解包错误:",e); return null; }
   }
-  module.exports.plugin = (c)=>plugin(c);
+  module.exports.plugin=(c)=>plugin(c);
   window.DecodePlugins = window.DecodePlugins || {};
   window.DecodePlugins.eval = { detect:c=>/eval\s*\(/.test(c), plugin:c=>module.exports.plugin(c) };
 })();
@@ -346,28 +324,22 @@ function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').te
 <!-- ====== P.A.C.K.E.R 解包（前端） ====== -->
 <script>
 (function () {
-  const P_RE = /^\s*eval\(function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{/;
+  const P_RE=/^\s*eval\(function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{/;
   function isPacked(code){ return P_RE.test(code); }
   function unpackOnce(source){
     if(!isPacked(source)) return null;
-    const m = source.match(/eval\(function\(p,a,c,k,e,d\)\{[\s\S]*?\}\s*\(\s*(['"`])([\s\S]*?)\1\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(['"`])([\s\S]*?)\5\.split\('(\|)'\)\s*,/);
+    const m=source.match(/eval\(function\(p,a,c,k,e,d\)\{[\s\S]*?\}\s*\(\s*(['"`])([\s\S]*?)\1\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(['"`])([\s\S]*?)\5\.split\((['"`])\7\)\s*,/);
     if(!m) return null;
-    const payload=m[2], radix=parseInt(m[3]), dictRaw=m[6], sep=m[7]||'|';
-    const dict = dictRaw.split(sep);
-    function unbase(str){ return parseInt(str, radix); }
-    let p = payload.replace(/\\([\\'"`])/g,'$1')
-                   .replace(/\\x([0-9A-Fa-f]{2})/g,(_,h)=>String.fromCharCode(parseInt(h,16)))
-                   .replace(/\\u([0-9A-Fa-f]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16)));
-    const tokenRe = /\b\w+\b/g;
-    p = p.replace(tokenRe, w=>{ const idx=unbase(w); return Number.isNaN(idx)? w : (dict[idx]??w); });
+    const payload=m[2], radix=parseInt(m[3],10), dictRaw=m[6], sep=m[7]||'|', dict=dictRaw.split(sep);
+    function unescapeStr(s){ return s.replace(/\\([\\'"`])/g,'$1').replace(/\\x([0-9A-Fa-f]{2})/g,(_,h)=>String.fromCharCode(parseInt(h,16))).replace(/\\u([0-9A-Fa-f]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16))); }
+    let p=unescapeStr(payload);
+    function unbase(str){ return parseInt(str,radix); }
+    p=p.replace(/\b\w+\b/g,w=>{ const idx=unbase(w); return Number.isNaN(idx)? w : (dict[idx]??w); });
     return p;
   }
-  function unpackRecursive(code, max=6){
-    let s=code; for(let i=0;i<max;i++){ const out=unpackOnce(s); if(out==null) break; s=String(out).trim(); }
-    return s;
-  }
+  function unpackRecursive(code,max=8){ let s=code,changed=false; for(let i=0;i<max;i++){ const out=unpackOnce(s); if(out==null) break; s=String(out).trim(); changed=true; } return changed? s : null; }
   window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.packer = { detect: c=>P_RE.test(c), plugin: c=>{ try{ const out=unpackRecursive(c); return out||c; }catch(e){ console.error('Packer 解包失败',e); return c; } } };
+  window.DecodePlugins.packer = { detect:c=>isPacked(c), plugin:c=>{ try{ const out=unpackRecursive(c); return out||c; }catch(e){ console.error('Packer 解包失败:',e); return c; } } };
 })();
 </script>
 
@@ -375,50 +347,44 @@ function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').te
 <script>
 function trySmartDecode(text){
   if(!$('#autoSmart').checked) return text;
-  let before = String(text), changed = false, rounds = 0;
-  const maxRounds = 6;
-  while(rounds++ < maxRounds){
-    let cur = before;
-    // 顺序：Packer -> Eval -> AA
-    try{ if(window.DecodePlugins?.packer?.detect(cur)){ const t = window.DecodePlugins.packer.plugin(cur); if(typeof t==='string') cur = t; } }catch{}
-    try{ if(window.DecodePlugins?.eval?.detect(cur)){ const t = window.DecodePlugins.eval.plugin(cur); if(typeof t==='string') cur = t; } }catch{}
-    try{ if(window.DecodePlugins?.aadecode?.detect(cur)){ const t = window.DecodePlugins.aadecode.plugin(cur); if(typeof t==='string') cur = t; } }catch{}
-    if(cur === before) break;
-    before = cur; changed = true;
+  let before=String(text),changed=false,rounds=0,maxRounds=8;
+  while(rounds++<maxRounds){
+    let cur=before;
+    try{ if(window.DecodePlugins?.packer?.detect(cur)){ const t=window.DecodePlugins.packer.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
+    try{ if(window.DecodePlugins?.eval?.detect(cur)){ const t=window.DecodePlugins.eval.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
+    try{ if(window.DecodePlugins?.aadecode?.detect(cur)){ const t=window.DecodePlugins.aadecode.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
+    if(cur===before) break; before=cur; changed=true;
   }
-  return changed ? before : text;
+  return changed? before : text;
 }
 function trySmartDecodeAndShow(src,label){
   if(!$('#autoSmart').checked) return;
-  const out = trySmartDecode(src);
-  if(out !== src){
-    $('#codeOut').textContent = out;
-    setStatus(`✅ ${label} · 本地智能解密完成`);
-  }
+  const out=trySmartDecode(src);
+  if(out!==src){ $('#codeOut').textContent=out; setStatus(`✅ ${label} · 本地智能解密完成`); }
 }
 
 /* ====== 后台恢复轮询（含智能解密） ====== */
 function saveJobForAutoResume(job){
-  const data = { ...job, startedAt: Date.now(), lastSha:'', etag:'', expiry: Date.now()+job.maxWait*1000+5*60*1000 };
+  const data={...job,startedAt:Date.now(),lastSha:'',etag:'',expiry:Date.now()+job.maxWait*1000+5*60*1000};
   localStorage.setItem('oto_auto_job', JSON.stringify(data));
 }
-function loadJob(){ try{ const raw=localStorage.getItem('oto_auto_job'); if(!raw) return null; const j=JSON.parse(raw); if(!j || !j.expiry || Date.now()>j.expiry){ localStorage.removeItem('oto_auto_job'); return null; } return j; }catch{ return null; } }
+function loadJob(){ try{ const raw=localStorage.getItem('oto_auto_job'); if(!raw) return null; const j=JSON.parse(raw); if(!j||!j.expiry||Date.now()>j.expiry){ localStorage.removeItem('oto_auto_job'); return null;} return j; }catch{ return null; } }
 function clearJob(){ localStorage.removeItem('oto_auto_job'); }
-async function pollOutputOnce(job, state){
+async function pollOutputOnce(job,state){
   const api=`https://api.github.com/repos/${job.repo}/contents/${job.whichOut}?ref=${job.branch}&t=${Date.now()}`;
-  const headers={ ...ghHeaders() }; if(state.etag){ headers['If-None-Match']=state.etag; }
+  const headers={...ghHeaders()}; if(state.etag){ headers['If-None-Match']=state.etag; }
   const res=await fetch(api,{headers,cache:'no-store'});
   if(res.status===304){ setStatus('等待中…（未改变 304）'); return {done:false}; }
   const text=await res.text(); if(!res.ok){ setStatus(`等待中…（HTTP ${res.status}）`); return {done:false}; }
   const etag=res.headers.get('ETag')||state.etag; const j=JSON.parse(text); const sha=j.sha||''; const b64=(j.content||'').replace(/\n/g,''); const raw=j.content?b64ToUtf8(b64):'';
-  if(state.sha && sha===state.sha){ setStatus('等待中…（未更新）'); return {done:false, etag, sha: state.sha}; }
+  if(state.sha && sha===state.sha){ setStatus('等待中…（未更新）'); return {done:false,etag,sha:state.sha}; }
   if(raw && raw.trim()){
-    const final = trySmartDecode(raw);
-    $('#codeOut').textContent = final;
-    setStatus( final!==raw ? `✅ 本地智能解密完成 · ${final.length} 字符` : `✅ 已获取到最新 ${job.whichOut} · ${raw.length} 字符`);
-    return {done:true, etag, sha};
+    const final=trySmartDecode(raw);
+    $('#codeOut').textContent=final;
+    setStatus(final!==raw?`✅ 本地智能解密完成 · ${final.length} 字符`:`✅ 已获取到最新 ${job.whichOut} · ${raw.length} 字符`);
+    return {done:true,etag,sha};
   }
-  setStatus('等待中…（文件为空或未生成）'); return {done:false, etag, sha};
+  setStatus('等待中…（文件为空或未生成）'); return {done:false,etag,sha};
 }
 async function autoResumeIfNeeded(){
   const job=loadJob(); if(!job) return;
