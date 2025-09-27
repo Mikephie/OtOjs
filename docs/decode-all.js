@@ -302,14 +302,54 @@ function simpleFormat(src) {
 // 统一美化入口（优先 Prettier，其次兜底）
 function prettyFormat(code) {
   try {
-    if (window.prettier && window.prettierPlugins && window.prettierPlugins.babel) {
+    const hasPrettier = !!window.prettier;
+    const rawPlugins = window.prettierPlugins;
+    const plugins = Array.isArray(rawPlugins)
+      ? rawPlugins
+      : rawPlugins && rawPlugins.babel
+      ? [rawPlugins.babel]
+      : null;
+
+    if (hasPrettier && plugins) {
       return window.prettier.format(code, {
         parser: "babel",
-        plugins: [window.prettierPlugins.babel],
+        plugins,
       });
     }
   } catch {}
-  return simpleFormat(code);
+  return simpleFormat(code); // 没有/失败就兜底分行
+}
+
+// ========== 智能解密调度（先解包→再美化）==========
+async function smartDecodePipeline(code) {
+  let out = String(code);
+  let changed = true;
+  let rounds = 0;
+
+  // 固定插件顺序，避免 Object.keys 顺序不稳定
+  const ORDER = ["aadecode", "eval", "jsfuck"];
+
+  while (changed && rounds < 20) {
+    changed = false;
+    rounds++;
+
+    for (const key of ORDER) {
+      const p = window.DecodePlugins[key];
+      if (!p || typeof p.detect !== "function" || typeof p.plugin !== "function") continue;
+
+      if (p.detect(out)) {
+        const res = p.plugin(out);
+        if (typeof res === "string" && res && res !== out) {
+          out = res;
+          changed = true;
+          break; // ★ 成功解出一层，立刻换轮继续剥下一层
+        }
+      }
+    }
+  }
+
+  // 统一在最后做一次美化（若已加载 Prettier 就用它，否则走 simpleFormat）
+  return prettyFormat(out);
 }
 
 // 暴露到全局
