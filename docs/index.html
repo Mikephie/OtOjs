@@ -6,6 +6,7 @@
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
   <style>
+    /* 让结果区域自然换行，避免挤成一行 */
     pre { white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
@@ -52,7 +53,7 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" checked /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
@@ -60,7 +61,7 @@
       <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
 
-    <!-- 输出 -->
+    <!-- 输出（Raw） -->
     <div class="card">
       <div class="row compact">
         <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
@@ -72,21 +73,21 @@
     </div>
   </div>
 
-  <!-- Prettier 三件套 -->
+  <!-- 可选：Prettier（用于“解密之后”的美化；加载失败不影响秒解） -->
   <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
   <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
   <script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
 
-  <!-- 顺序：先插件，再主逻辑 -->
+  <!-- 顺序非常重要：先插件，再主逻辑（保持你的文件名） -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 全局复制函数 -->
+  <!-- 全局复制函数（移动端可用） -->
   <script>
     async function copySel(sel, btn){
       try{
-        const el=document.querySelector(sel);
-        const t=el?(el.value??el.textContent??''):'';
+        const el = document.querySelector(sel);
+        const t = el ? (el.value ?? el.textContent ?? '') : '';
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(t);
         } else {
@@ -96,50 +97,67 @@
         }
         const old=btn.textContent; btn.textContent='✅ 已复制';
         setTimeout(()=>btn.textContent=old,1200);
-      }catch(e){ alert('复制失败：'+e.message); }
+      }catch(e){
+        alert('复制失败：'+e.message);
+      }
     }
   </script>
 
-  <!-- 秒解兜底监视器 -->
+  <!-- “先解密，后美化”的秒解监视器（不会改动原始输入） -->
   <script>
-  async function smartDecodeNow(code){
-    if (typeof window.smartDecodePipeline !== 'function') {
-      return null;
-    }
-    try { return await window.smartDecodePipeline(code); } catch { return null; }
-  }
-  function localFormat(s){
-    if(typeof s!=='string') return s;
-    return s.replace(/;\s*/g,';\n').replace(/\}\s*/g,'}\n').trim();
-  }
-  (function(){
-    const input=document.querySelector('#codeIn');
-    const out=document.querySelector('#codeOut');
-    const status=document.getElementById('status');
-    if(!input||!out) return;
-    let lastVal=input.value;
-    setInterval(async ()=>{
-      const enable=document.querySelector('#autoDecode')?.checked;
-      const val=input.value;
-      if(!enable){ lastVal=val; return; }
-      if(val && val!==lastVal){
-        lastVal=val;
-        out.textContent=localFormat(val);
-        const decoded=await smartDecodeNow(val);
-        if(decoded && decoded!==val){
-          out.textContent=localFormat(decoded);
-          if(document.querySelector('#autoBeautify')?.checked && window.prettier){
-            try{
-              out.textContent=prettier.format(out.textContent,{parser:'babel',plugins:[prettierPlugins.babel,prettierPlugins.estree]});
-            }catch{}
-          }
-          status.innerHTML='<small>✅ 秒解完成</small>';
-        }else{
-          status.innerHTML='<small>ℹ️ 已载入（无可解层）</small>';
-        }
+    // 封装：立即执行一次“解密→可选美化→显示”
+    async function decodeAndRender(src){
+      const outEl = document.querySelector('#codeOut');
+      const statusEl = document.getElementById('status');
+      if (!outEl) return;
+
+      // 1) 先解密（不对原文做任何分行/替换）
+      let decoded = null;
+      if (document.querySelector('#autoDecode')?.checked && typeof window.smartDecodePipeline === 'function') {
+        try { decoded = await window.smartDecodePipeline(String(src)); } catch {}
       }
-    },400);
-  })();
+
+      // 2) 选择展示内容：能解出来就展示解密结果，否则展示原文
+      let shown = (typeof decoded === 'string' && decoded) ? decoded : String(src);
+      let pretty = shown;
+
+      // 3) 仅对“已选中的展示内容”做 Prettier（不会影响后续再次解密）
+      if (document.querySelector('#autoBeautify')?.checked &&
+          window.prettier && window.prettierPlugins &&
+          (window.prettierPlugins.babel || window.prettierPlugins.estree)) {
+        try {
+          const plugins = [window.prettierPlugins.babel, window.prettierPlugins.estree].filter(Boolean);
+          pretty = window.prettier.format(shown, { parser: 'babel', plugins });
+        } catch { pretty = shown; }
+      }
+
+      outEl.textContent = pretty;
+      statusEl.innerHTML = '<small>' +
+        ((decoded && decoded!==src) ? '✅ 已解密' : 'ℹ️ 已载入（无可解层）') +
+        (pretty!==shown ? ' · 已美化' : '') +
+        '</small>';
+    }
+
+    // 监视 #codeIn 内容变化：文件/远程/粘贴/手改都会触发
+    (function(){
+      const input = document.querySelector('#codeIn');
+      if (!input) return;
+      let last = input.value;
+      setInterval(async ()=>{
+        const cur = input.value;
+        if (cur !== last) {
+          last = cur;
+          if (cur.trim()) await decodeAndRender(cur);
+        }
+      }, 350);
+    })();
+
+    // 文件导入快捷：与你现有 app.js 的 pick()/loadRemote()/pasteFromClipboard() 兼容
+    document.getElementById('file')?.addEventListener('change', async e=>{
+      const f=e.target.files?.[0]; if(!f) return;
+      const txt=await f.text(); document.querySelector('#codeIn').value=txt;
+      await decodeAndRender(txt);
+    });
   </script>
 </body>
 </html>
