@@ -288,12 +288,30 @@ function downloadOutput(){
 
 <!-- ========= GitHub 提交 & 轮询（含后台恢复） ========= -->
 <script>
+// 提交前“秒解预览”——不阻塞提交，若开启美化则异步美化后刷新显示
+function previewLocalImmediately(code){
+  const dec = trySmartDecode(code);
+  $('#codeOut').textContent = dec;
+  setStatus('🟢 本地预览（已提交，等待远端产物覆盖）');
+  // 异步美化（不阻塞 PUT）
+  (async()=>{ 
+    const pretty = await maybeBeautify(dec);
+    if(pretty!==dec){
+      $('#codeOut').textContent = pretty;
+      setStatus('🟢 本地预览（已美化）');
+    }
+  })();
+}
+
 async function submitInput(){
   const path=$('#pathIn').value.trim()||'input.js';
   const api=`${repoBase()}/contents/${path}`;
   const code=$('#codeIn').value;
   if(!code){ setStatus('没有可上传的内容'); return }
-  trySmartDecodeAndShow(code,'输入（已提交）');
+
+  // ★ 立刻本地秒解并展示
+  previewLocalImmediately(code);
+
   try{
     let sha='';
     const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&t=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
@@ -372,7 +390,7 @@ async function startAutoPoll(){
         const final = await maybeBeautify(dec);
         $('#codeOut').textContent=final;
         setStatus( dec!==out ? '✅ 已获取并本地智能解密'+(final!==dec?'（已美化）':'') : '✅ 已获取到最新 '+which );
-        // 同步 Raw 元信息与链接（不额外请求）
+        // 同步 Raw 面板（不额外请求）
         $('#rawLink').href = rawUrl();
         $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${which}</span> · ${out.length} 字符`;
         return true;
@@ -467,8 +485,11 @@ async function trySmartDecodeAndShow(src,label){
     const pretty = await maybeBeautify(decoded);
     $('#codeOut').textContent = pretty;
     setStatus(`✅ ${label} · 本地智能解密完成${pretty!==decoded?'（已美化）':''}`);
-    // 更新 Raw 面板的链接（如果用户想开新页看）
     $('#rawLink').href = rawUrl();
+  }else{
+    // 就算不可解，也直接显示输入（并尝试美化让可读）
+    const pretty = await maybeBeautify(src);
+    $('#codeOut').textContent = pretty;
   }
 }
 </script>
@@ -495,7 +516,6 @@ async function pollOutputOnce(job,state){
     const final = await maybeBeautify(finalDecoded);
     $('#codeOut').textContent = final;
     setStatus( finalDecoded!==raw ? `✅ 本地智能解密完成${final!==finalDecoded?'（已美化）':''}` : `✅ 已获取到最新 ${job.whichOut}` );
-    // Raw 面板元信息更新
     $('#rawLink').href = rawUrl(job.whichOut);
     $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${job.whichOut}</span> · ${raw.length} 字符`;
     return {done:true, etag, sha};
