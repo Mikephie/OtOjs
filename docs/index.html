@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OtOjs 解密前端 · 三件式</title>
+  <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -34,12 +34,12 @@
       <div class="row compact">
         <input type="file" id="file" accept=".js,.txt,.json" />
         <button onclick="pick()">文件</button>
-        <input id="remoteUrl" placeholder="https:// 原始脚本 URL" />
+        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
         <button onclick="loadRemote()">远程</button>
         <button onclick="pasteFromClipboard()">粘贴</button>
         <button class="err" onclick="clrIn()">清空</button>
       </div>
-      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里…"></textarea>
+      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
       <div class="row compact">
         <button class="ok" onclick="submitInput()">提交</button>
         <button class="warn" onclick="startAutoPoll()">轮询</button>
@@ -49,12 +49,12 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" /> 自动美化 (Prettier)</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut"></pre>
+      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
 
     <!-- 输出 -->
@@ -69,11 +69,14 @@
     </div>
   </div>
 
-  <!-- 引入 -->
-  <script src="app.js"></script>
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
   <script src="decode-all.js"></script>
-  <!-- 可选本地化 -->
-  <!-- <script src="prettier.min.js"></script>
-       <script src="parser-babel.min.js"></script> -->
+  <script src="app.js"></script>
+
+  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
+  <!--
+  <script src="prettier.min.js"></script>
+  <script src="parser-babel.min.js"></script>
+  -->
 </body>
 </html>
