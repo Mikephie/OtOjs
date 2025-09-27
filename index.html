@@ -293,6 +293,7 @@ async function submitInput(){
   const api=`${repoBase()}/contents/${path}`;
   const code=$('#codeIn').value;
   if(!code){ setStatus('没有可上传的内容'); return }
+  trySmartDecodeAndShow(code,'输入（已提交）');
   try{
     let sha='';
     const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&t=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
