@@ -69,9 +69,14 @@
     </div>
   </div>
 
-  <!-- 顺序非常重要：先插件，再主逻辑 -->
-  <script src="decode-all.js" defer></script>
-  <script src="app.js" defer></script>
+  <!-- Prettier 依赖 -->
+<script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
+
+<!-- 顺序非常重要：先插件，再主逻辑 -->
+<script src="decode-all.js"></script>
+<script src="app.js"></script>
 
   <!-- 页面初始化时自动触发解密 -->
   <script>
