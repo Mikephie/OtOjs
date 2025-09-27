@@ -25,7 +25,14 @@
   button.ok{border-color:var(--ok)}
   button.warn{border-color:var(--warn)}
   button.err{border-color:var(--err)}
-  pre{white-space:pre;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:380px;overflow:auto}
+  /* 核心：折行显示 */
+  pre{
+    white-space: pre-wrap;      /* 允许自动折行 */
+    word-break: break-word;     /* 超长 token 也换行 */
+    background:#0b1020;border:1px solid var(--line2);
+    border-radius:10px;padding:10px;font-size:12px;
+    max-height:380px;overflow:auto
+  }
   small{color:var(--muted)}
   .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
   .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
@@ -57,7 +64,7 @@
   .switch{margin-right:12px;font-size:12px}
 
   /* Raw 面板 */
-  #outputRaw{white-space:pre;max-height:240px}
+  #outputRaw{white-space:pre-wrap;word-break:break-word;max-height:240px}
 </style>
 </head>
 <body>
@@ -286,11 +293,42 @@ function downloadOutput(){
 }
 </script>
 
+<!-- ========= “展开转义换行 + 软断行” ========= -->
+<script>
+// 把 \" \\n \\t 这类转义还原为真实字符（JSON 安全展开）
+function expandEscapedNewlines(s){
+  if (typeof s !== 'string') return s;
+  const hasEscaped = (s.match(/\\n/g)||[]).length > (s.match(/\n/g)||[]).length;
+  if (!hasEscaped) return s;
+  try {
+    const tmp = '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    return JSON.parse(tmp);
+  } catch {
+    return s
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\r/g, '\r');
+  }
+}
+// 可选：对“全在一行”的 JS 做温和断行，避免 Prettier 前完全一行难读
+function softBreak(js){
+  if (typeof js !== 'string') return js;
+  if ((js.match(/\n/g)||[]).length >= 5) return js; // 已有足够换行则不处理
+  return js
+    .replace(/;\s*(?!\n)/g, ';\n')
+    .replace(/\}\s*(?!\n)/g, '}\n')
+    .replace(/\)\s*;\s*(?!\n)/g, ');\n');
+}
+</script>
+
 <!-- ========= GitHub 提交 & 轮询（含后台恢复） ========= -->
 <script>
-// 提交前“秒解预览”——不阻塞提交，若开启美化则异步美化后刷新显示
+// 提交前“秒解预览”：先智能解密 → 展开换行 → 软断行 →（可选）美化
 function previewLocalImmediately(code){
-  const dec = trySmartDecode(code);
+  const dec0 = trySmartDecode(code);
+  const dec1 = expandEscapedNewlines(dec0);
+  const dec  = softBreak(dec1);
   $('#codeOut').textContent = dec;
   setStatus('🟢 本地预览（已提交，等待远端产物覆盖）');
   // 异步美化（不阻塞 PUT）
@@ -309,7 +347,7 @@ async function submitInput(){
   const code=$('#codeIn').value;
   if(!code){ setStatus('没有可上传的内容'); return }
 
-  // ★ 立刻本地秒解并展示
+  // ★ 立刻本地秒解并展示（含展开换行）
   previewLocalImmediately(code);
 
   try{
@@ -385,8 +423,10 @@ async function startAutoPoll(){
       const out=j.content?b64ToUtf8(b64):'';
       if(out && out.trim()){
         lastSha=sha||nowTs();
-        // 智能解密 + 美化
-        const dec = trySmartDecode(out);
+        // 智能解密 + 展开换行 + 软断行 + 美化
+        const dec0 = trySmartDecode(out);
+        const dec1 = expandEscapedNewlines(dec0);
+        const dec  = softBreak(dec1);
         const final = await maybeBeautify(dec);
         $('#codeOut').textContent=final;
         setStatus( dec!==out ? '✅ 已获取并本地智能解密'+(final!==dec?'（已美化）':'') : '✅ 已获取到最新 '+which );
@@ -480,17 +520,14 @@ function trySmartDecode(text){
 }
 async function trySmartDecodeAndShow(src,label){
   if(!$('#autoSmart').checked) return;
-  const decoded = trySmartDecode(src);
-  if(decoded !== src){
-    const pretty = await maybeBeautify(decoded);
-    $('#codeOut').textContent = pretty;
-    setStatus(`✅ ${label} · 本地智能解密完成${pretty!==decoded?'（已美化）':''}`);
-    $('#rawLink').href = rawUrl();
-  }else{
-    // 就算不可解，也直接显示输入（并尝试美化让可读）
-    const pretty = await maybeBeautify(src);
-    $('#codeOut').textContent = pretty;
-  }
+  const dec0 = trySmartDecode(src);
+  const dec1 = expandEscapedNewlines(dec0);
+  const dec  = softBreak(dec1);
+  const pretty = await maybeBeautify(dec);
+  $('#codeOut').textContent = pretty;
+  const changed = (dec0!==src);
+  setStatus(`✅ ${label} · ${changed?'本地智能解密完成':'已载入'}${pretty!==dec?'（已美化）':''}`);
+  $('#rawLink').href = rawUrl();
 }
 </script>
 
@@ -512,10 +549,12 @@ async function pollOutputOnce(job,state){
   const etag=res.headers.get('ETag')||state.etag; const j=JSON.parse(text); const sha=j.sha||''; const b64=(j.content||'').replace(/\n/g,''); const raw=j.content?b64ToUtf8(b64):'';
   if(state.sha && sha===state.sha){ setStatus('等待中…（未更新）'); return {done:false,etag,sha:state.sha}; }
   if(raw && raw.trim()){
-    const finalDecoded = trySmartDecode(raw);
-    const final = await maybeBeautify(finalDecoded);
+    const dec0 = trySmartDecode(raw);
+    const dec1 = expandEscapedNewlines(dec0);
+    const dec  = softBreak(dec1);
+    const final = await maybeBeautify(dec);
     $('#codeOut').textContent = final;
-    setStatus( finalDecoded!==raw ? `✅ 本地智能解密完成${final!==finalDecoded?'（已美化）':''}` : `✅ 已获取到最新 ${job.whichOut}` );
+    setStatus( dec0!==raw ? `✅ 本地智能解密完成${final!==dec?'（已美化）':''}` : `✅ 已获取到最新 ${job.whichOut}` );
     $('#rawLink').href = rawUrl(job.whichOut);
     $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${job.whichOut}</span> · ${raw.length} 字符`;
     return {done:true, etag, sha};
