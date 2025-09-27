@@ -123,20 +123,55 @@
     return code;
   }
 
-  /* ======================= AADecode ======================= */
+  /* ======================= AADecode（加宽松正则 + 兜底） ======================= */
   Plugins.aadecode = {
     name: "aadecode",
     detect(code) { return /ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(code); },
     plugin(code) {
       try {
-        const idx = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
+        // 1) 按常见写法找出编码体起始
+        const start = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
         let header = "", encoded = code;
-        if (idx > 0) { header = code.slice(0, idx).trim(); encoded = code.slice(idx); }
-        let part = encoded.replace(") ('_')", "").replace("(ﾟДﾟ) ['_'] (", "return ");
-        // eslint-disable-next-line no-new-func
-        const out = new Function(part)();
-        const finalText = header ? header + "\n\n" + out : out;
-        return isStr(finalText) ? finalText : String(finalText);
+        if (start > 0) { header = code.slice(0, start).trim(); encoded = code.slice(start); }
+
+        // 2) 宽松把 (ﾟДﾟ)['_'](  =>  return 
+        //    允许任意空格、单双引号、属性访问方式
+        let part = encoded.replace(/\(\s*ﾟДﾟ\s*\)\s*\[\s*['"]_['"]\s*\]\s*\(/g, "return ");
+        // 3) 清理尾部 )('_') / ) ("_") 等
+        part = part.replace(/\)\s*\(\s*['"]_['"]\s*\)/g, ")");
+
+        // 4) 第一尝试：直接运行
+        try {
+          // eslint-disable-next-line no-new-func
+          const out1 = new Function(part)();
+          if (isStr(out1)) return header ? header + "\n\n" + out1 : out1;
+        } catch {}
+
+        // 5) 第二尝试：把 eval(...) 包一层 return，以应对某些“内部仍调用 eval”的变体
+        try {
+          const part2 = part.replace(/\beval\s*\(/g, "return (");
+          // eslint-disable-next-line no-new-func
+          const out2 = new Function(part2)();
+          if (isStr(out2)) return header ? header + "\n\n" + out2 : out2;
+        } catch {}
+
+        // 6) 兜底：沙箱捕获 alert/document.write 等（少见，但以防万一）
+        let captured = null;
+        const sandbox = {
+          alert: (s) => { captured = toStr(s); },
+          console,
+          document: { write: (s) => { captured = toStr(s); } },
+          window: {},
+          self: {},
+          globalThis: {},
+        };
+        try {
+          // eslint-disable-next-line no-new-func
+          Function(...Object.keys(sandbox), `"use strict";try{${part}}catch(e){}`)(...Object.values(sandbox));
+        } catch {}
+        if (isStr(captured) && captured) return header ? header + "\n\n" + captured : captured;
+
+        return null;
       } catch (e) { log("AADecode 失败：", e); return null; }
     },
   };
@@ -212,8 +247,6 @@
       if (m1) return m1[2];
 
       // (0,eval)("...") / window['eval']("...") / this["eval"]("...")
-      const reIE = /\(\s*0\s*,\s*eval\s*\)\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/
-                 || /(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/;
       const m2 = pre.match(/\(\s*0\s*,\s*eval\s*\)\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
       if (m2) return m2[2];
 
@@ -245,7 +278,6 @@
     function captureByTransform(code) {
       let captured = null;
       const setter = `__CAP__ = (x)=>{__PAYLOAD__ = x;return x;}`;
-      const safe = (s) => s.replace(/\$/g, "$$$$");
 
       // 统一替换常见调用为 setter
       const replaced = code
