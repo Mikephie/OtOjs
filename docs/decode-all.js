@@ -1,7 +1,8 @@
 /* ========================================================================
- * decode-all.js —— OtOjs 前端解密插件总汇（完整版）
+ * decode-all.js —— OtOjs 前端解密插件总汇（完整版·强化版）
  * 集成：AAEncode / Eval+Packer（含间接 eval）/ JSFuck
  * 调度：smartDecodePipeline 按 [aadecode → evalpack → jsfuck] 多轮递进
+ * 注：在不改变外部 API 和顺序的前提下增强鲁棒性与覆盖面
  * ===================================================================== */
 
 (function () {
@@ -14,10 +15,13 @@
   const isStr = (v) => typeof v === "string";
   const toStr = (x) => (x == null ? "" : String(x));
 
+  // ===== 文本预处理：转义/拼接/基元构造 =====
   function tryDecodeHexEscapes(s) {
     try {
-      return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-              .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+      return s
+        .replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+        .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16))) // ▲ 新增 \u{...}
+        .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
     } catch { return s; }
   }
   function tryFromCharCodeCall(s) {
@@ -25,7 +29,7 @@
     let out = s, changed = false;
     out = out.replace(re, (_, list) => {
       try {
-        const arr = Function(`return [${list}]`)();
+        const arr = Function(`"use strict";return [${list}]`)();
         if (Array.isArray(arr)) {
           changed = true;
           return arr.map((n)=>String.fromCharCode(Number(n)||0)).join("");
@@ -41,7 +45,7 @@
       let out = s, changed = false;
       out = out.replace(re, (_, list) => {
         try {
-          const arr = Function(`return [${list}]`)();
+          const arr = Function(`"use strict";return [${list}]`)();
           if (Array.isArray(arr)) {
             changed = true;
             return arr.join("");
@@ -52,7 +56,7 @@
       const re2 = /\[\s*([^\]]+?)\s*\]\s*\.map\(\s*[^)]*String\.fromCharCode[^)]*\)\s*\.join\(\s*(['"])\s*\2\s*\)/g;
       out = out.replace(re2, (_, list) => {
         try {
-          const arr = Function(`return [${list}]`)();
+          const arr = Function(`"use strict";return [${list}]`)();
           if (Array.isArray(arr)) {
             return arr.map((n)=>String.fromCharCode(Number(n)||0)).join("");
           }
@@ -80,10 +84,10 @@
     } catch { return s; }
   }
   function stripIIFEOnce(code) {
-    const m = code.match(/^\s*[!+~\-]?\s*\(?\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\)\s*;?\s*\(?\s*\)\s*;?\s*$/)
-             || code.match(/^\s*!\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\(\s*\)\s*;?\s*$/);
-    if (m && m[1]) return m[1];
-    return code;
+    const m =
+      code.match(/^\s*[!+~\-]?\s*\(?\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\)\s*;?\s*\(?\s*\)\s*;?\s*$/) ||
+      code.match(/^\s*!\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\(\s*\)\s*;?\s*$/);
+    return (m && m[1]) ? m[1] : code;
   }
 
   /* ======================= AADecode（宽松正则 + 兜底） ======================= */
@@ -121,38 +125,52 @@
     },
   };
 
-  /* =================== Eval / Packer（超强） =================== */
+  /* =================== Eval / Packer（强化） =================== */
   (function registerEvalPacker() {
+    // 更宽松：最后一个形参可能是 r 或 d；允许空白与换行
     function looksLikePacker(code) {
-      return /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{/.test(code);
+      return /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*(r|d)\s*\)\s*\{/.test(code);
     }
+    // 静态解 Packer：容忍分隔、空白、引号差异；尽量直接复原 payload
     function extractPackerParams(code) {
       const re = new RegExp(
-        String.raw`eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{[\s\S]*?\}\s*\(\s*([`'"])([\s\S]*?)\1\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([`'"])([\s\S]*?)\5\s*\.split\s*\(\s*([`'"])([\s\S]*?)\7\s*\)\s*,\s*(\d+)\s*,\s*\{\s*\}\s*\)\s*\)`,
+        String.raw`eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*(?:r|d)\s*\)\s*\{[\s\S]*?\}\s*\(\s*([`+'`'`'`'`'+`"'"`]+`)+`, // 占位避免渲染器吞
         "m"
       );
-      const m = code.match(re);
+      // ↑ 上面的写法在某些渲染器里会被破坏，这里改成分段拼接再组装（避免转义噪音）
+      const head = `eval\\s*\\(\\s*function\\s*\\(\\s*p\\s*,\\s*a\\s*,\\s*c\\s*,\\s*k\\s*,\\s*e\\s*,\\s*(?:r|d)\\s*\\)\\s*\\{[\\s\\S]*?\\}\\s*\\(\\s*`;
+      const tail = `\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\'"\\\`])([\\s\\S]*?)\\3\\s*\\.split\\s*\\(\\s*([\\'"\\\`])([\\s\\S]*?)\\5\\s*\\)\\s*,\\s*(\\d+)\\s*,\\s*\\{\\s*\\}\\s*\\)\\s*\\)`;
+      const core = new RegExp(
+        head + `([\\'"\\\`])([\\s\\S]*?)\\1` + tail, "m"
+      );
+      const m = code.match(core);
       if (!m) return null;
       return {
         payload: m[2],
         radix: parseInt(m[3]),
         count: parseInt(m[4]),
         wordsRaw: m[6],
-        sep: m[8],
-        countCheck: parseInt(m[9]),
+        sep: m[7],
+        countCheck: parseInt(m[8]),
       };
     }
     function unpackPacker(params) {
       const { payload, radix, count, wordsRaw, sep } = params;
       const words = wordsRaw.split(sep);
+
+      // baseN：把 0..count-1 映射到 packer 的“键”
       function baseN(c) {
         c = parseInt(c, radix);
-        return (c < radix ? "" : baseN(Math.floor(c / radix))) + ((c = c % radix) > 35 ? String.fromCharCode(c + 29) : c.toString(36));
+        return (c < radix ? "" : baseN(Math.floor(c / radix))) +
+               ((c = c % radix) > 35 ? String.fromCharCode(c + 29) : c.toString(36));
       }
+      // 词典
       const dict = Object.create(null);
       for (let i = 0; i < count; i++) {
-        const k = baseN(i); dict[k] = words[i] || k;
+        const k = baseN(i);
+        dict[k] = words[i] || k;
       }
+      // 自后向前替换，降低“误替换更长键前缀”的概率
       let out = payload;
       for (let i = count - 1; i >= 0; i--) {
         const k = baseN(i), v = dict[k];
@@ -161,18 +179,22 @@
       return out;
     }
 
+    // 纯文本静态拉取（不执行）：覆盖多种“把代码塞进字符串再 eval”的写法
     function staticPullPayload(code) {
       let pre = code;
       pre = tryAtobEval(pre);
       pre = tryFromCharCodeCall(pre);
       pre = tryArrayJoinBuild(pre);
       pre = tryDecodeHexEscapes(pre);
+
       const reEval = /\beval\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/;
       const m1 = pre.match(reEval); if (m1) return m1[2];
       const m2 = pre.match(/\(\s*0\s*,\s*eval\s*\)\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/); if (m2) return m2[2];
       const m3 = pre.match(/(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/); if (m3) return m3[2];
       const m4 = pre.match(/set(?:Timeout|Interval)\s*\(\s*([`'"])([\s\S]*?)\1\s*,/i); if (m4) return m4[2];
       const m5 = pre.match(/\bnew?\s*Function\s*\(\s*([`'"])([\s\S]*?)\1\s*\)\s*\(\s*\)/i); if (m5) return m5[2];
+
+      // document.write('<script>...<\/script>')
       const mw = pre.match(/document\.write\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/i);
       if (mw) {
         try {
@@ -184,6 +206,7 @@
       return null;
     }
 
+    // 语义替换：把各种 eval 入口改成 __CAP__ 捕获，不真正执行
     function captureByTransform(code) {
       const replaced = code
         .replace(/\beval\s*\(/g, "(__CAP__)(")
@@ -200,6 +223,7 @@
       try { return Function(runner)(); } catch { return null; }
     }
 
+    // 轻沙盒：钩住 eval / new Function / setTimeout / document.write
     function captureBySandbox(code) {
       let captured = null;
       const hookEval = (x)=> (captured = x);
@@ -236,8 +260,10 @@
     function unpackOnce(input) {
       let code = input;
 
+      // 去一层 IIFE 包裹
       code = stripIIFEOnce(code);
 
+      // 1) 直接静态 Packer 回填
       if (looksLikePacker(code)) {
         const p = extractPackerParams(code);
         if (p) {
@@ -248,12 +274,15 @@
         }
       }
 
+      // 2) 静态拉取（字符串层面）
       const stat = staticPullPayload(code);
       if (isStr(stat) && stat && stat !== code) return stat;
 
+      // 3) 语义替换捕获
       const byTrans = captureByTransform(code);
       if (isStr(byTrans) && byTrans && byTrans !== code) return byTrans;
 
+      // 4) 轻沙盒捕获
       const bySand = captureBySandbox(code);
       if (isStr(bySand) && bySand && bySand !== code) return bySand;
 
@@ -294,7 +323,7 @@
       },
     };
 
-    // 兼容你原来使用的 window.DecodePlugins.eval 命名
+    // 兼容旧命名
     Plugins.eval = Plugins.evalpack;
   })();
 
@@ -303,10 +332,17 @@
     name: "jsfuck",
     detect(code) {
       const s = String(code).replace(/\s+/g, "");
-      return s.length > 80 && /^[\[\]\(\)\!\+\-<>=&|{},;:?%/*.^'"`0-9a-zA-Z\s]+$/.test(code) && /(\[\]|\(\)|\!\+|\+\!)/.test(s);
+      // 粗略启发式：长度、字符集、JSFuck常见片段
+      return s.length > 80 &&
+             /^[\[\]\(\)\!\+\-<>=&|{},;:?%/*.^'"`0-9a-zA-Z\s]+$/.test(code) &&
+             /(\[\]|\(\)|\!\+|\+\!)/.test(s);
     },
     plugin(code) {
-      try { /* eslint-disable no-eval */ const out = eval(code); /* eslint-enable */
+      try {
+        // 注意：JSFuck 的执行是计算出纯字符串源码，不应产生副作用
+        /* eslint-disable no-eval */
+        const out = eval(code);
+        /* eslint-enable */
         return out == null ? null : String(out);
       } catch (e) { log("JSFuck 失败：", e); return null; }
     },
