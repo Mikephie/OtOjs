@@ -278,6 +278,28 @@ window.DecodePlugins = window.DecodePlugins || {};
   };
 })();
 
+// ===== 轻量美化（无依赖）：分号/花括号换行 + 基础缩进 =====
+function simpleFormat(src) {
+  try {
+    let out = "", indent = 0;
+    const lines = String(src)
+      .replace(/\r/g, "")
+      .replace(/;/g, ";\n")       // 分号后换行
+      .replace(/\{/g, "{\n")      // 左花括号后换行
+      .replace(/\}/g, "\n}\n")    // 右花括号前后换行
+      .split("\n");
+
+    for (let raw of lines) {
+      let line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith("}")) indent = Math.max(0, indent - 1);
+      out += "  ".repeat(indent) + line + "\n";
+      if (line.endsWith("{")) indent++;
+    }
+    return out.trim() + "\n";
+  } catch { return String(src); }
+}
+
 // ========== 智能解密调度 ==========
 async function smartDecodePipeline(code) {
   let out = code;
@@ -295,6 +317,8 @@ async function smartDecodePipeline(code) {
       }
     }
   }
+  // ★ 新增：解包完成后做一次轻量美化，输出按行显示
+  out = simpleFormat(out);
   return out;
 }
 
