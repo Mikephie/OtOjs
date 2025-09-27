@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- 兜底换行，避免长行挤成一行；如被外部样式覆盖，下面两个 <pre> 也会用内联样式强制 -->
   <style>
-    /* 兜底：防止主题样式把 <pre> 设成单行 */
     pre{white-space:pre-wrap;word-break:break-word}
   </style>
 </head>
@@ -58,7 +58,7 @@
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <!-- 内联样式确保换行 -->
+      <!-- 用内联样式强制换行显示 -->
       <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word" placeholder="结果将显示在这里"></pre>
     </div>
 
@@ -70,16 +70,16 @@
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
       </div>
-      <!-- 内联样式确保换行 -->
+      <!-- 用内联样式强制换行显示 -->
       <pre id="outputRaw" style="white-space:pre-wrap;word-break:break-word"></pre>
     </div>
   </div>
 
-  <!-- 先插件，再主逻辑（保持你原来的顺序） -->
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 复制按钮：全局可用，不依赖 app.js -->
+  <!-- 复制按钮：内联全局函数，避免依赖 app.js 暴露 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -100,62 +100,40 @@
     }
   </script>
 
-  <!-- 本地排版器：还原 \"\\n\" → 换行；对 { } [ ] , ; 字符串外换行缩进 -->
+  <!-- 自动展开 \"\\n\" 为真实换行 + 温和断行，保证中间内容可读 -->
   <script>
-    function expandEscaped(s){
+    function expandEscapedNewlines(s){
       if (typeof s !== 'string') return s;
-      if (!/\\[nrt"\\]/.test(s)) return s;
+      if (!/\\n|\\r\\n/.test(s)) return s; // 没有转义换行就不处理
       try {
         const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
         return JSON.parse(wrapped);
       } catch {
-        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\r/g,'\r').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
+        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
       }
     }
-    function tryPrettyJSON(s){
-      try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return null; }
+    function softBreak(s){
+      if (typeof s !== 'string') return s;
+      // 已经有不少换行就不动；否则对 ; } 等做温和断行
+      if ((s.match(/\n/g)||[]).length >= 5) return s;
+      return s
+        .replace(/;\s*(?!\n)/g,';\n')
+        .replace(/\}\s*(?!\n)/g,'}\n')
+        .replace(/\)\s*;\s*(?!\n)/g,');\n');
     }
-    function simplePretty(s){
-      let out='', indent=0, inStr=false, quote='', esc=false;
-      const tab=()=> '  '.repeat(Math.max(0,indent));
-      for(let i=0;i<s.length;i++){
-        const ch=s[i];
-        if(inStr){
-          out+=ch;
-          if(esc){ esc=false; }
-          else if(ch==='\\'){ esc=true; }
-          else if(ch===quote){ inStr=false; }
-          continue;
-        }
-        if(ch==='\"'||ch==="'"||ch==='`'){ inStr=true; quote=ch; esc=false; out+=ch; continue; }
-        if(ch==='{'||ch==='['){ out+=ch+'\n'; indent++; out+=tab(); continue; }
-        if(ch==='}'||ch===']'){ out+='\n'; indent--; out+=tab()+ch; continue; }
-        if(ch===','||ch===';'){ out+=ch+'\n'+tab(); continue; }
-        if(ch==='\n'){ out+='\n'+tab(); continue; }
-        out+=ch;
-      }
-      return out.replace(/\n{3,}/g,'\n\n').trim()+'\n';
+    function reflowPre(el){
+      const raw = el.textContent || '';
+      const expanded = expandEscapedNewlines(raw);
+      const out = softBreak(expanded);
+      if (out !== raw) el.textContent = out;
     }
-    function autoFormat(raw){
-      if (!raw || typeof raw!=='string') return raw;
-      const expanded = expandEscaped(raw);
-      const j = tryPrettyJSON(expanded);
-      return j || simplePretty(expanded);
-    }
-    function attachReflow(preId){
-      const el=document.getElementById(preId);
-      if(!el) return;
-      const apply=()=>{
-        const raw=el.textContent||'';
-        const pretty=autoFormat(raw);
-        if(pretty && pretty!==raw) el.textContent=pretty;
-      };
-      apply();
-      new MutationObserver(apply).observe(el,{childList:true,subtree:true,characterData:true});
-    }
+    // 监听两个 <pre> 的内容变化，自动展开/断行（不影响原有逻辑）
+    const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
+    const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
     window.addEventListener('load', ()=>{
-      attachReflow('codeOut');
-      attachReflow('outputRaw');
+      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
+      if(a) _mo1.observe(a,{childList:true,subtree:true,characterData:true});
+      if(b) _mo2.observe(b,{childList:true,subtree:true,characterData:true});
     });
   </script>
 </body>
