@@ -1,6 +1,6 @@
-// ========== app.js (完整，前端优先 + 后台兜底 + 本地存储) ==========
+// ================= app.js（完整版） =================
 
-// ---- DOM 工具 ----
+// ------------- 工具与状态 -------------
 const $ = (s) => document.querySelector(s);
 function setStatus(msg) { $('#status').innerHTML = '<small>状态：' + msg + '</small>'; }
 function nowTs(){ return Date.now().toString(); }
@@ -9,7 +9,10 @@ function okBar(){ $('#bar').style.background='var(--ok)'; }
 function warnBar(){ $('#bar').style.background='var(--warn)'; }
 function hideBar(){ $('#barWrap').style.display='none'; }
 
-// ---- 本地存储（repo/branch/token/开关） ----
+// 控制台详细日志开关
+function vlog(...args){ if($('#verboseLog')?.checked) console.log('[OtOjs]', ...args); }
+
+// ------------- 本地存储（repo/branch/token/开关） -------------
 (function restoreSettings(){
   const repo = localStorage.getItem('repo_name');
   const branch = localStorage.getItem('branch_name');
@@ -18,33 +21,30 @@ function hideBar(){ $('#barWrap').style.display='none'; }
   if (branch) $('#branch').value = branch;
   if (token) $('#token').value = token;
 
-  const autoDecode = localStorage.getItem('autoDecode');
-  const autoBeautify = localStorage.getItem('autoBeautify');
-  const autoResume = localStorage.getItem('autoResume');
-  if (autoDecode !== null) $('#autoDecode').checked = autoDecode === '1';
-  if (autoBeautify !== null) $('#autoBeautify').checked = autoBeautify === '1';
-  if (autoResume !== null) $('#autoResume').checked = autoResume === '1';
+  [['autoDecode','autoDecode'],['autoBeautify','autoBeautify'],['autoResume','autoResume'],['verboseLog','verboseLog']].forEach(([id,key])=>{
+    const val = localStorage.getItem(key);
+    if (val !== null && $('#'+id)) $('#'+id).checked = val === '1';
+  });
 })();
-
 ['repo','branch','token'].forEach(id=>{
-  const el = $('#'+id);
-  el.addEventListener('change', ()=>{
-    const v = el.value.trim();
+  $('#'+id).addEventListener('change', ()=>{
+    const v = $('#'+id).value.trim();
     if (id==='repo') localStorage.setItem('repo_name', v);
     if (id==='branch') localStorage.setItem('branch_name', v);
     if (id==='token') localStorage.setItem('github_token', v);
   });
 });
-[['autoDecode','autoDecode'],['autoBeautify','autoBeautify'],['autoResume','autoResume']].forEach(([id,key])=>{
-  const el = $('#'+id);
-  el.addEventListener('change', ()=> localStorage.setItem(key, el.checked ? '1':'0'));
+['autoDecode','autoBeautify','autoResume','verboseLog'].forEach(id=>{
+  $('#'+id).addEventListener('change', ()=> localStorage.setItem(id, $('#'+id).checked ? '1':'0'));
 });
 
-// ---- 文件/剪贴板/远程加载 ----
+// ------------- 文件/剪贴板/远程加载 -------------
 function pick(){ $('#file').click(); }
+$('#pickBtn').addEventListener('click', pick);
+
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
-  const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
+  const txt=await f.text(); $('#codeIn').value=txt; setStatus(`已载入本地文件：${f.name} · ${txt.length} 字符`);
   autoDecodeIfNeeded();
 });
 
@@ -52,23 +52,48 @@ async function pasteFromClipboard(){
   try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); autoDecodeIfNeeded(); }
   catch(e){ setStatus('粘贴失败：'+e.message); }
 }
+$('#pasteBtn').addEventListener('click', pasteFromClipboard);
 
-async function loadRemote(){
-  let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
+function normalizeGithubBlob(u){
   if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
-    u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
+    return u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
   }
-  try{
-    const r=await fetch(u+'?t='+nowTs(),{cache:'no-store'}); const t=await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
-    $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符'); autoDecodeIfNeeded();
-  }catch(e){ setStatus('远程加载失败：'+e.message); }
+  return u;
 }
 
+async function loadRemote(){
+  let u=$('#remoteUrl').value.trim();
+  if(!u){ setStatus('请输入 URL'); return }
+  u = normalizeGithubBlob(u);
+  vlog('远程加载 URL:', u);
+  try{
+    const r=await fetch(u + (u.includes('?')?'&':'?') + 't=' + nowTs(), {cache:'no-store'});
+    const contentType = r.headers.get('content-type')||'';
+    const t=await r.text();
+    if(!r.ok){
+      setStatus('远程加载失败：HTTP '+r.status+' '+r.statusText);
+      $('#codeIn').value = t || '';
+      return;
+    }
+    if(!/javascript|text\/plain|application\/octet-stream|text\/|json/i.test(contentType)){
+      vlog('Content-Type 警告：', contentType);
+    }
+    $('#codeIn').value=t;
+    setStatus('远程已加载 · '+t.length+' 字符');
+    autoDecodeIfNeeded();
+  }catch(e){
+    setStatus('远程加载异常：'+e.message);
+  }
+}
+$('#remoteBtn').addEventListener('click', loadRemote);
+
+// ------------- 清空 -------------
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
 function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
+$('#clrInBtn').addEventListener('click', clrIn);
+$('#clrAllBtn').addEventListener('click', clrAll);
 
-// ---- 美化（可选 Prettier） ----
+// ------------- Prettier（可选） -------------
 async function ensurePrettier(){
   if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
   const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
@@ -86,34 +111,78 @@ async function beautify(){
     setStatus('已用 Prettier 美化');
   }catch(e){ setStatus('Prettier 失败：'+e.message); }
 }
+$('#beautifyBtn').addEventListener('click', beautify);
 
-// ---- 复制（修复：支持 pre 文本） ----
-async function copySel(sel,btn){
-  try{
-    const el=$(sel); const t=el?(el.value??el.textContent??''):'';
-    await navigator.clipboard.writeText(t);
-    const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
-  }catch(e){ setStatus('复制失败：'+e.message); }
+// ------------- 复制 -------------
+async function copySelText(t){
+  await navigator.clipboard.writeText(t);
 }
+$('#copyBtn').addEventListener('click', async ()=>{
+  const t = $('#codeOut').textContent||'';
+  if(!t.trim()){ setStatus('无可复制内容'); return;}
+  try{ await copySelText(t); setStatus('✅ 已复制结果'); }catch(e){ setStatus('复制失败：'+e.message); }
+});
+$('#copyRawBtn').addEventListener('click', async ()=>{
+  const t = $('#outputRaw').textContent||'';
+  if(!t.trim()){ setStatus('无可复制 Raw'); return;}
+  try{ await copySelText(t); setStatus('✅ 已复制 Raw'); }catch(e){ setStatus('复制失败：'+e.message); }
+});
 
-// ---- GitHub API 头 ----
+// ------------- GitHub API -------------
 function ghHeaders(){
   const t=$('#token').value.trim();
   if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
   return {
     'Authorization':'Bearer '+t,
     'Accept':'application/vnd.github+json',
-    'If-None-Match': '' // 禁止沿用旧 ETag
+    'If-None-Match': ''
   };
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
-
-// ---- Base64 UTF-8 安全转换 ----
 function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))) }catch{ return atob(b64) } }
 
-// ---- 提交 input.js（PUT） + 可选自动轮询 ----
+// ------------- 前端秒解（核心） -------------
+function tryFrontendDecode(code) {
+  try {
+    if (typeof window.smartDecodePipeline !== 'function' && typeof window.runDecodeAll === 'function'){
+      const out = window.runDecodeAll(code);
+      return (typeof out === 'string' && out && out !== code) ? out : null;
+    }
+    if (typeof window.smartDecodePipeline === 'function'){
+      const out = window.smartDecodePipeline(code);
+      return (typeof out === 'string' && out && out !== code) ? out : null;
+    }
+    return null;
+  } catch { return null; }
+}
+async function runLocalDecode(source='in'){
+  const raw = source==='out' ? ($('#codeOut').textContent||'') : ($('#codeIn').value||'');
+  const code = raw.trim();
+  if(!code){ setStatus('没有可解密的内容'); return; }
+  setStatus('本地解密中…');
+  const dec = tryFrontendDecode(code);
+  if (dec) {
+    $('#codeOut').textContent = dec;
+    setStatus('✅ 前端秒解成功');
+    if ($('#autoBeautify')?.checked) await beautify();
+  } else {
+    setStatus('⚠️ 前端未能完全解出，可点击“提交（后台）”');
+  }
+}
+$('#decodeBtn').addEventListener('click', ()=> runLocalDecode('in'));
+
+// 自动触发（输入改变且开启自动解密）
+let autoTimer = null;
+function autoDecodeIfNeeded(){
+  if (!$('#autoDecode').checked) return;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(()=>runLocalDecode('in'), 400);
+}
+$('#codeIn').addEventListener('input', autoDecodeIfNeeded);
+
+// ------------- 提交（后台） -------------
 async function submitInput(){
-  const path='input.js'; // 固定入口，Action 自己处理
+  const path='input.js';
   const api=`${repoBase()}/contents/${path}`;
   const code=$('#codeIn').value;
   if(!code){ setStatus('没有可上传的内容'); return }
@@ -131,27 +200,25 @@ async function submitInput(){
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
     setStatus('提交成功 · 工作流将自动开始');
-
-    if ($('#autoResume').checked) {
-      startAutoPoll(true);
-    }
+    if ($('#autoResume').checked) startAutoPoll(true);
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
+$('#submitBtn').addEventListener('click', submitInput);
 
-// ---- 自动轮询 output（两种产物任选其一） ----
+// ------------- 自动轮询输出 -------------
 let pollingTimer=null, barTimer=null;
 async function startAutoPoll(){
   try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
   if(pollingTimer){ clearInterval(pollingTimer); pollingTimer=null; }
   if(barTimer){ clearInterval(barTimer); barTimer=null; }
 
-  const which=$('#whichOut')?.value || 'output/output.js';
+  const which=$('#whichOut').value;
   const branch=$('#branch').value.trim();
   const api=`${repoBase()}/contents/${which}?ref=${branch}`;
-  const interval=5000; // 5s
-  const maxWait=150000; // 150s
+  const interval=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
+  const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
 
-  let lastSha=''; 
+  let lastSha='';
   let waited=0;
 
   setStatus('正在轮询：'+which);
@@ -204,9 +271,9 @@ async function startAutoPoll(){
   }
 }
 
-// ---- 手动拉取 Raw ----
+// ------------- Raw 快速拉取与下载 -------------
 async function loadOutputRaw(path){
-  path = path || ($('#whichOut')?.value || 'output/output.js');
+  path = path || $('#whichOut').value;
   const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
   try{
     const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
@@ -218,73 +285,24 @@ async function loadOutputRaw(path){
     setStatus('拉取失败');
   }
 }
+$('#raw1').addEventListener('click', ()=>loadOutputRaw('output/output.js'));
+$('#raw2').addEventListener('click', ()=>loadOutputRaw('output/output.deob2.js'));
 
-// ---- 下载输出 ----
 function downloadOutput(){
   const t=$('#codeOut').textContent||$('#outputRaw').textContent||'';
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'}));
-  const which=($('#whichOut')?.value || 'output/output.js').split('/').pop()||'output.js';
+  const which=$('#whichOut').value.split('/').pop()||'output.js';
   a.download=which;
   a.click(); URL.revokeObjectURL(a.href);
 }
+$('#downloadBtn').addEventListener('click', downloadOutput);
 
-// ---- 前端秒解（核心） ----
-function tryFrontendDecode(code) {
-  try {
-    if (typeof window.smartDecodePipeline !== 'function') return null;
-    const out = window.smartDecodePipeline(code);
-    if (typeof out === 'string' && out && out !== code) return out;
-    return null;
-  } catch { return null; }
-}
-
-async function runLocalDecode(source='in'){
-  const raw = source==='out' ? ($('#codeOut').textContent||'') : ($('#codeIn').value||'');
-  const code = raw.trim();
-  if(!code){ setStatus('没有可解密的内容'); return; }
-  setStatus('本地解密中…');
-  const dec = tryFrontendDecode(code);
-  if (dec) {
-    $('#codeOut').textContent = dec;
-    setStatus('✅ 前端秒解成功');
-    if ($('#autoBeautify')?.checked) await beautify();
-  } else {
-    setStatus('⚠️ 前端未能完全解出，可点击“提交（后台）”');
-  }
-}
-
-// ---- 自动触发（输入改变时，若开启自动解密） ----
-let autoTimer = null;
-function autoDecodeIfNeeded(){
-  if (!$('#autoDecode').checked) return;
-  clearTimeout(autoTimer);
-  autoTimer = setTimeout(()=>runLocalDecode('in'), 400);
-}
-$('#codeIn').addEventListener('input', autoDecodeIfNeeded);
-
-// ---- 按钮事件（与 index.html 对齐） ----
-// 解密（前端）
-document.querySelector('button.ok')?.addEventListener('click', (e)=>{
-  // 支持 Shift+点击 强制本地解
-  if (e.shiftKey) { e.preventDefault(); runLocalDecode('in'); return; }
-  runLocalDecode('in');
+// ------------- 导出到 window（兼容旧内联调用） -------------
+Object.assign(window, {
+  pick, pasteFromClipboard, loadRemote,
+  clrIn, clrAll, beautify,
+  submitInput, startAutoPoll,
+  loadOutputRaw, downloadOutput,
+  autoDecodeIfNeeded
 });
-// 提交（后台）
-document.querySelector('button.warn')?.addEventListener('click', (e)=>{
-  submitInput();
-});
-
-// 暴露给全局（index.html 按钮直接 onclick 的场景）
-window.pick = pick;
-window.loadRemote = loadRemote;
-window.pasteFromClipboard = pasteFromClipboard;
-window.clrIn = clrIn;
-window.clrAll = clrAll;
-window.beautify = beautify;
-window.copySel = copySel;
-window.submitInput = submitInput;
-window.startAutoPoll = startAutoPoll;
-window.loadOutputRaw = loadOutputRaw;
-window.downloadOutput = downloadOutput;
-window.autoDecodeIfNeeded = autoDecodeIfNeeded;
