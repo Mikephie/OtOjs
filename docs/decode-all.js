@@ -79,16 +79,16 @@ window.DecodePlugins = window.DecodePlugins || {};
   }
   function unpack(code) {
     if (!code.includes("eval")) return null;
-    // 检测 packer
+    // 1) 先尝试 Packer
     const packerParams = unpackDeanEdwardsPacker(code);
     if (packerParams) {
       try {
         let result = executeDeanEdwardsUnpacker(packerParams);
         if (result && result.includes("eval")) result = unpack(result);
         return result;
-      } catch { }
+      } catch { /* 继续尝试其他方法 */ }
     }
-    // Function 替换法
+    // 2) Function 替换法（捕获 eval 参数）
     try {
       let result = null;
       const modifiedCode = code.replace(/\beval\b/g, '(function(x){result=x;return x;})');
@@ -149,3 +149,7 @@ async function smartDecodePipeline(code) {
   }
   return out;
 }
+
+// 暴露到全局
+window.DecodePlugins = window.DecodePlugins || {};
+window.smartDecodePipeline = smartDecodePipeline;
