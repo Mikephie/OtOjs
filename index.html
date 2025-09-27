@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 解密前端（自动轮询 + 后台恢复）</title>
+<title>OtOjs · 解密前端（自动轮询 + 后台恢复 + AADecode/Eval）</title>
 <style>
   :root{
     --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
@@ -32,10 +32,13 @@
   .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:6px 10px;background:#0b1020}
   .hint{font-size:12px;color:var(--muted)}
 
-  /* —— 紧凑一排五个按钮 —— */
+  /* 一排小按钮（7个：文件/远程/粘贴/格式/清空/AA解/Eval） */
   .btnbar{
-    display:grid; grid-template-columns:repeat(5,1fr);
+    display:grid; grid-template-columns:repeat(7,1fr);
     gap:6px; margin-top:8px; position:relative; z-index:1;
+  }
+  @media (max-width:560px){
+    .btnbar{ grid-template-columns:repeat(5,1fr); }
   }
   .btncard{
     min-width:0; max-width:none;
@@ -50,7 +53,7 @@
   .btnicon{font-size:16px}
   .btntxt{font-size:11px; font-weight:600; margin-top:2px}
 
-  /* —— 远程弹窗（悬浮，不占布局） —— */
+  /* 远程弹窗（悬浮，不占布局） */
   .remote-pop{
     position:fixed; left:0; top:0; width:min(92vw,360px);
     background:#0f1621; border:1px solid var(--line2); border-radius:12px;
@@ -69,42 +72,28 @@
   }
   .remote-pop .pop-btn.ok{ border-color:var(--ok) }
   .remote-pop .pop-btn.cancel{ border-color:var(--err) }
+
+  /* 折叠的高级设置 */
+  details.setting{ margin-top:8px }
+  details.setting summary{ cursor:pointer; color:var(--muted); user-select:none }
+  details.setting summary::-webkit-details-marker{ display:none }
+  details.setting summary::before{ content:"▸ "; }
+  details.setting[open] summary::before{ content:"▾ "; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>OtOjs · 解密前端（自动轮询 + 后台恢复）</h1>
+  <h1>OtOjs · 解密前端</h1>
 
   <div class="card">
     <div class="row">
-      <div style="flex:2">
-        <label>REPO</label>
-        <input id="repo" value="Mikephie/OtOjs" />
-      </div>
-      <div>
-        <label>BRANCH</label>
-        <input id="branch" value="main" />
-      </div>
-      <div>
-        <label>Token（contents:rw）</label>
-        <input id="token" type="password" placeholder="ghp_..." />
-      </div>
+      <div style="flex:2"><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
+      <div><label>BRANCH</label><input id="branch" value="main" /></div>
+      <div><label>Token（contents:rw）</label><input id="token" type="password" placeholder="ghp_..." /></div>
     </div>
     <div class="row">
-      <div>
-        <label>input.js 路径</label>
-        <input id="pathIn" value="input.js" />
-      </div>
-      <div>
-        <label>默认输出路径</label>
-        <input id="pathOut" value="output/output.js" />
-      </div>
-      <div>
-        <label>提交信息</label>
-        <input id="commitMsg" value="update: input.js via UI" />
-      </div>
-    </div>
-    <div class="row">
+      <div><label>input.js 路径</label><input id="pathIn" value="input.js" /></div>
+      <div><label>提交信息</label><input id="commitMsg" value="update: input.js via UI" /></div>
       <div>
         <label>要拉取哪个输出文件？</label>
         <select id="whichOut">
@@ -112,45 +101,39 @@
           <option value="output/output.deob2.js">第②次产物：output/output.deob2.js</option>
         </select>
       </div>
-      <div>
-        <label>轮询间隔（秒）</label>
-        <input id="pollSec" type="number" value="5" />
-      </div>
-      <div>
-        <label>最大等待（秒）</label>
-        <input id="maxWait" type="number" value="150" />
-      </div>
     </div>
+
+    <!-- 折叠：高级设置（轮询间隔 / 最大等待） -->
+    <details class="setting">
+      <summary>高级设置</summary>
+      <div class="row" style="margin-top:8px">
+        <div><label>轮询间隔（秒）</label><input id="pollSec" type="number" value="5" /></div>
+        <div><label>最大等待（秒）</label><input id="maxWait" type="number" value="150" /></div>
+      </div>
+    </details>
+
     <div class="hint">提交后可后台执行；页面回到前台会自动恢复拉取。</div>
   </div>
 
   <div class="card">
     <small>把待解密脚本放到 <b>input.js</b> → 工作流自动跑 → 在你选择的输出文件中获取结果</small>
 
-    <!-- 隐藏文件 input（由“文件”卡片触发） -->
+    <!-- 隐藏文件 input -->
     <input type="file" id="file" accept=".js,.txt,.json" hidden />
 
-    <!-- 按钮栏：一排紧凑小按钮 -->
+    <!-- 小按钮区：7 个 -->
     <div class="btnbar" id="quick-btns">
-      <label for="file" class="btncard" id="btn-file" role="button" tabindex="0" aria-label="文件">
-        <span class="btnicon">📁</span><span class="btntxt">文件</span>
-      </label>
-      <div class="btncard" id="btn-remote" role="button" tabindex="0" aria-expanded="false" aria-controls="remote-pop">
-        <span class="btnicon">🌐</span><span class="btntxt">远程</span>
-      </div>
-      <button class="btncard" id="btn-paste" type="button" aria-label="粘贴">
-        <span class="btnicon">📋</span><span class="btntxt">粘贴</span>
-      </button>
-      <button class="btncard" id="btn-clean" type="button" aria-label="格式">
-        <span class="btnicon">🧹</span><span class="btntxt">格式</span>
-      </button>
-      <button class="btncard" id="btn-clear" type="button" aria-label="清空">
-        <span class="btnicon">🗑️</span><span class="btntxt">清空</span>
-      </button>
+      <label for="file" class="btncard" id="btn-file"><span class="btnicon">📁</span><span class="btntxt">文件</span></label>
+      <div class="btncard" id="btn-remote"><span class="btnicon">🌐</span><span class="btntxt">远程</span></div>
+      <button class="btncard" id="btn-paste" type="button"><span class="btnicon">📋</span><span class="btntxt">粘贴</span></button>
+      <button class="btncard" id="btn-clean" type="button"><span class="btnicon">🧹</span><span class="btntxt">格式</span></button>
+      <button class="btncard" id="btn-clear" type="button"><span class="btnicon">🗑️</span><span class="btntxt">清空</span></button>
+      <button class="btncard" id="btn-aade" type="button"><span class="btnicon">🪄</span><span class="btntxt">AA解</span></button>
+      <button class="btncard" id="btn-eval" type="button"><span class="btnicon">🧩</span><span class="btntxt">Eval</span></button>
     </div>
 
-    <!-- 远程弹窗（悬浮层） -->
-    <div class="remote-pop" id="remote-pop" role="dialog" aria-label="远程加载">
+    <!-- 远程弹窗 -->
+    <div class="remote-pop" id="remote-pop">
       <input id="remoteUrlInline" type="url" placeholder="https:// 原始脚本 URL（支持 github/blob → raw）" />
       <div class="pop-row">
         <button class="pop-btn ok" id="remote-confirm">拉取</button>
@@ -198,7 +181,7 @@
 </div>
 
 <script>
-/* ====== 原功能 + 调整：提交后默认不强制轮询，交给后台恢复 ====== */
+/* ====== 原功能 + 后台恢复：和之前一致（略注释） ====== */
 const $=s=>document.querySelector(s);
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 function showBar(){ $('#barWrap').style.display='block'; const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.background='var(--accent)'; setTimeout(()=>b.style.width='100%',50); }
@@ -209,17 +192,12 @@ function hideBar(){ $('#barWrap').style.display='none'; }
 function ghHeaders(){
   const t=$('#token').value.trim();
   if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
-  return {
-    'Authorization':'Bearer '+t,
-    'Accept':'application/vnd.github+json',
-    'If-None-Match': '' // 禁止沿用旧 ETag
-  };
+  return {'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','If-None-Match':''};
 }
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 function nowTs(){ return Date.now().toString() }
 
 // 本地文件
-function pick(){ $('#file').click(); }
 $('#file').addEventListener('change', async (e)=>{
   const f=e.target.files?.[0]; if(!f) return;
   const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
@@ -238,20 +216,15 @@ async function loadRemote(){
   }catch(e){ setStatus('远程加载失败：'+e.message); }
 }
 
-// 粘贴板
-async function pasteFromClipboard(){
-  try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }
-  catch(e){ setStatus('粘贴失败：'+e.message); }
-}
-
-// 清空
+// 粘贴板 / 清空
+async function pasteFromClipboard(){ try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); }catch(e){ setStatus('粘贴失败：'+e.message); } }
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
 function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
 
 // Base64 → UTF8
 function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))) }catch{ return atob(b64) } }
 
-// 提交 input.js（PUT）——这里修改：提交后写入恢复任务，不强制立即轮询
+// 提交 input.js（PUT）。提交后：如勾选“后台恢复”，写入任务，不立刻强制轮询
 async function submitInput(){
   const path=$('#pathIn').value.trim()||'input.js';
   const api=`${repoBase()}/contents/${path}`;
@@ -261,17 +234,11 @@ async function submitInput(){
     let sha='';
     const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&t=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
     if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={
-      message: $('#commitMsg').value.trim()||'update via UI',
-      content: btoa(unescape(encodeURIComponent(code))),
-      branch: $('#branch').value.trim(),
-      sha: sha||undefined
-    };
+    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
     const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, cache:'no-store', body: JSON.stringify(body) });
     const txt=await res.text();
     if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
 
-    // ✅ 记录“可恢复任务”
     if (document.querySelector('#autoResume')?.checked) {
       saveJobForAutoResume({
         repo: $('#repo').value.trim(),
@@ -280,16 +247,14 @@ async function submitInput(){
         pollSec: Math.max(2, parseInt($('#pollSec').value||'5',10)),
         maxWait: Math.max(10, parseInt($('#maxWait').value||'150',10))
       });
-      setStatus('提交成功 · Actions 后台执行中（可离开页面，回来我会自动拉取最新结果）');
-      // 需要的话，立刻开始一次恢复（可选）：
-      // autoResumeIfNeeded();
+      setStatus('提交成功 · Actions 后台执行中（可离开页面，回来自动拉取最新结果）');
     } else {
       setStatus('提交成功 · 如需拉取请手动点击“开始自动轮询”');
     }
   }catch(e){ setStatus('提交失败：'+e.message); }
 }
 
-// —— 手动自动轮询（与原版一致） ——
+// —— 手动自动轮询（与之前一致） ——
 let pollingTimer=null, barTimer=null;
 async function startAutoPoll(){
   try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
@@ -302,8 +267,7 @@ async function startAutoPoll(){
   const interval=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
   const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
 
-  let lastSha=''; 
-  let waited=0;
+  let lastSha=''; let waited=0;
 
   setStatus('正在轮询：'+which);
   showBar();
@@ -327,88 +291,30 @@ async function startAutoPoll(){
     try{
       const r=await fetch(api+'&t='+nowTs(),{headers:ghHeaders(),cache:'no-store'});
       const raw=await r.text();
-      if(!r.ok){
-        setStatus('等待中… '+which+'（HTTP '+r.status+'）');
-        return false;
-      }
+      if(!r.ok){ setStatus('等待中… '+which+'（HTTP '+r.status+'）'); return false; }
       const j=JSON.parse(raw);
       const sha=j.sha||'';
-      if(sha && sha===lastSha){
-        setStatus('等待中… '+which+'（未更新）');
-        return false;
-      }
-      const b64=(j.content||'').replace(/\n/g,'');
-      const out=j.content?b64ToUtf8(b64):'';
-      if(out && out.trim()){
-        lastSha=sha||nowTs();
-        $('#codeOut').textContent=out;
-        setStatus('✅ 已获取到最新 '+which+' · '+(out.length)+' 字符');
-        return true;
-      }else{
-        setStatus('等待中… '+which+'（文件为空或未生成）');
-        return false;
-      }
-    }catch(e){
-      setStatus('等待中… '+which+'（'+e.message+'）');
-      return false;
-    }
+      if(sha && sha===lastSha){ setStatus('等待中… '+which+'（未更新）'); return false; }
+      const b64=(j.content||'').replace(/\n/g,''); const out=j.content?b64ToUtf8(b64):'';
+      if(out && out.trim()){ lastSha=sha||nowTs(); $('#codeOut').textContent=out; setStatus('✅ 已获取到最新 '+which+' · '+(out.length)+' 字符'); return true; }
+      else{ setStatus('等待中… '+which+'（文件为空或未生成）'); return false; }
+    }catch(e){ setStatus('等待中… '+which+'（'+e.message+'）'); return false; }
   }
 }
 
-// 手动拉取 Raw
+// Raw / 下载 / 美化 / 复制
 async function loadOutputRaw(path){
   path = path || $('#whichOut').value;
   const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
-  try{
-    const r=await fetch(url,{cache:'no-store'}); const t=await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText);
-    $('#outputRaw').textContent=t;
-    setStatus('已拉取 Raw · '+path+' · '+t.length+' 字符');
-  }catch(e){
-    $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url;
-    setStatus('拉取失败');
-  }
+  try{ const r=await fetch(url,{cache:'no-store'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+path+' · '+t.length+' 字符'); }catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
 }
+function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').textContent||''; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'})); const which=$('#whichOut').value.split('/').pop()||'output.js'; a.download=which; a.click(); URL.revokeObjectURL(a.href); }
+async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return; const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js'; const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js'; document.body.appendChild(s1); await new Promise(r=>s1.onload=r); document.body.appendChild(s2); await new Promise(r=>s2.onload=r); }
+async function beautify(){ let s=$('#codeOut').textContent||$('#codeIn').value||''; if(!s){ setStatus('无待美化内容'); return } try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }catch(e){ setStatus('Prettier 失败：'+e.message); } }
+async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);}catch(e){ setStatus('复制失败：'+e.message); }}
 
-// 下载
-function downloadOutput(){
-  const t=$('#codeOut').textContent||$('#outputRaw').textContent||'';
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'}));
-  const which=$('#whichOut').value.split('/').pop()||'output.js';
-  a.download=which;
-  a.click(); URL.revokeObjectURL(a.href);
-}
-
-// Prettier（可选）
-async function ensurePrettier(){
-  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
-  const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
-  const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
-  document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
-  document.body.appendChild(s2); await new Promise(r=>s2.onload=r);
-}
-async function beautify(){
-  let s=$('#codeOut').textContent||$('#codeIn').value||'';
-  if(!s){ setStatus('无待美化内容'); return }
-  try{
-    await ensurePrettier();
-    const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]});
-    $('#codeOut').textContent=out;
-    setStatus('已用 Prettier 美化');
-  }catch(e){ setStatus('Prettier 失败：'+e.message); }
-}
-
-// 复制
-async function copySel(sel,btn){
-  try{
-    const el=$(sel); const t=el?(el.value??el.textContent??''):'';
-    await navigator.clipboard.writeText(t);
-    const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
-  }catch(e){ setStatus('复制失败：'+e.message); }
-}
-
-/* ====== 远程弹窗交互（写值到 #remoteUrl 再复用 loadRemote） ====== */
+/* 远程弹窗交互 */
 (function(){
   const btn = document.getElementById('btn-remote');
   const pop = document.getElementById('remote-pop');
@@ -427,134 +333,197 @@ async function copySel(sel,btn){
     pop.style.left = left + 'px';
     pop.style.top  = top + 'px';
   }
-  function openPop(){ placePop(); pop.classList.add('show'); btn.setAttribute('aria-expanded','true'); setTimeout(()=>inputInline?.focus(), 0); }
-  function closePop(){ pop.classList.remove('show'); btn.setAttribute('aria-expanded','false'); }
-
+  function openPop(){ placePop(); pop.classList.add('show'); setTimeout(()=>inputInline?.focus(),0); }
+  function closePop(){ pop.classList.remove('show'); }
   btn.addEventListener('click', (e)=>{ e.preventDefault(); pop.classList.contains('show')? closePop(): openPop(); });
-  btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); btn.click(); } });
   cancelBtn.addEventListener('click', (e)=>{ e.preventDefault(); closePop(); });
-
-  async function doFetchFromInline(){
-    const u = (inputInline.value||'').trim();
-    if(!u){ setStatus('请输入 URL'); inputInline.focus(); return; }
-    inputHidden.value = u;  // 写到隐藏 input，兼容 loadRemote()
-    closePop();
-    try{ await loadRemote(); }catch(err){ console.error(err); }
-  }
+  async function doFetchFromInline(){ const u=(inputInline.value||'').trim(); if(!u){ setStatus('请输入 URL'); inputInline.focus(); return; } inputHidden.value=u; closePop(); try{ await loadRemote(); }catch(err){ console.error(err); } }
   confirmBtn.addEventListener('click', (e)=>{ e.preventDefault(); doFetchFromInline(); });
   inputInline.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doFetchFromInline(); } });
   document.addEventListener('click', (e)=>{ const inBtn=btn.contains(e.target), inPop=pop.contains(e.target); if(!inBtn && !inPop) closePop(); });
 
-  // 其它小按钮
+  // 其它按钮
   document.getElementById('btn-paste')?.addEventListener('click', (e)=>{ e.preventDefault(); pasteFromClipboard(); });
   document.getElementById('btn-clean')?.addEventListener('click', (e)=>{ e.preventDefault(); beautify(); });
   document.getElementById('btn-clear')?.addEventListener('click', (e)=>{ e.preventDefault(); clrIn(); });
 })();
 </script>
 
+<!-- ====== AADecode 插件（浏览器内置） ====== -->
+<script>
+(function () {
+  const module = { exports: {} };
+
+  function extractHeader(code) {
+    const aaStartIndex = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
+    if (aaStartIndex > 0) {
+      const header = code.substring(0, aaStartIndex).trim();
+      const encodedPart = code.substring(aaStartIndex);
+      return { header, encodedPart };
+    }
+    return { header: "", encodedPart: code };
+  }
+
+  function plugin(code) {
+    try {
+      const { header, encodedPart } = extractHeader(code);
+      if (!(encodedPart.includes("ﾟДﾟ") || encodedPart.includes("(ﾟΘﾟ)") || encodedPart.includes("ﾟωﾟﾉ") || encodedPart.includes("ﾟдﾟ"))) {
+        return null;
+      }
+      let decodePart = encodedPart;
+      decodePart = decodePart.replace(") ('_')", "");
+      decodePart = decodePart.replace("(ﾟДﾟ) ['_'] (", "return ");
+      const x = new Function(decodePart);  // ⚠️ 可能执行代码，请仅对信任的来源使用
+      const decodedContent = x();
+      return header ? `${header}\n\n${decodedContent}` : decodedContent;
+    } catch (error) {
+      console.error("AADecode解码错误:", error);
+      return null;
+    }
+  }
+
+  module.exports = plugin;
+
+  window.DecodePlugins = window.DecodePlugins || {};
+  window.DecodePlugins.aadecode = {
+    detect(code){ return code.includes("ﾟωﾟﾉ") || code.includes("ﾟДﾟ") || code.includes("ﾟдﾟ") || code.includes("ﾟΘﾟ"); },
+    plugin(code){
+      try{
+        console.log("尝试解密 AADecode...");
+        const result = module.exports(code);
+        return result !== null ? result : code;
+      }catch(e){
+        console.error("AADecode插件错误:", e);
+        return code;
+      }
+    }
+  };
+  window.professionalAADecode = module.exports;
+  console.log("专业 AADecode 插件已加载");
+})();
+</script>
+
+<!-- ====== Eval 解包（浏览器内置，无外部插件） ====== -->
+<script>
+(function () {
+  const module = { exports: {} };
+
+  /* 解包 eval 代码：把 eval(...) 替换成 (x=>x)(...) 抓出参数；失败时做宽松替换 */
+  function plugin(code) {
+    try {
+      if (!code.includes("eval(") && !code.includes("eval (")) return null;
+      let modifiedCode = code.replace(/eval\s*\(/g, "(function(x){return x;})(");
+
+      try {
+        const env = { window:{}, document:{}, navigator:{ userAgent:"Mozilla/5.0" }, location:{} };
+        const result = Function("window","document","navigator","location",`return ${modifiedCode}`)(env.window,env.document,env.navigator,env.location);
+        if (typeof result === "string") {
+          if (result.includes("eval(")) return plugin(result); // 递归继续解
+          return result;
+        }
+        return String(result);
+      } catch (err) {
+        console.log("执行替换 eval 的方法失败，尝试直接替换");
+        try { modifiedCode = code.replace(/eval\s*\(/g, "("); return modifiedCode; }
+        catch(replaceErr){ console.error("直接替换也失败:", replaceErr); return null; }
+      }
+    } catch (error) {
+      console.error("Eval解包发生错误:", error);
+      return null;
+    }
+  }
+
+  module.exports.plugin = function(code){ return plugin(code); };
+
+  window.DecodePlugins = window.DecodePlugins || {};
+  window.DecodePlugins.eval = {
+    detect(code){ return code.includes("eval(") || code.includes("eval ("); },
+    plugin(code){ return module.exports.plugin(code); }
+  };
+  console.log("Eval 解包插件已加载");
+})();
+</script>
+
+<!-- ====== 统一的解密按钮逻辑（AA解 / Eval） ====== -->
+<script>
+(function(){
+  function getSourceText(){
+    // 优先使用结果区（便于链式解密）；否则用输入区
+    const out = $('#codeOut').textContent || '';
+    if(out.trim()) return { text: out, target: 'out' };
+    const inp = $('#codeIn').value || '';
+    return { text: inp, target: 'in' };
+  }
+  function setOutputText(txt){
+    $('#codeOut').textContent = txt;
+    setStatus('✅ 已写入结果区 · '+txt.length+' 字符');
+  }
+
+  async function runAA(){
+    const { text } = getSourceText();
+    if(!text.trim()){ setStatus('没有可解密内容'); return; }
+    try{
+      const dec = window.DecodePlugins?.aadecode?.plugin(text);
+      if(dec==null){ setStatus('AA 解密失败或非 AADecode 内容'); return; }
+      setOutputText(dec);
+    }catch(e){ setStatus('AA 解密异常：'+e.message); }
+  }
+  async function runEval(){
+    const { text } = getSourceText();
+    if(!text.trim()){ setStatus('没有可解包内容'); return; }
+    try{
+      const dec = window.DecodePlugins?.eval?.plugin(text);
+      if(dec==null){ setStatus('Eval 解包失败或非 eval 封装'); return; }
+      setOutputText(dec);
+    }catch(e){ setStatus('Eval 解包异常：'+e.message); }
+  }
+
+  document.getElementById('btn-aade')?.addEventListener('click', runAA);
+  document.getElementById('btn-eval')?.addEventListener('click', runEval);
+})();
+</script>
+
 <script>
 /* ========= 自动恢复轮询（后台执行 + 自动拉取最新） ========= */
-
-/** 保存“待完成任务”到 localStorage */
 function saveJobForAutoResume(job){
-  const data = {
-    ...job,
-    startedAt: Date.now(),
-    lastSha: '',
-    etag: '',
-    // 允许恢复窗口：maxWait + 5分钟缓冲
-    expiry: Date.now() + job.maxWait*1000 + 5*60*1000
-  };
+  const data = { ...job, startedAt: Date.now(), lastSha:'', etag:'', expiry: Date.now()+job.maxWait*1000+5*60*1000 };
   localStorage.setItem('oto_auto_job', JSON.stringify(data));
 }
-
-/** 读取任务 */
-function loadJob(){
-  try{
-    const raw = localStorage.getItem('oto_auto_job');
-    if(!raw) return null;
-    const j = JSON.parse(raw);
-    if(!j || !j.expiry || Date.now()>j.expiry){ localStorage.removeItem('oto_auto_job'); return null; }
-    return j;
-  }catch{ return null; }
-}
-
-/** 清理任务 */
+function loadJob(){ try{ const raw=localStorage.getItem('oto_auto_job'); if(!raw) return null; const j=JSON.parse(raw); if(!j||!j.expiry||Date.now()>j.expiry){ localStorage.removeItem('oto_auto_job'); return null;} return j; }catch{ return null; } }
 function clearJob(){ localStorage.removeItem('oto_auto_job'); }
-
-/** 单次轮询：用 ETag + SHA 判断是否更新 */
 async function pollOutputOnce(job, state){
-  const api = `https://api.github.com/repos/${job.repo}/contents/${job.whichOut}?ref=${job.branch}&t=${Date.now()}`;
-  const headers = { ...ghHeaders() };
-  if(state.etag){ headers['If-None-Match'] = state.etag; }
-
-  const res = await fetch(api, { headers, cache:'no-store' });
-  if(res.status === 304){
-    setStatus('等待中…（未改变 304）');
-    return { done:false };
-  }
-  const text = await res.text();
-  if(!res.ok){
-    setStatus(`等待中…（HTTP ${res.status}）`);
-    return { done:false };
-  }
-  const etag = res.headers.get('ETag') || state.etag;
-  const j = JSON.parse(text);
-  const sha = j.sha || '';
-  const b64 = (j.content||'').replace(/\n/g,'');
-  const out = j.content ? b64ToUtf8(b64) : '';
-
-  if(state.sha && sha === state.sha){
-    setStatus('等待中…（未更新）');
-    return { done:false, etag, sha: state.sha };
-  }
-  if(out && out.trim()){
-    $('#codeOut').textContent=out;
-    setStatus(`✅ 已获取到最新 ${job.whichOut} · ${out.length} 字符`);
-    return { done:true, etag, sha };
-  }
-  setStatus('等待中…（文件为空或未生成）');
-  return { done:false, etag, sha };
+  const api=`https://api.github.com/repos/${job.repo}/contents/${job.whichOut}?ref=${job.branch}&t=${Date.now()}`;
+  const headers={ ...ghHeaders() }; if(state.etag){ headers['If-None-Match']=state.etag; }
+  const res=await fetch(api,{headers,cache:'no-store'});
+  if(res.status===304){ setStatus('等待中…（未改变 304）'); return {done:false}; }
+  const text=await res.text(); if(!res.ok){ setStatus(`等待中…（HTTP ${res.status}）`); return {done:false}; }
+  const etag=res.headers.get('ETag')||state.etag; const j=JSON.parse(text); const sha=j.sha||''; const b64=(j.content||'').replace(/\n/g,''); const out=j.content?b64ToUtf8(b64):'';
+  if(state.sha && sha===state.sha){ setStatus('等待中…（未更新）'); return {done:false,etag,sha:state.sha}; }
+  if(out && out.trim()){ $('#codeOut').textContent=out; setStatus(`✅ 已获取到最新 ${job.whichOut} · ${out.length} 字符`); return {done:true,etag,sha}; }
+  setStatus('等待中…（文件为空或未生成）'); return {done:false,etag,sha};
 }
-
-/** 自动恢复轮询：页面加载或回到前台时触发 */
 async function autoResumeIfNeeded(){
-  const job = loadJob();
-  if(!job) return;
-
-  // 前台短、后台长
-  const short = Math.max(2, parseInt(job.pollSec||5,10));
-  const long  = Math.min(30, short*3);
-
-  let waited = 0;
-  let sha = '';
-  let etag = '';
-  setStatus(`⏳ 正在恢复轮询：${job.whichOut}`);
-  showBar();
-  const b = $('#bar');
-  const barTimer = setInterval(()=>{ b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; }, 5000);
-
+  const job=loadJob(); if(!job) return;
+  const short=Math.max(2, parseInt(job.pollSec||5,10));
+  const long=Math.min(30, short*3);
+  let waited=0, sha='', etag='';
+  setStatus(`⏳ 正在恢复轮询：${job.whichOut}`); showBar();
+  const b=$('#bar'); const barTimer=setInterval(()=>{ b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; },5000);
   async function tick(){
-    const interval = document.hidden ? long*1000 : short*1000;
-    const { done, sha:newSha, etag:newEtag } = await pollOutputOnce(job, { sha, etag });
-    if(newSha) sha = newSha; if(newEtag) etag = newEtag;
-
-    if(done){
-      okBar(); clearInterval(timer); clearInterval(barTimer); clearJob(); return;
-    }
-    waited += interval;
-    if(waited >= job.maxWait*1000){
+    const interval=document.hidden? long*1000 : short*1000;
+    const {done, sha:newSha, etag:newEtag}=await pollOutputOnce(job,{sha,etag});
+    if(newSha) sha=newSha; if(newEtag) etag=newEtag;
+    if(done){ okBar(); clearInterval(timer); clearInterval(barTimer); clearJob(); return; }
+    waited+=interval;
+    if(waited>=job.maxWait*1000){
       warnBar(); clearInterval(timer); clearInterval(barTimer);
       setStatus(`⌛ 超时：仍未获取到 ${job.whichOut}，可能 Actions 还在跑或失败（稍后再来或手动拉取）`);
-      // 不立即清任务，允许你稍后回来继续尝试
     }
   }
-
   await tick();
-  const timer = setInterval(tick, short*1000);
+  const timer=setInterval(tick, short*1000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) tick(); }, {passive:true});
 }
-
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoResumeIfNeeded(); }, {passive:true});
 window.addEventListener('load', autoResumeIfNeeded);
 </script>
