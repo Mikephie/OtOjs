@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- 兜底换行：确保中间内容不是一整行 -->
+  <!-- 兜底换行，避免长行挤成一行；如被外部样式覆盖，下面两个 <pre> 也会用内联样式强制 -->
   <style>
     pre{white-space:pre-wrap;word-break:break-word}
   </style>
@@ -58,7 +58,8 @@
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+      <!-- 用内联样式强制换行显示 -->
+      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word" placeholder="结果将显示在这里"></pre>
     </div>
 
     <!-- 输出 -->
@@ -69,11 +70,12 @@
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
       </div>
-      <pre id="outputRaw"></pre>
+      <!-- 用内联样式强制换行显示 -->
+      <pre id="outputRaw" style="white-space:pre-wrap;word-break:break-word"></pre>
     </div>
   </div>
 
-  <!-- 先插件，再主逻辑（保持你的加载顺序） -->
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
@@ -87,8 +89,8 @@
           await navigator.clipboard.writeText(t);
         } else {
           const ta = document.createElement('textarea');
-          ta.value = t; document.body.appendChild(ta); ta.select();
-          document.execCommand('copy'); ta.remove();
+          ta.value = t; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy'); ta.remove();
         }
         const old = btn.textContent; btn.textContent = '✅ 已复制';
         setTimeout(()=> btn.textContent = old, 1200);
@@ -96,6 +98,43 @@
         alert('复制失败：' + e.message);
       }
     }
+  </script>
+
+  <!-- 自动展开 \"\\n\" 为真实换行 + 温和断行，保证中间内容可读 -->
+  <script>
+    function expandEscapedNewlines(s){
+      if (typeof s !== 'string') return s;
+      if (!/\\n|\\r\\n/.test(s)) return s; // 没有转义换行就不处理
+      try {
+        const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+        return JSON.parse(wrapped);
+      } catch {
+        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
+      }
+    }
+    function softBreak(s){
+      if (typeof s !== 'string') return s;
+      // 已经有不少换行就不动；否则对 ; } 等做温和断行
+      if ((s.match(/\n/g)||[]).length >= 5) return s;
+      return s
+        .replace(/;\s*(?!\n)/g,';\n')
+        .replace(/\}\s*(?!\n)/g,'}\n')
+        .replace(/\)\s*;\s*(?!\n)/g,');\n');
+    }
+    function reflowPre(el){
+      const raw = el.textContent || '';
+      const expanded = expandEscapedNewlines(raw);
+      const out = softBreak(expanded);
+      if (out !== raw) el.textContent = out;
+    }
+    // 监听两个 <pre> 的内容变化，自动展开/断行（不影响原有逻辑）
+    const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
+    const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
+    window.addEventListener('load', ()=>{
+      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
+      if(a) _mo1.observe(a,{childList:true,subtree:true,characterData:true});
+      if(b) _mo2.observe(b,{childList:true,subtree:true,characterData:true});
+    });
   </script>
 </body>
 </html>
