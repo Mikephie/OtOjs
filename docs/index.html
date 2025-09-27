@@ -70,7 +70,7 @@
     </div>
   </div>
 
-  <!-- 先插件，再主逻辑 -->
+  <!-- 解码插件 & 主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
@@ -87,19 +87,16 @@
     }
   </script>
 
-  <!-- Prettier：显式加载 estree + 重写 beautify 使用两个插件 -->
+  <!-- Prettier（babel + estree） -->
   <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
   <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
   <script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
   <script>
     async function beautify(){
-      let s=document.querySelector('#codeOut').textContent || document.querySelector('#codeIn').value || '';
+      const s=document.querySelector('#codeOut').textContent || document.querySelector('#codeIn').value || '';
       if(!s.trim()){ document.getElementById('status').innerHTML='<small>无待美化内容</small>'; return; }
       try{
-        const out = prettier.format(String(s), {
-          parser: 'babel',
-          plugins: [prettierPlugins.babel, prettierPlugins.estree]
-        });
+        const out = prettier.format(String(s), { parser:'babel', plugins:[prettierPlugins.babel, prettierPlugins.estree] });
         document.querySelector('#codeOut').textContent = out;
         document.getElementById('status').innerHTML = '<small>已用 Prettier 美化</small>';
       }catch(e){
@@ -108,39 +105,43 @@
     }
   </script>
 
-  <!-- 轻量防卡排版：展开 \"\\n\"、JSON 尝试、结构字符缩进，长度>200k跳过 -->
+  <!-- 秒解“胶水层”：确保粘贴/导入/远程后立刻解密；若解密器未就绪则动态补载后重试 -->
   <script>
-    const FORMAT_MAX = 200000;   // 超过则不处理，避免卡顿
-    const BATCH_DELAY = 120;     // 防抖
+    // 等 smartDecodePipeline，就绪直接用；否则补载 decode-all.js
+    async function smartDecodeNow(code){
+      if (typeof window.smartDecodePipeline !== 'function') {
+        await new Promise((resolve)=> {
+          const s=document.createElement('script');
+          s.src='decode-all.js?t=' + Date.now();
+          s.onload=resolve; s.onerror=resolve;
+          document.head.appendChild(s);
+        });
+      }
+      if (typeof window.smartDecodePipeline === 'function'){
+        try { return await window.smartDecodePipeline(code); }
+        catch(_) { return null; }
+      }
+      return null;
+    }
 
-    function expandEscapedSafe(s){
-      if (typeof s !== 'string' || s.length > FORMAT_MAX) return s;
+    // 轻量本地排版（长度 > 200k 不处理，避免卡顿）
+    const FORMAT_MAX = 200000;
+    function expandEscaped(s){
+      if (typeof s!=='string'||s.length>FORMAT_MAX) return s;
       if (!/\\[nrt"\\]/.test(s)) return s;
-      try {
-        const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
-        return JSON.parse(wrapped);
-      } catch {
+      try{ const w='"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"'; return JSON.parse(w); }
+      catch{
         return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\r/g,'\r').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
       }
     }
-    function tryPrettyJSONSafe(s){
-      if (typeof s!=='string' || s.length > FORMAT_MAX) return null;
-      try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return null; }
-    }
-    function simplePrettySafe(s){
-      if (typeof s!=='string' || s.length > FORMAT_MAX) return s;
-      let out='', indent=0, inStr=false, quote='', esc=false;
-      const tab=()=> '  '.repeat(Math.max(0,indent));
+    function tryPrettyJSON(s){ if(typeof s!=='string'||s.length>FORMAT_MAX) return null; try{ return JSON.stringify(JSON.parse(s),null,2); }catch{return null;} }
+    function simplePretty(s){
+      if(typeof s!=='string'||s.length>FORMAT_MAX) return s;
+      let out='',indent=0,inStr=false,q='',esc=false; const tab=()=>'  '.repeat(Math.max(0,indent));
       for(let i=0;i<s.length;i++){
         const ch=s[i];
-        if(inStr){
-          out+=ch;
-          if(esc) esc=false;
-          else if(ch==='\\') esc=true;
-          else if(ch===quote) inStr=false;
-          continue;
-        }
-        if(ch==='\"'||ch==="'"||ch==='`'){ inStr=true; quote=ch; esc=false; out+=ch; continue; }
+        if(inStr){ out+=ch; if(esc)esc=false; else if(ch==='\\')esc=true; else if(ch===q) inStr=false; continue; }
+        if(ch==='\"'||ch==="'"||ch==='`'){ inStr=true;q=ch;esc=false;out+=ch;continue; }
         if(ch==='{'||ch==='['){ out+=ch+'\n'; indent++; out+=tab(); continue; }
         if(ch==='}'||ch===']'){ out+='\n'; indent--; out+=tab()+ch; continue; }
         if(ch===','||ch===';'){ out+=ch+'\n'+tab(); continue; }
@@ -149,38 +150,47 @@
       }
       return out.replace(/\n{3,}/g,'\n\n').trim()+'\n';
     }
-    function autoFormatSafe(raw){
-      if (!raw || typeof raw!=='string') return raw;
-      const expanded = expandEscapedSafe(raw);
-      const j = tryPrettyJSONSafe(expanded);
-      return j || simplePrettySafe(expanded);
-    }
-    function runIdle(fn){ window.requestIdleCallback ? requestIdleCallback(()=>setTimeout(fn,0),{timeout:300}) : setTimeout(fn,0); }
-    function attachReflowSafe(preId){
-      const el=document.getElementById(preId); if(!el) return;
-      let pending=false, t=null;
-      const schedule=()=>{
-        if(t) clearTimeout(t);
-        t=setTimeout(()=>{
-          if(pending) return;
-          pending=true;
-          runIdle(()=>{
-            try{
-              const raw=el.textContent||'';
-              if(raw.length>FORMAT_MAX){ pending=false; return; }
-              const pretty=autoFormatSafe(raw);
-              if(pretty && pretty!==raw) el.textContent=pretty;
-            }finally{ pending=false; }
-          });
-        }, BATCH_DELAY);
+    function localFormat(s){ const e=expandEscaped(s); return tryPrettyJSON(e) || simplePretty(e); }
+
+    // 粘贴/文件/远程完成后“立刻秒解” + 可选美化
+    function autoDecodeGlue(){
+      const input = document.querySelector('#codeIn');
+      const out   = document.querySelector('#codeOut');
+      const status= document.getElementById('status');
+      let last = '';
+
+      const run = async () => {
+        const enable = document.querySelector('#autoDecode')?.checked;
+        const code = input.value || '';
+        if (!enable || !code || code===last) return;
+        last = code;
+
+        // 先跑本地快速排版，提升可读性
+        out.textContent = localFormat(code);
+
+        const decoded = await smartDecodeNow(code);
+        if (typeof decoded === 'string' && decoded && decoded !== code){
+          out.textContent = localFormat(decoded);
+          // 若勾选自动美化，再交给 Prettier（失败不影响展示）
+          if (document.querySelector('#autoBeautify')?.checked) {
+            try {
+              const pretty = prettier.format(String(out.textContent), { parser:'babel', plugins:[prettierPlugins.babel, prettierPlugins.estree] });
+              out.textContent = pretty;
+            } catch(_) {}
+          }
+          status.innerHTML = '<small>✅ 本地秒解完成</small>';
+        } else {
+          status.innerHTML = '<small>ℹ️ 已载入（未检测到可解密层或已是明文）</small>';
+        }
       };
-      schedule();
-      new MutationObserver(schedule).observe(el,{childList:true,subtree:true,characterData:true});
+
+      const debounce = (fn, ms)=>{ let t=null; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); } };
+
+      // 监听输入框变化（粘贴/远程/文件赋值都会触发 input 事件）
+      input.addEventListener('input', debounce(run, 200));
     }
-    window.addEventListener('load', ()=>{
-      attachReflowSafe('codeOut');
-      attachReflowSafe('outputRaw');
-    });
+
+    window.addEventListener('load', autoDecodeGlue);
   </script>
 </body>
 </html>
