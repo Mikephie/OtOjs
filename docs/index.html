@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- 兜底换行：确保中间内容不是一整行 -->
+  <style>
+    pre{white-space:pre-wrap;word-break:break-word}
+  </style>
 </head>
 <body>
   <div class="wrap">
@@ -49,12 +53,12 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" checked /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut" title="结果将显示在这里"></pre>
+      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
 
     <!-- 输出 -->
@@ -65,24 +69,18 @@
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
       </div>
-      <pre id="outputRaw" title="Raw 输出文件内容"></pre>
+      <pre id="outputRaw"></pre>
     </div>
   </div>
 
-  <!-- Prettier 依赖（含 estree，避免 AST “estree” 报错）-->
-  <script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
-  <script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
-  <script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
-
-  <!-- 顺序非常重要：先插件，再主逻辑 -->
+  <!-- 先插件，再主逻辑（保持你的加载顺序） -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 修复复制 + 强制挂载“自动秒解”钩子（不改 app.js，仅补钩） -->
+  <!-- 复制按钮：内联全局函数，避免依赖 app.js 暴露 -->
   <script>
-    // --- 复制按钮：不依赖 app.js，全局可用 ---
-    async function copySel(sel, btn) {
-      try {
+    async function copySel(sel, btn){
+      try{
         const el = document.querySelector(sel);
         const t = el ? (el.value ?? el.textContent ?? '') : '';
         if (navigator.clipboard?.writeText) {
@@ -93,79 +91,11 @@
           document.execCommand('copy'); ta.remove();
         }
         const old = btn.textContent; btn.textContent = '✅ 已复制';
-        setTimeout(() => btn.textContent = old, 1200);
-      } catch (e) { alert('复制失败：' + e.message); }
+        setTimeout(()=> btn.textContent = old, 1200);
+      }catch(e){
+        alert('复制失败：' + e.message);
+      }
     }
-
-    // --- Prettier 工具 ---
-    function prettierPluginsArr() {
-      if (Array.isArray(window.prettierPlugins)) return window.prettierPlugins;
-      const arr = [];
-      if (window.prettierPlugins?.babel) arr.push(window.prettierPlugins.babel);
-      if (window.prettierPlugins?.estree) arr.push(window.prettierPlugins.estree);
-      return arr;
-    }
-    async function prettyIfNeeded(code) {
-      if (!document.querySelector('#autoBeautify').checked) return code;
-      try {
-        return await window.prettier.format(String(code), {
-          parser: 'babel',
-          plugins: prettierPluginsArr()
-        });
-      } catch { return code; }
-    }
-
-    // --- 智能秒解：直接调用 decode-all.js 暴露的 smartDecodePipeline ---
-    async function runSmartDecode(src) {
-      if (!document.querySelector('#autoDecode').checked) return null;
-      if (typeof window.smartDecodePipeline !== 'function') return null;
-      try { return await window.smartDecodePipeline(String(src)); }
-      catch { return null; }
-    }
-
-    // --- 把“秒解 +（可选）美化”写回输出框 ---
-    async function decodeAndShow(src, label) {
-      const decoded = await runSmartDecode(src);
-      if (!decoded) return false;
-      const pretty = await prettyIfNeeded(decoded);
-      document.querySelector('#codeOut').textContent = pretty;
-      const s = (pretty !== decoded) ? '（已美化）' : '';
-      const st = document.querySelector('#status'); if (st) st.innerHTML = `<small>状态：✅ ${label} · 已智能解密${s}</small>`;
-      return true;
-    }
-
-    // --- 绑定事件（不改你的 app.js；两边都能触发） ---
-    function debounce(fn, t=300){ let id; return (...a)=>{ clearTimeout(id); id=setTimeout(()=>fn(...a),t); }; }
-
-    // 1) 选择文件后：读文本 → 秒解 →（可选）美化
-    document.getElementById('file').addEventListener('change', async (e) => {
-      const f = e.target.files?.[0]; if (!f) return;
-      const txt = await f.text();
-      // app.js 自己也会触发；这里再补一层，以确保“秒解一定会跑”
-      decodeAndShow(txt, '本地文件');
-    });
-
-    // 2) 手动粘贴/编辑：防抖 400ms 自动尝试秒解
-    document.getElementById('codeIn').addEventListener('input', debounce(async () => {
-      const v = document.getElementById('codeIn').value;
-      if (!v.trim()) return;
-      decodeAndShow(v, '输入');
-    }, 400));
-
-    // 3) 拉取 Raw 后自动尝试秒解（监听 #outputRaw 的变化）
-    //    如果你的 app.js 在 loadOutputRaw 里已经会 decode，就当双保险。
-    const rawEl = document.getElementById('outputRaw');
-    const mo = new MutationObserver(debounce(async () => {
-      const raw = rawEl.textContent || '';
-      if (raw.trim()) decodeAndShow(raw, 'Raw');
-    }, 300));
-    mo.observe(rawEl, { childList: true, characterData: true, subtree: true });
-
-    // 4) 初始：如果 textarea 里本来就有内容，且勾选了“自动智能解密”，也尝试跑一次
-    window.addEventListener('load', () => {
-      const init = document.getElementById('codeIn').value.trim();
-      if (init) decodeAndShow(init, '初始内容');
-    });
   </script>
 </body>
 </html>
