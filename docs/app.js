@@ -26,16 +26,6 @@ function debounce(fn, wait = 300) {
   };
 }
 
-// 等待 decode-all.js 挂好 smartDecodePipeline（最多等 3s）
-async function waitSmartPipeline(ms = 3000) {
-  const start = Date.now();
-  while (typeof window.smartDecodePipeline !== 'function') {
-    if (Date.now() - start > ms) return false;
-    await new Promise(r => setTimeout(r, 50));
-  }
-  return true;
-}
-
 // ========== GitHub API 基础 ==========
 function ghHeaders() {
   const t = $('#token').value.trim();
@@ -215,9 +205,11 @@ async function loadOutputRaw(path){
     $('#outputRaw').textContent=t;
     setStatus('已拉取 Raw · '+path+' · '+t.length+' 字符');
     if($('#autoDecode').checked){
-      const decoded = await window.smartDecodePipeline(t);
-      if (decoded) $('#codeOut').textContent = decoded;
-      if ($('#autoBeautify').checked) await beautify();
+      const decoded = await smartDecodePipeline(t);   // ✅ await
+      if (decoded) {
+        $('#codeOut').textContent = decoded;
+        if ($('#autoBeautify').checked) await beautify();  // ✅ await
+      }
     }
   }catch(e){
     $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url;
@@ -268,30 +260,22 @@ async function copySel(sel,btn){
 }
 
 // ========== 智能解密入口 ==========
-async function autoDecodeIfNeeded() {
-  if (!$('#autoDecode').checked) return;
-
-  const ready = await waitSmartPipeline(3000);
-  if (!ready) {
-    setStatus('智能解密插件未加载（请确认 decode-all.js 在 app.js 之前引入）');
+async function autoDecodeIfNeeded(){
+  if(!$('#autoDecode').checked) return;
+  if (typeof window.smartDecodePipeline !== 'function') {
+    setStatus('智能解密插件未加载（请确认 decode-all.js 已在 app.js 之前引入）');
     return;
   }
-
   let code=$('#codeIn').value||$('#codeOut').textContent||'';
   if(!code.trim()) return;
-
-  setStatus('正在智能解密…');
-  const decoded = await window.smartDecodePipeline(code);
-  if (!decoded) {
-    setStatus('没有可解内容或未匹配到已支持的混淆模式');
-    return;
-  }
-
-  $('#codeOut').textContent = decoded;
-  setStatus('✅ 已解密并格式化');
-
-  if ($('#autoBeautify').checked) {
-    try { await beautify(); } catch {}
+  try {
+    const decoded = await smartDecodePipeline(code);   // ✅ await
+    if(decoded){
+      $('#codeOut').textContent=decoded;
+      if($('#autoBeautify').checked) await beautify();  // ✅ await
+    }
+  } catch(e){
+    setStatus('解密失败：'+e.message);
   }
 }
 
