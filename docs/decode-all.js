@@ -278,7 +278,7 @@ window.DecodePlugins = window.DecodePlugins || {};
   };
 })();
 
-// ===== 轻量美化（零依赖） =====
+// 轻量分行（兜底，美化失败也能看）
 function simpleFormat(src) {
   try {
     let out = "", indent = 0;
@@ -299,25 +299,17 @@ function simpleFormat(src) {
   } catch { return String(src); }
 }
 
-// ========== 智能解密调度 ==========
-async function smartDecodePipeline(code) {
-  let out = code;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const key of Object.keys(window.DecodePlugins)) {
-      const p = window.DecodePlugins[key];
-      if (p.detect(out)) {
-        const res = p.plugin(out);
-        if (res && res !== out) {
-          out = res;
-          changed = true;
-          break;                // ★ 成功后立刻换轮
-        }
-      }
+// 统一美化入口（优先 Prettier，其次兜底）
+function prettyFormat(code) {
+  try {
+    if (window.prettier && window.prettierPlugins && window.prettierPlugins.babel) {
+      return window.prettier.format(code, {
+        parser: "babel",
+        plugins: [window.prettierPlugins.babel],
+      });
     }
-  }
-  return simpleFormat(out);     // ★ 输出前分行
+  } catch {}
+  return simpleFormat(code);
 }
 
 // 暴露到全局
