@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 解密前端（后台恢复 + 智能解密）</title>
+<title>OtOjs · 解密前端（智能解密 + 后台恢复 + 设置持久化）</title>
 <style>
   :root{
     --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
@@ -25,7 +25,7 @@
   button.ok{border-color:var(--ok)}
   button.warn{border-color:var(--warn)}
   button.err{border-color:var(--err)}
-  pre{white-space:pre-wrap;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:380px;overflow:auto}
+  pre{white-space:pre;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:380px;overflow:auto}
   small{color:var(--muted)}
   .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
   .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
@@ -53,9 +53,8 @@
   details.setting summary::before{content:"▸ "}
   details.setting[open] summary::before{content:"▾ "}
 
-  /* 小开关：普通复选框 + 文案，简洁不突兀 */
-  .switch{display:flex;align-items:center;gap:8px}
-  .switch input{width:auto}
+  /* 简洁开关：复选框 + 文案 */
+  .switch{margin-right:12px;font-size:12px}
 </style>
 </head>
 <body>
@@ -63,14 +62,20 @@
   <h1>OtOjs · 解密前端</h1>
 
   <div class="card">
-    <!-- 只保留 repo/branch/token 在外面 -->
+    <!-- 外层：REPO / BRANCH / Token -->
     <div class="row">
       <div><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
       <div><label>BRANCH</label><input id="branch" value="main" /></div>
-      <div><label>Token（contents:rw）</label><input id="token" type="password" placeholder="ghp_..." /></div>
+      <div>
+        <label>Token（contents:rw）</label>
+        <input id="token" type="password" placeholder="ghp_..." />
+        <div style="margin-top:6px">
+          <label class="switch"><input id="rememberToken" type="checkbox" />记住 Token（存本机 localStorage）</label>
+        </div>
+      </div>
     </div>
 
-    <!-- 其他全部折叠 -->
+    <!-- 其他设置全部折叠 -->
     <details class="setting">
       <summary>高级设置</summary>
       <div class="row" style="margin-top:8px">
@@ -88,13 +93,14 @@
         <div><label>轮询间隔（秒）</label><input id="pollSec" type="number" value="5" /></div>
         <div><label>最大等待（秒）</label><input id="maxWait" type="number" value="150" /></div>
       </div>
-      <div class="row">
+      <div style="margin-top:6px">
+        <label class="switch"><input id="autoResume" type="checkbox" checked />后台恢复拉取</label>
         <label class="switch"><input id="autoSmart" type="checkbox" checked />自动智能解密（Packer→Eval→AA）</label>
-        <label class="switch"><input id="autoResume" type="checkbox" checked />提交后允许后台执行并自动恢复拉取</label>
+        <label class="switch"><input id="autoBeautify" type="checkbox" checked />自动美化（Prettier）</label>
+        <label class="switch"><input id="keepHeader" type="checkbox" />保留前缀（AADecode）</label>
       </div>
+      <small>提交后可后台执行；页面回到前台会自动恢复拉取并尝试本地智能解密。</small>
     </details>
-
-    <div class="hint">提交后可后台执行；页面回到前台会自动恢复拉取并尝试本地智能解密。</div>
   </div>
 
   <div class="card">
@@ -127,7 +133,6 @@
     <div class="row">
       <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
       <button class="warn" onclick="startAutoPoll()">② 开始自动轮询（根据选择的输出文件）</button>
-      <button onclick="beautify()">（可选）结果美化</button>
       <button onclick="copySel('#codeOut', this)">复制结果</button>
       <button class="err" onclick="clrAll()">清空输入与结果</button>
     </div>
@@ -136,49 +141,77 @@
     <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
     <pre id="codeOut" placeholder="结果将显示在这里"></pre>
   </div>
-
-  <div class="card">
-    <div class="row">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span>快速拉取 Raw：</span>
-        <button onclick="loadOutputRaw('output/output.js')">output/output.js</button>
-        <button onclick="loadOutputRaw('output/output.deob2.js')">output/output.deob2.js</button>
-      </div>
-      <button onclick="copySel('#outputRaw', this)">复制</button>
-      <button onclick="downloadOutput()">下载当前结果</button>
-    </div>
-    <pre id="outputRaw"></pre>
-  </div>
 </div>
 
+<!-- ========= 基础工具 ========= -->
 <script>
-/* ====== 基础工具 & 状态栏 ====== */
 const $=s=>document.querySelector(s);
 function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
 function showBar(){ $('#barWrap').style.display='block'; const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.background='var(--accent)'; setTimeout(()=>b.style.width='100%',50); }
 function okBar(){ $('#bar').style.background='var(--ok)'; }
 function warnBar(){ $('#bar').style.background='var(--warn)'; }
 function hideBar(){ $('#barWrap').style.display='none'; }
-function ghHeaders(){ const t=$('#token').value.trim(); if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); } return {'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','If-None-Match':''}; }
+function ghHeaders(){
+  const t=$('#token').value.trim();
+  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
+  return {'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','If-None-Match':''};
+}
 function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
 function nowTs(){ return Date.now().toString() }
+function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))) }catch{ return atob(b64) } }
 </script>
 
+<!-- ========= Prettier ========= -->
 <script>
-/* ====== 文件导入 / 远程 / 粘贴 / 清空 / 美化 ====== */
-$('#file').addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(!f) return; const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符'); trySmartDecodeAndShow(txt,'输入'); });
+async function ensurePrettier(){
+  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
+  const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
+  const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
+  document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
+  document.body.appendChild(s2); await new Promise(r=>s2.onload=r);
+}
+async function maybeBeautify(s){
+  if (!$('#autoBeautify').checked) return s;
+  try { await ensurePrettier(); return prettier.format(String(s), { parser:'babel', plugins:[prettierPlugins.babel] }); }
+  catch { return s; }
+}
+async function beautify(){
+  let s=$('#codeOut').textContent||$('#codeIn').value||'';
+  if(!s){ setStatus('无待美化内容'); return }
+  const out=await maybeBeautify(s);
+  $('#codeOut').textContent=out;
+  setStatus('已用 Prettier 美化');
+}
+</script>
+
+<!-- ========= 输入源：文件 / 远程 / 粘贴 / 清空 ========= -->
+<script>
+$('#file').addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const txt=await f.text(); $('#codeIn').value=txt;
+  setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
+  trySmartDecodeAndShow(txt,'输入');
+});
 
 async function loadRemote(){
+  // 从弹窗 hidden input 取值
   let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
-  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){ u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/'); }
-  try{ const r=await fetch(u+'?t='+nowTs(),{cache:'no-store'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200)); $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符'); trySmartDecodeAndShow(t,'输入'); }catch(e){ setStatus('远程加载失败：'+e.message); }
+  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
+    u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
+  }
+  try{
+    const r=await fetch(u+'?t='+nowTs(),{cache:'no-store'}); const t=await r.text();
+    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
+    $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
+    trySmartDecodeAndShow(t,'输入');
+  }catch(e){ setStatus('远程加载失败：'+e.message); }
 }
-async function pasteFromClipboard(){ try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); trySmartDecodeAndShow(t,'输入'); }catch(e){ setStatus('粘贴失败：'+e.message); } }
+async function pasteFromClipboard(){
+  try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); trySmartDecodeAndShow(t,'输入'); }
+  catch(e){ setStatus('粘贴失败：'+e.message); }
+}
 function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
-function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
-async function ensurePrettier(){ if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return; const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js'; const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js'; document.body.appendChild(s1); await new Promise(r=>s1.onload=r); document.body.appendChild(s2); await new Promise(r=>s2.onload=r); }
-async function beautify(){ let s=$('#codeOut').textContent||$('#codeIn').value||''; if(!s){ setStatus('无待美化内容'); return } try{ await ensurePrettier(); const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]}); $('#codeOut').textContent=out; setStatus('已用 Prettier 美化'); }catch(e){ setStatus('Prettier 失败：'+e.message); } }
-async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.textContent??''):''; await navigator.clipboard.writeText(t); const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);}catch(e){ setStatus('复制失败：'+e.message); } }
+function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
 
 /* 远程弹窗交互 */
 (function(){
@@ -198,21 +231,26 @@ async function copySel(sel,btn){ try{ const el=$(sel); const t=el?(el.value??el.
 })();
 </script>
 
+<!-- ========= GitHub 提交 & 轮询（含后台恢复） ========= -->
 <script>
-/* ====== GitHub 提交 & 轮询（提交后可后台恢复） ====== */
-function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))) }catch{ return atob(b64) } }
-
 async function submitInput(){
   const path=$('#pathIn').value.trim()||'input.js';
   const api=`${repoBase()}/contents/${path}`;
   const code=$('#codeIn').value;
   if(!code){ setStatus('没有可上传的内容'); return }
   try{
-    let sha=''; const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&t=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
+    let sha='';
+    const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&t=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
     if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={ message: $('#commitMsg').value.trim()||'update via UI', content: btoa(unescape(encodeURIComponent(code))), branch: $('#branch').value.trim(), sha: sha||undefined };
+    const body={
+      message: $('#commitMsg').value.trim()||'update via UI',
+      content: btoa(unescape(encodeURIComponent(code))),
+      branch: $('#branch').value.trim(),
+      sha: sha||undefined
+    };
     const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, cache:'no-store', body: JSON.stringify(body) });
-    const txt=await res.text(); if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
+    const txt=await res.text();
+    if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
 
     if ($('#autoResume').checked) {
       saveJobForAutoResume({
@@ -238,91 +276,96 @@ async function startAutoPoll(){
   const which=$('#whichOut').value;
   const branch=$('#branch').value.trim();
   const api=`${repoBase()}/contents/${which}?ref=${branch}`;
-  const interval=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
+  const short=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
+  const long=Math.min(30000, short*3); // 后台慢一些
   const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
 
   let lastSha=''; let waited=0;
   setStatus('正在轮询：'+which); showBar();
   barTimer=setInterval(()=>{ const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; },5000);
 
-  await tryFetch();
-  pollingTimer=setInterval(async ()=>{
-    waited+=interval;
+  async function tick(){
+    const interval=document.hidden? long : short;
     const done=await tryFetch();
     if(done){ clearInterval(pollingTimer); pollingTimer=null; clearInterval(barTimer); barTimer=null; okBar(); return; }
-    if(waited>=maxWait){ clearInterval(pollingTimer); pollingTimer=null; clearInterval(barTimer); barTimer=null; warnBar(); setStatus('⌛ 超时：仍未获取到 '+which); }
-  }, interval);
+    waited+=interval;
+    if(waited>=maxWait){
+      clearInterval(pollingTimer); pollingTimer=null;
+      clearInterval(barTimer); barTimer=null;
+      warnBar();
+      setStatus('⌛ 超时：仍未获取到 '+which);
+    }
+  }
+  await tick();
+  pollingTimer=setInterval(tick, short);
 
   async function tryFetch(){
     try{
       const r=await fetch(api+'&t='+nowTs(),{headers:ghHeaders(),cache:'no-store'});
       const raw=await r.text();
       if(!r.ok){ setStatus('等待中… '+which+'（HTTP '+r.status+'）'); return false; }
-      const j=JSON.parse(raw); const sha=j.sha||''; if(sha && sha===lastSha){ setStatus('等待中… '+which+'（未更新）'); return false; }
-      const b64=(j.content||'').replace(/\n/g,''); const out=j.content?b64ToUtf8(b64):'';
+      const j=JSON.parse(raw);
+      const sha=j.sha||'';
+      if(sha && sha===lastSha){ setStatus('等待中… '+which+'（未更新）'); return false; }
+      const b64=(j.content||'').replace(/\n/g,'');
+      const out=j.content?b64ToUtf8(b64):'';
       if(out && out.trim()){
         lastSha=sha||nowTs();
-        const final = trySmartDecode(out);
-        $('#codeOut').textContent = final;
-        setStatus( final!==out ? '✅ 已获取并本地智能解密' : '✅ 已获取到最新 '+which );
+        const dec = trySmartDecode(out);
+        const final = await maybeBeautify(dec);
+        $('#codeOut').textContent=final;
+        setStatus( dec!==out ? '✅ 已获取并本地智能解密'+(final!==dec?'（已美化）':'') : '✅ 已获取到最新 '+which );
         return true;
-      }else{ setStatus('等待中… '+which+'（文件为空或未生成）'); return false; }
-    }catch(e){ setStatus('等待中… '+which+'（'+e.message+'）'); return false; }
+      }else{
+        setStatus('等待中… '+which+'（文件为空或未生成）'); return false;
+      }
+    }catch(e){
+      setStatus('等待中… '+which+'（'+e.message+'）'); return false;
+    }
   }
 }
-
-/* Raw / 下载 */
-async function loadOutputRaw(path){
-  path = path || $('#whichOut').value;
-  const url=`https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
-  try{ const r=await fetch(url,{cache:'no-store'}); const t=await r.text(); if(!r.ok) throw new Error(r.status+' '+r.statusText);
-    $('#outputRaw').textContent=t; setStatus('已拉取 Raw · '+path+' · '+t.length+' 字符'); }catch(e){ $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url; setStatus('拉取失败'); }
-}
-function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').textContent||''; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'})); const which=$('#whichOut').value.split('/').pop()||'output.js'; a.download=which; a.click(); URL.revokeObjectURL(a.href); }
 </script>
 
-<!-- ====== AADecode（前端） ====== -->
+<!-- ========= AADecode / Eval / Packer 插件 ========= -->
 <script>
+// AADecode
 (function () {
   const module = { exports: {} };
-  function extractHeader(code){ const i=code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/); if(i>0) return {header:code.substring(0,i).trim(),encodedPart:code.substring(i)}; return {header:"",encodedPart:code}; }
+  function extractHeader(code){
+    const i = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
+    if(i>0) return { header: code.substring(0,i).trim(), encodedPart: code.substring(i) };
+    return { header:"", encodedPart: code };
+  }
   function plugin(code){
     try{
       const { header, encodedPart } = extractHeader(code);
       if(!(/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(encodedPart))) return null;
-      let s=encodedPart.replace(") ('_')","").replace("(ﾟДﾟ) ['_'] (","return ");
-      const x=new Function(s); const out=x();
-      return header?`${header}\n\n${out}`:out;
-    }catch(e){ console.error("AADecode解码错误:",e); return null; }
+      let s = encodedPart.replace(") ('_')","").replace("(ﾟДﾟ) ['_'] (","return ");
+      const out = new Function(s)();
+      const keep = document.querySelector('#keepHeader')?.checked;
+      return keep && header ? `${header}\n\n${out}` : out;
+    }catch(e){ return null; }
   }
   module.exports = plugin;
   window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.aadecode = { detect:c=>/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(c), plugin:c=>{ try{ const r=module.exports(c); return r??c; }catch(e){ console.error(e); return c; } } };
+  window.DecodePlugins.aadecode = { detect:c=>/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(c), plugin:c=>{ try{ return module.exports(c) ?? c; }catch{ return c; } } };
 })();
-</script>
 
-<!-- ====== Eval 解包（前端） ====== -->
-<script>
-(function () {
-  const module = { exports: {} };
+// Eval
+(function(){
   function plugin(code){
+    if(!/eval\s*\(/.test(code)) return null;
     try{
-      if(!/eval\s*\(/.test(code)) return null;
-      let safe=code.replace(/\beval\s*\(/g,'(function(__x){return __x;})(');
-      try{
-        const out=Function('"use strict";return ('+safe+')')();
-        return (typeof out==='string')? out : String(out);
-      }catch{ return null; }
-    }catch(e){ console.error("Eval 解包错误:",e); return null; }
+      const safe = code.replace(/\beval\s*\(/g, '(function(__x){return __x;})(');
+      const out = Function('"use strict";return ('+safe+')')();
+      return (typeof out==='string') ? out : String(out);
+    }catch{ return null; }
   }
-  module.exports.plugin=(c)=>plugin(c);
   window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.eval = { detect:c=>/eval\s*\(/.test(c), plugin:c=>module.exports.plugin(c) };
+  window.DecodePlugins.eval = { detect:c=>/eval\s*\(/.test(c), plugin:c=>{ try{ return plugin(c) ?? c; }catch{ return c; } } };
 })();
-</script>
 
-<!-- ====== P.A.C.K.E.R 解包（前端） ====== -->
-<script>
+// Packer
 (function () {
   const P_RE=/^\s*eval\(function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{/;
   function isPacked(code){ return P_RE.test(code); }
@@ -339,11 +382,11 @@ function downloadOutput(){ const t=$('#codeOut').textContent||$('#outputRaw').te
   }
   function unpackRecursive(code,max=8){ let s=code,changed=false; for(let i=0;i<max;i++){ const out=unpackOnce(s); if(out==null) break; s=String(out).trim(); changed=true; } return changed? s : null; }
   window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.packer = { detect:c=>isPacked(c), plugin:c=>{ try{ const out=unpackRecursive(c); return out||c; }catch(e){ console.error('Packer 解包失败:',e); return c; } } };
+  window.DecodePlugins.packer = { detect:c=>isPacked(c), plugin:c=>{ try{ const out=unpackRecursive(c); return out||c; }catch{ return c; } } };
 })();
 </script>
 
-<!-- ====== 智能解密（自动） ====== -->
+<!-- ========= 智能解密 + 显示 ========= -->
 <script>
 function trySmartDecode(text){
   if(!$('#autoSmart').checked) return text;
@@ -355,37 +398,46 @@ function trySmartDecode(text){
     try{ if(window.DecodePlugins?.aadecode?.detect(cur)){ const t=window.DecodePlugins.aadecode.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
     if(cur===before) break; before=cur; changed=true;
   }
-  return changed? before : text;
+  return changed ? before : text;
 }
-function trySmartDecodeAndShow(src,label){
+async function trySmartDecodeAndShow(src,label){
   if(!$('#autoSmart').checked) return;
-  const out=trySmartDecode(src);
-  if(out!==src){ $('#codeOut').textContent=out; setStatus(`✅ ${label} · 本地智能解密完成`); }
+  const decoded = trySmartDecode(src);
+  if(decoded !== src){
+    const pretty = await maybeBeautify(decoded);
+    $('#codeOut').textContent = pretty;
+    setStatus(`✅ ${label} · 本地智能解密完成${pretty!==decoded?'（已美化）':''}`);
+  }
 }
+</script>
 
-/* ====== 后台恢复轮询（含智能解密） ====== */
+<!-- ========= 后台恢复轮询 ========= -->
+<script>
 function saveJobForAutoResume(job){
   const data={...job,startedAt:Date.now(),lastSha:'',etag:'',expiry:Date.now()+job.maxWait*1000+5*60*1000};
   localStorage.setItem('oto_auto_job', JSON.stringify(data));
 }
 function loadJob(){ try{ const raw=localStorage.getItem('oto_auto_job'); if(!raw) return null; const j=JSON.parse(raw); if(!j||!j.expiry||Date.now()>j.expiry){ localStorage.removeItem('oto_auto_job'); return null;} return j; }catch{ return null; } }
 function clearJob(){ localStorage.removeItem('oto_auto_job'); }
+
 async function pollOutputOnce(job,state){
   const api=`https://api.github.com/repos/${job.repo}/contents/${job.whichOut}?ref=${job.branch}&t=${Date.now()}`;
-  const headers={...ghHeaders()}; if(state.etag){ headers['If-None-Match']=state.etag; }
+  const headers={ ...ghHeaders() }; if(state.etag){ headers['If-None-Match']=state.etag; }
   const res=await fetch(api,{headers,cache:'no-store'});
   if(res.status===304){ setStatus('等待中…（未改变 304）'); return {done:false}; }
   const text=await res.text(); if(!res.ok){ setStatus(`等待中…（HTTP ${res.status}）`); return {done:false}; }
   const etag=res.headers.get('ETag')||state.etag; const j=JSON.parse(text); const sha=j.sha||''; const b64=(j.content||'').replace(/\n/g,''); const raw=j.content?b64ToUtf8(b64):'';
   if(state.sha && sha===state.sha){ setStatus('等待中…（未更新）'); return {done:false,etag,sha:state.sha}; }
   if(raw && raw.trim()){
-    const final=trySmartDecode(raw);
-    $('#codeOut').textContent=final;
-    setStatus(final!==raw?`✅ 本地智能解密完成 · ${final.length} 字符`:`✅ 已获取到最新 ${job.whichOut} · ${raw.length} 字符`);
-    return {done:true,etag,sha};
+    const finalDecoded = trySmartDecode(raw);
+    const final = await maybeBeautify(finalDecoded);
+    $('#codeOut').textContent = final;
+    setStatus( finalDecoded!==raw ? `✅ 本地智能解密完成${final!==finalDecoded?'（已美化）':''}` : `✅ 已获取到最新 ${job.whichOut}` );
+    return {done:true, etag, sha};
   }
-  setStatus('等待中…（文件为空或未生成）'); return {done:false,etag,sha};
+  setStatus('等待中…（文件为空或未生成）'); return {done:false, etag, sha};
 }
+
 async function autoResumeIfNeeded(){
   const job=loadJob(); if(!job) return;
   const short=Math.max(2, parseInt(job.pollSec||5,10)), long=Math.min(30, short*3);
@@ -407,5 +459,63 @@ async function autoResumeIfNeeded(){
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoResumeIfNeeded(); }, {passive:true});
 window.addEventListener('load', autoResumeIfNeeded);
 </script>
+
+<!-- ========= 设置持久化 ========= -->
+<script>
+const SETTINGS_KEY='oto_settings_v2';
+
+function readSettings(){
+  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); }catch{ return {}; }
+}
+function writeSettings(obj){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj)); }catch{}
+}
+function loadSettingsToUI(){
+  const s=readSettings();
+  if(s.repo) $('#repo').value=s.repo;
+  if(s.branch) $('#branch').value=s.branch;
+  if(s.rememberToken && s.token) $('#token').value=s.token;
+  if(s.rememberToken) $('#rememberToken').checked=true;
+  if(s.pathIn) $('#pathIn').value=s.pathIn;
+  if(s.commitMsg) $('#commitMsg').value=s.commitMsg;
+  if(s.whichOut) $('#whichOut').value=s.whichOut;
+  if(typeof s.pollSec==='number') $('#pollSec').value=s.pollSec;
+  if(typeof s.maxWait==='number') $('#maxWait').value=s.maxWait;
+  if(typeof s.autoResume==='boolean') $('#autoResume').checked=s.autoResume;
+  if(typeof s.autoSmart==='boolean') $('#autoSmart').checked=s.autoSmart;
+  if(typeof s.autoBeautify==='boolean') $('#autoBeautify').checked=s.autoBeautify;
+  if(typeof s.keepHeader==='boolean') $('#keepHeader').checked=s.keepHeader;
+}
+function gatherSettings(){
+  return {
+    repo: $('#repo').value.trim(),
+    branch: $('#branch').value.trim(),
+    rememberToken: $('#rememberToken').checked,
+    token: $('#rememberToken').checked ? $('#token').value.trim() : '',
+    pathIn: $('#pathIn').value.trim(),
+    commitMsg: $('#commitMsg').value.trim(),
+    whichOut: $('#whichOut').value,
+    pollSec: parseInt($('#pollSec').value,10)||5,
+    maxWait: parseInt($('#maxWait').value,10)||150,
+    autoResume: $('#autoResume').checked,
+    autoSmart: $('#autoSmart').checked,
+    autoBeautify: $('#autoBeautify').checked,
+    keepHeader: $('#keepHeader').checked,
+  };
+}
+function bindPersist(){
+  const ids=['repo','branch','token','rememberToken','pathIn','commitMsg','whichOut','pollSec','maxWait','autoResume','autoSmart','autoBeautify','keepHeader'];
+  ids.forEach(id=>{
+    const el=$('#'+id);
+    if(!el) return;
+    const evt = (el.tagName==='SELECT' || el.type==='checkbox') ? 'change' : 'input';
+    el.addEventListener(evt, ()=>writeSettings(gatherSettings()), {passive:true});
+  });
+}
+window.addEventListener('load',()=>{ loadSettingsToUI(); bindPersist(); });
+</script>
+
+<!-- 占位：隐藏文件 input 在上面 -->
+<input type="file" id="file" accept=".js,.txt,.json" hidden />
 </body>
 </html>
