@@ -1,137 +1,82 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 前端解密（前端优先 + 后台兜底）</title>
-<style>
-  :root{
-    --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
-    --text:#e6eef7;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--link:#67e8f9;
-    --accent:#3b82f6;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
-  a{color:var(--link)}
-  .wrap{max-width:1060px;margin:0 auto;padding:18px 14px 80px}
-  h1{margin:10px 0 6px;font-size:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
-  label{font-size:12px;color:var(--muted);margin-right:6px}
-  input,select,textarea{width:100%;background:#0f1a2b;color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:13px}
-  textarea{min-height:180px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
-  .row>*{flex:1 1 200px}
-  .row .tight{flex:0 0 auto}
-  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:var(--btn);color:var(--text);cursor:pointer;font-weight:600}
-  button.ok{border-color:var(--ok)}
-  button.warn{border-color:var(--warn)}
-  button.err{border-color:var(--err)}
-  pre{white-space:pre-wrap;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:420px;overflow:auto}
-  small{color:var(--muted)}
-  .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
-  .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
-  .pill{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:6px 10px;background:#0b1020}
-  details{border:1px solid var(--line);border-radius:10px;padding:8px;background:#0c1421}
-  summary{cursor:pointer;color:var(--muted)}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="wrap">
-  <h1>OtOjs · 前端解密（前端优先 + 后台兜底）</h1>
+  <div class="wrap">
+    <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
 
-  <!-- 基本设置（本地持久化） -->
-  <div class="card">
-    <div class="row">
-      <div style="flex:2">
-        <label>REPO</label>
-        <input id="repo" value="Mikephie/OtOjs" />
-      </div>
-      <div>
-        <label>BRANCH</label>
-        <input id="branch" value="main" />
-      </div>
-      <div>
-        <label>Token（contents:rw）</label>
-        <input id="token" type="password" placeholder="ghp_..." />
-      </div>
-    </div>
-
-    <details>
-      <summary>高级设置（可折叠）</summary>
-      <div class="row" style="margin-top:8px">
-        <div>
-          <label>自动拉取的输出文件</label>
-          <select id="whichOut">
-            <option value="output/output.js">第①次产物：output/output.js</option>
-            <option value="output/output.deob2.js">第②次产物：output/output.deob2.js</option>
-          </select>
-        </div>
-        <div class="tight">
-          <label>轮询间隔（秒）</label>
-          <input id="pollSec" type="number" value="5" />
-        </div>
-        <div class="tight">
-          <label>最大等待（秒）</label>
-          <input id="maxWait" type="number" value="150" />
-        </div>
-      </div>
+    <!-- 基础配置 -->
+    <div class="card">
       <div class="row">
-        <div class="pill">
-          <label><input id="autoDecode" type="checkbox" checked /> 前端自动解密</label>
-          <label><input id="autoBeautify" type="checkbox" /> 自动美化</label>
-          <label><input id="autoResume" type="checkbox" checked /> 提交后自动轮询</label>
-          <label><input id="verboseLog" type="checkbox" /> 控制台详细日志</label>
+        <div style="flex:2">
+          <label>REPO</label>
+          <input id="repo" value="Mikephie/OtOjs" />
+        </div>
+        <div>
+          <label>BRANCH</label>
+          <input id="branch" value="main" />
+        </div>
+        <div>
+          <label>Token（contents:rw）</label>
+          <input id="token" type="password" placeholder="ghp_..." />
         </div>
       </div>
-    </details>
-  </div>
-
-  <!-- 输入/操作 -->
-  <div class="card">
-    <small>把待解密脚本放到 <b>输入</b> → 先点<b>解密（前端）</b>；若不行再<b>提交（后台）</b>。</small>
-    <div class="row">
-      <input type="file" id="file" accept=".js,.txt,.json" />
-      <button id="pickBtn">选择文件</button>
-      <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
-      <button id="remoteBtn">远程加载</button>
-      <button id="pasteBtn">粘贴板</button>
-      <button class="err" id="clrInBtn">清空输入</button>
-    </div>
-    <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
-
-    <div class="row">
-      <button class="ok" id="decodeBtn">解密（前端）</button>
-      <button class="warn" id="submitBtn">提交（后台）</button>
-      <button id="beautifyBtn">美化</button>
-      <button id="copyBtn">复制结果</button>
-      <button class="err" id="clrAllBtn">清空输入与结果</button>
     </div>
 
-    <div id="status"><small>状态：就绪</small></div>
-    <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-
-    <div class="row">
+    <!-- 输入 -->
+    <div class="card">
+      <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
+      <div class="row compact">
+        <input type="file" id="file" accept=".js,.txt,.json" />
+        <button onclick="pick()">文件</button>
+        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
+        <button onclick="loadRemote()">远程</button>
+        <button onclick="pasteFromClipboard()">粘贴</button>
+        <button class="err" onclick="clrIn()">清空</button>
+      </div>
+      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
+      <div class="row compact">
+        <button class="ok" onclick="submitInput()">提交</button>
+        <button class="warn" onclick="startAutoPoll()">轮询</button>
+        <button onclick="beautify()">美化</button>
+        <button onclick="copySel('#codeOut', this)">复制</button>
+        <button class="err" onclick="clrAll()">清空全部</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
+      </div>
+      <div id="status"><small>状态：就绪</small></div>
+      <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
       <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
-  </div>
 
-  <!-- Raw 快速拉取 -->
-  <div class="card">
-    <div class="row">
-      <div class="pill">
-        <span>快速拉取 Raw：</span>
-        <button id="raw1">output/output.js</button>
-        <button id="raw2">output/output.deob2.js</button>
+    <!-- 输出 -->
+    <div class="card">
+      <div class="row compact">
+        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
+        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
+        <button onclick="copySel('#outputRaw', this)">复制结果</button>
+        <button onclick="downloadOutput()">下载</button>
       </div>
-      <button id="copyRawBtn">复制 Raw</button>
-      <button id="downloadBtn">下载当前结果</button>
+      <pre id="outputRaw"></pre>
     </div>
-    <pre id="outputRaw"></pre>
   </div>
-</div>
 
-<!-- 先加载插件，再加载逻辑（顺序非常重要） -->
-<script src="decode-all.js"></script>
-<script src="app.js"></script>
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
+  <script src="decode-all.js"></script>
+  <script src="app.js"></script>
+
+  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
+  <!--
+  <script src="prettier.min.js"></script>
+  <script src="parser-babel.min.js"></script>
+  -->
 </body>
 </html>
