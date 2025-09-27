@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OtOjs 解密前端 · 三件式</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
+
+    <!-- 基础配置 -->
+    <div class="card">
+      <div class="row">
+        <div style="flex:2">
+          <label>REPO</label>
+          <input id="repo" value="Mikephie/OtOjs" />
+        </div>
+        <div>
+          <label>BRANCH</label>
+          <input id="branch" value="main" />
+        </div>
+        <div>
+          <label>Token（contents:rw）</label>
+          <input id="token" type="password" placeholder="ghp_..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- 输入 -->
+    <div class="card">
+      <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
+      <div class="row compact">
+        <input type="file" id="file" accept=".js,.txt,.json" />
+        <button onclick="pick()">文件</button>
+        <input id="remoteUrl" placeholder="https:// 原始脚本 URL" />
+        <button onclick="loadRemote()">远程</button>
+        <button onclick="pasteFromClipboard()">粘贴</button>
+        <button class="err" onclick="clrIn()">清空</button>
+      </div>
+      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里…"></textarea>
+      <div class="row compact">
+        <button class="ok" onclick="submitInput()">提交</button>
+        <button class="warn" onclick="startAutoPoll()">轮询</button>
+        <button onclick="beautify()">美化</button>
+        <button onclick="copySel('#codeOut', this)">复制</button>
+        <button class="err" onclick="clrAll()">清空全部</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化 (Prettier)</label>
+        <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
+      </div>
+      <div id="status"><small>状态：就绪</small></div>
+      <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
+      <pre id="codeOut"></pre>
+    </div>
+
+    <!-- 输出 -->
+    <div class="card">
+      <div class="row compact">
+        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
+        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
+        <button onclick="copySel('#outputRaw', this)">复制结果</button>
+        <button onclick="downloadOutput()">下载</button>
+      </div>
+      <pre id="outputRaw"></pre>
+    </div>
+  </div>
+
+  <!-- 引入 -->
+  <script src="app.js"></script>
+  <script src="decode-all.js"></script>
+  <!-- 可选本地化 -->
+  <!-- <script src="prettier.min.js"></script>
+       <script src="parser-babel.min.js"></script> -->
+</body>
+</html>
