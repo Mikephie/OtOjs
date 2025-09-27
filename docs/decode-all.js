@@ -41,17 +41,19 @@ window.DecodePlugins = window.DecodePlugins || {};
   };
 })();
 
-/* =================== Eval / Packer（超强·无副作用捕获） =================== */
-(function registerEvalPacker() {
-  // 允许 r/d 作为最后形参；空白灵活
+// ========== Eval + Dean Edwards Packer 插件 ==========
+(function () {
+  // 1) 识别“像 packer”的外形（最后参数可能是 r 或 d）
   function looksLikePacker(code) {
     return /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*(r|d)\s*\)\s*\{/.test(code);
   }
 
-  // 静态解析 packer 的六参调用：eval(function(p,a,c,k,e,d){...})('<payload>',radix,count,'w1|w2|...', '|', 0,{})
-  function extractPackerParams(code) {
-    const head = `eval\\s*\\(\\s*function\\s*\\(\\s*p\\s*,\\s*a\\s*,\\s*c\\s*,\\s*k\\s*,\\s*e\\s*,\\s*(?:r|d)\\s*\\)\\s*\\{[\\s\\S]*?\\}\\s*\\(\\s*`;
-    const tail = `\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\'"\\\`])([\\s\\S]*?)\\3\\s*\\.split\\s*\\(\\s*([\\'"\\\`])([\\s\\S]*?)\\5\\s*\\)\\s*,\\s*(\\d+)\\s*,\\s*\\{\\s*\\}\\s*\\)\\s*\\)`;
+  // 2) 尝试静态解析 Packer 六参调用（兼容引号/分隔符/空白）
+  function parsePackerParams(code) {
+    const head =
+      `eval\\s*\\(\\s*function\\s*\\(\\s*p\\s*,\\s*a\\s*,\\s*c\\s*,\\s*k\\s*,\\s*e\\s*,\\s*(?:r|d)\\s*\\)\\s*\\{[\\s\\S]*?\\}\\s*\\(\\s*`;
+    const tail =
+      `\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\'"\\\`])([\\s\\S]*?)\\3\\s*\\.split\\s*\\(\\s*([\\'"\\\`])([\\s\\S]*?)\\5\\s*\\)\\s*,\\s*(\\d+)\\s*,\\s*\\{\\s*\\}\\s*\\)\\s*\\)`;
     const core = new RegExp(head + `([\\'"\\\`])([\\s\\S]*?)\\1` + tail, "m");
     const m = code.match(core);
     if (!m) return null;
@@ -65,15 +67,17 @@ window.DecodePlugins = window.DecodePlugins || {};
     };
   }
 
-  // 回填字典并替换（自后向前，避免前缀碰撞）
+  // 3) 回填词典（自后向前替换，避免前缀碰撞）
   function unpackPacker(params) {
     const { payload, radix, count, wordsRaw, sep } = params;
     const words = wordsRaw.split(sep);
+
     function baseN(c) {
       c = parseInt(c, radix);
       return (c < radix ? "" : baseN(Math.floor(c / radix))) +
              ((c = c % radix) > 35 ? String.fromCharCode(c + 29) : c.toString(36));
     }
+
     let out = payload;
     for (let i = count - 1; i >= 0; i--) {
       const k = baseN(i);
@@ -83,65 +87,50 @@ window.DecodePlugins = window.DecodePlugins || {};
     return out;
   }
 
-  // —— 文本级“预解”以便直接抓字符串 —— //
-  function _tryDecodeHexEscapes(s) {
-    try {
-      return s
-        .replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-        .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-        .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-    } catch { return s; }
-  }
-  function _tryFromCharCode(s) {
-    return s.replace(/String\.fromCharCode\s*\(\s*([^)]+?)\s*\)/g, (m, list) => {
+  // 4) 纯文本静态拉取：把“字符串里的代码”直接抠出来（不执行）
+  function staticPull(code) {
+    // atob("...") → "bin"
+    code = code.replace(/atob\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/g, (m, q, b64) => {
       try {
-        const arr = Function(`"use strict";return [${list}]`)();
-        return Array.isArray(arr) ? arr.map(n => String.fromCharCode(Number(n)||0)).join("") : m;
-      } catch { return m; }
-    });
-  }
-  function _tryArrayJoin(s) {
-    let out = s;
-    out = out.replace(/\[\s*([^\]]+?)\s*\]\.join\(\s*(['"])\s*\2\s*\)/g, (m, list) => {
-      try { const arr = Function(`"use strict";return [${list}]`)(); return Array.isArray(arr)? arr.join("") : m; } catch { return m; }
-    });
-    out = out.replace(/\[\s*([^\]]+?)\s*\]\s*\.map\([^)]*String\.fromCharCode[^)]*\)\s*\.join\(\s*(['"])\s*\2\s*\)/g, (m, list) => {
-      try { const arr = Function(`"use strict";return [${list}]`)(); return Array.isArray(arr)? arr.map(n=>String.fromCharCode(Number(n)||0)).join("") : m; } catch { return m; }
-    });
-    return out;
-  }
-  function _tryAtobInline(s) {
-    return s.replace(/atob\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/g, (m, q, b64) => {
-      try {
-        const bin = typeof atob !== "undefined" ? atob(b64)
-          : (typeof Buffer !== "undefined" ? Buffer.from(String(b64), "base64").toString("binary") : b64);
+        const bin = typeof atob !== "undefined"
+          ? atob(b64)
+          : (typeof Buffer !== "undefined"
+              ? Buffer.from(String(b64), "base64").toString("binary")
+              : b64);
         return JSON.stringify(bin);
       } catch { return m; }
     });
-  }
-
-  function staticPullPayload(code) {
-    let pre = code;
-    pre = _tryAtobInline(pre);
-    pre = _tryFromCharCode(pre);
-    pre = _tryArrayJoin(pre);
-    pre = _tryDecodeHexEscapes(pre);
-
-    const m1 = pre.match(/\beval\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
-    if (m1) return m1[2];
-    const m2 = pre.match(/\(\s*0\s*,\s*eval\s*\)\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
-    if (m2) return m2[2];
-    const m3 = pre.match(/(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
-    if (m3) return m3[2];
-    const m4 = pre.match(/set(?:Timeout|Interval)\s*\(\s*([`'"])([\s\S]*?)\1\s*,/i);
-    if (m4) return m4[2];
-    const m5 = pre.match(/\bnew?\s*Function\s*\(\s*([`'"])([\s\S]*?)\1\s*\)\s*\(\s*\)/i);
-    if (m5) return m5[2];
-
-    const mw = pre.match(/document\.write\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/i);
-    if (mw) {
+    // fromCharCode/数组拼接 → 明文
+    code = code.replace(/String\.fromCharCode\s*\(\s*([^)]+?)\s*\)/g, (m, list) => {
       try {
-        const html = JSON.parse(mw[1] + mw[2] + mw[1]);
+        const arr = Function(`"use strict";return [${list}]`)();
+        return Array.isArray(arr) ? arr.map(n=>String.fromCharCode(Number(n)||0)).join("") : m;
+      } catch { return m; }
+    }).replace(/\[\s*([^\]]+?)\s*\]\.join\(\s*(['"])\s*\2\s*\)/g, (m, list) => {
+      try { const arr = Function(`"use strict";return [${list}]`)(); return Array.isArray(arr)? arr.join("") : m; }
+      catch { return m; }
+    });
+
+    // 直接 eval("…")
+    let m = code.match(/\beval\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
+    if (m) return m[2];
+    // (0,eval)("…")
+    m = code.match(/\(\s*0\s*,\s*eval\s*\)\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
+    if (m) return m[2];
+    // window['eval']("…")
+    m = code.match(/(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
+    if (m) return m[2];
+    // setTimeout("…",…)
+    m = code.match(/set(?:Timeout|Interval)\s*\(\s*([`'"])([\s\S]*?)\1\s*,/i);
+    if (m) return m[2];
+    // new Function("…")()
+    m = code.match(/\bnew?\s*Function\s*\(\s*([`'"])([\s\S]*?)\1\s*\)\s*\(\s*\)/i);
+    if (m) return m[2];
+    // document.write('<script>…</script>')
+    m = code.match(/document\.write\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/i);
+    if (m) {
+      try {
+        const html = JSON.parse(m[1] + m[2] + m[1]);
         const sm = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
         if (sm) return sm[1];
       } catch {}
@@ -149,7 +138,7 @@ window.DecodePlugins = window.DecodePlugins || {};
     return null;
   }
 
-  // —— 两种“安全捕获”，都不真正执行业务代码 —— //
+  // 5) 语义替换捕获：把所有 eval 入口改成 __CAP__，拿字符串不执行
   function captureByTransform(code) {
     const replaced = code
       .replace(/\beval\s*\(/g, "(__CAP__)(")
@@ -166,6 +155,7 @@ window.DecodePlugins = window.DecodePlugins || {};
     try { return Function(runner)(); } catch { return null; }
   }
 
+  // 6) 轻沙盒捕获：Hook eval/new Function/setTimeout/document.write
   function captureBySandbox(code) {
     let captured = null;
     const hookEval = (x)=> (captured = x);
@@ -174,8 +164,11 @@ window.DecodePlugins = window.DecodePlugins || {};
       if (args.length === 1 && typeof args[0] === "string") { captured = args[0]; return function () {}; }
       return function(){};
     };
-    let lastWrite = "";
-    const hookWrite = (s) => { lastWrite = String(s); const m=lastWrite.match(/<script[^>]*>([\s\S]*?)<\/script>/i); if(m) captured=m[1]; };
+    const hookWrite = (s) => {
+      const html = String(s);
+      const m = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      if (m) captured = m[1];
+    };
     const sandbox = {
       eval: hookEval,
       window: { eval: hookEval },
@@ -199,18 +192,18 @@ window.DecodePlugins = window.DecodePlugins || {};
     return captured;
   }
 
-  // —— 单轮尝试顺序：Packer静态 → 文本静态 → 语义替换 → 轻沙盒 —— //
+  // 7) 单轮：Packer静态 → 文本静态 → 语义替换 → 沙盒
   function unpackOnce(input) {
-    let code = input;
+    let code = String(input);
 
-    // 某些外层 IIFE/一元包装会挡住匹配，先剥一层（不改变语义）
-    const mIife =
+    // 去掉最外层 IIFE/一元包装（常见）
+    const iife =
       code.match(/^\s*[!+~\-]?\s*\(?\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\)\s*;?\s*\(?\s*\)\s*;?\s*$/) ||
       code.match(/^\s*!\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\(\s*\)\s*;?\s*$/);
-    if (mIife && mIife[1]) code = mIife[1];
+    if (iife && iife[1]) code = iife[1];
 
     if (looksLikePacker(code)) {
-      const p = extractPackerParams(code);
+      const p = parsePackerParams(code);
       if (p) {
         try {
           const out = unpackPacker(p);
@@ -218,7 +211,8 @@ window.DecodePlugins = window.DecodePlugins || {};
         } catch {}
       }
     }
-    const stat = staticPullPayload(code);
+
+    const stat = staticPull(code);
     if (stat && stat !== code) return stat;
 
     const byTrans = captureByTransform(code);
@@ -230,8 +224,9 @@ window.DecodePlugins = window.DecodePlugins || {};
     return null;
   }
 
-  function unwrapRecursive(code, maxDepth = 15) {
-    let out = code;
+  // 8) 递归多轮（最多 15 轮）
+  function unpackAll(code, maxDepth = 15) {
+    let out = String(code);
     for (let i = 0; i < maxDepth; i++) {
       const next = unpackOnce(out);
       if (!next) break;
@@ -241,31 +236,26 @@ window.DecodePlugins = window.DecodePlugins || {};
     return out;
   }
 
-  // 注册为插件；不动你的外层架构与顺序
-  Plugins.evalpack = {
-    name: "evalpack",
-    detect(code) {
-      return (
-        /\beval\s*\(/.test(code) ||
-        /\(\s*0\s*,\s*eval\s*\)\s*\(/.test(code) ||
-        /(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(/.test(code) ||
-        /set(?:Timeout|Interval)\s*\(\s*['"]/i.test(code) ||
-        /\bnew?\s*Function\s*\(\s*['"]/.test(code) ||
-        looksLikePacker(code)
-      );
-    },
-    plugin(code) {
-      try {
-        const out = unwrapRecursive(code, 15);
-        return out && out !== code ? out : null;
-      } catch (e) { return null; }
-    },
-  };
+  // 注册插件：保持对外名称/接口不变
+  function detect(code) {
+    return (
+      code.includes("eval(") ||
+      /\(\s*0\s*,\s*eval\s*\)\s*\(/.test(code) ||
+      /(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(/.test(code) ||
+      /set(?:Timeout|Interval)\s*\(\s*['"]/i.test(code) ||
+      /\bnew?\s*Function\s*\(\s*['"]/.test(code) ||
+      looksLikePacker(code)
+    );
+  }
+  function plugin(code) {
+    try {
+      const out = unpackAll(code, 15);
+      return out && out !== code ? out : null;
+    } catch { return null; }
+  }
 
-  // 兼容旧命名（如果你外面用了 Plugins.eval）
-  Plugins.eval = Plugins.evalpack;
+  window.DecodePlugins.eval = { detect, plugin };
 })();
-
 
 // ========== JSFuck 插件 ==========
 (function () {
