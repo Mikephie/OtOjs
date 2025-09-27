@@ -205,11 +205,9 @@ async function loadOutputRaw(path){
     $('#outputRaw').textContent=t;
     setStatus('已拉取 Raw · '+path+' · '+t.length+' 字符');
     if($('#autoDecode').checked){
-      const decoded = await smartDecodePipeline(t);   // ✅ await
-      if (decoded) {
-        $('#codeOut').textContent = decoded;
-        if ($('#autoBeautify').checked) await beautify();  // ✅ await
-      }
+      const decoded = await smartDecodePipeline(t);
+      if (decoded) $('#codeOut').textContent = decoded;
+      if ($('#autoBeautify').checked) await beautify();
     }
   }catch(e){
     $('#outputRaw').textContent='拉取失败：'+e.message+'\n'+url;
@@ -227,19 +225,32 @@ function downloadOutput(){
 }
 
 // ========== Prettier ==========
-async function ensurePrettier(){
-  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
+async function ensurePrettier() {
+  const hasArray = Array.isArray(window.prettierPlugins) && window.prettierPlugins.length > 0;
+  const hasObj = window.prettierPlugins && window.prettierPlugins.babel;
+  if (window.prettier && (hasArray || hasObj)) return;
+
   const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
-  const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
   document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
+
+  const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
   document.body.appendChild(s2); await new Promise(r=>s2.onload=r);
 }
+
 async function beautify(){
   let s=$('#codeOut').textContent||$('#codeIn').value||'';
   if(!s){ setStatus('无待美化内容'); return }
   try{
     await ensurePrettier();
-    const out=prettier.format(s,{parser:'babel',plugins:[prettierPlugins.babel]});
+
+    let plugins=[];
+    if(Array.isArray(window.prettierPlugins)){
+      plugins=window.prettierPlugins;
+    }else if(window.prettierPlugins && window.prettierPlugins.babel){
+      plugins=[window.prettierPlugins.babel];
+    }
+
+    const out=await window.prettier.format(s,{parser:'babel',plugins});
     $('#codeOut').textContent=out;
     setStatus('已用 Prettier 美化');
   }catch(e){ setStatus('Prettier 失败：'+e.message); }
@@ -268,14 +279,10 @@ async function autoDecodeIfNeeded(){
   }
   let code=$('#codeIn').value||$('#codeOut').textContent||'';
   if(!code.trim()) return;
-  try {
-    const decoded = await smartDecodePipeline(code);   // ✅ await
-    if(decoded){
-      $('#codeOut').textContent=decoded;
-      if($('#autoBeautify').checked) await beautify();  // ✅ await
-    }
-  } catch(e){
-    setStatus('解密失败：'+e.message);
+  const decoded = await smartDecodePipeline(code);
+  if(decoded){
+    $('#codeOut').textContent=decoded;
+    if($('#autoBeautify').checked) await beautify();
   }
 }
 
