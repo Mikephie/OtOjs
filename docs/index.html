@@ -46,6 +46,8 @@
         <button onclick="beautify()">美化</button>
         <button onclick="copySel('#codeOut', this)">复制</button>
         <button class="err" onclick="clrAll()">清空全部</button>
+        <!-- 新增：清空远程两个文件（input.js 与 output/output.js） -->
+        <button id="clearRepoBtn" class="warn">清空远程 input/output</button>
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
