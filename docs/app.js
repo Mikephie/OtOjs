@@ -217,6 +217,7 @@ async function clearRemoteFiles(){
   try{
     await githubUpsert('input.js', '');
     await githubUpsert('output/output.js', '');
+    await githubUpsert('output/output.deob2.js', '');
     setStatus('✅ 远程 input.js 与 output/output.js 已置空');
   }catch(e){
     setStatus('❌ 清空失败：' + e.message);
