@@ -1,11 +1,14 @@
 // decode-all.js — OtOjs 前端解密插件总汇
-// 集成：AAEncode, Eval/Packer, JSFuck
-// 用法：app.js 中的 smartDecodePipeline() 会依次调用
+// 集成：AAEncode, Eval/Packer（若未提供 wrapper，使用内置后备实现）
+// 用法：app.js 中的 smartDecodePipeline() 会依次调用（见 ORDER）
 
+// 不要清空已有插件，保留 wrapper 先注册的内容
 window.DecodePlugins = window.DecodePlugins || {};
 
-// ========== AADecode 插件 ==========
+/* ================= AADecode 插件（仅在不存在同名插件时注册） ================= */
 (function () {
+  if (window.DecodePlugins.aadecode) return; // ★ 若 wrapper 已注册，直接使用
+
   function extractHeader(code) {
     const aaStartIndex = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
     if (aaStartIndex > 0) {
@@ -15,40 +18,42 @@ window.DecodePlugins = window.DecodePlugins || {};
     }
     return { header: "", encodedPart: code };
   }
+  function aaDecodeOnce(code) {
+    try {
+      let s = code
+        .replace(") ('_')", "")
+        .replace("(ﾟДﾟ) ['_'] (", "return ")
+        .replace(/^\s*[^=]+=\s*/, ""); // 去掉变量赋值
+      /* eslint-disable no-new-func */
+      return new Function(s)();
+    } catch { return null; }
+  }
   function plugin(code) {
     try {
       const { header, encodedPart } = extractHeader(code);
-      if (!(encodedPart.includes("ﾟДﾟ") || encodedPart.includes("(ﾟΘﾟ)") || encodedPart.includes("ﾟωﾟﾉ") || encodedPart.includes("ﾟдﾟ"))) {
-        return null;
-      }
-      let decodePart = encodedPart;
-      decodePart = decodePart.replace(") ('_')", "");
-      decodePart = decodePart.replace("(ﾟДﾟ) ['_'] (", "return ");
-      const x = new Function(decodePart);
-      const decodedContent = x();
-      if (header) return `${header}\n\n${decodedContent}`;
-      return decodedContent;
+      if (!(/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(encodedPart))) return null;
+      const out = aaDecodeOnce(encodedPart);
+      if (typeof out === "string" && out) return header ? `${header}\n\n${out}` : out;
+      return null;
     } catch (e) {
       console.error("[AAdecode] 解码失败:", e);
       return null;
     }
   }
   window.DecodePlugins.aadecode = {
-    detect: function (code) {
-      return code.includes("ﾟωﾟﾉ") || code.includes("ﾟДﾟ") || code.includes("ﾟдﾟ") || code.includes("ﾟΘﾟ");
-    },
+    detect: (code) => /ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(code),
     plugin
   };
 })();
 
-// ========== Eval + Dean Edwards Packer 插件 ==========
+/* ========== Eval + Packer 插件（仅在不存在同名插件时注册） ========== */
 (function () {
-  // 1) 识别“像 packer”的外形（最后参数可能是 r 或 d）
+  if (window.DecodePlugins.eval) return; // ★ 若 wrapper 已注册，直接使用
+
   function looksLikePacker(code) {
     return /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*(r|d)\s*\)\s*\{/.test(code);
   }
 
-  // 2) 尝试静态解析 Packer 六参调用（兼容引号/分隔符/空白）
   function parsePackerParams(code) {
     const head =
       `eval\\s*\\(\\s*function\\s*\\(\\s*p\\s*,\\s*a\\s*,\\s*c\\s*,\\s*k\\s*,\\s*e\\s*,\\s*(?:r|d)\\s*\\)\\s*\\{[\\s\\S]*?\\}\\s*\\(\\s*`;
@@ -67,17 +72,14 @@ window.DecodePlugins = window.DecodePlugins || {};
     };
   }
 
-  // 3) 回填词典（自后向前替换，避免前缀碰撞）
   function unpackPacker(params) {
     const { payload, radix, count, wordsRaw, sep } = params;
     const words = wordsRaw.split(sep);
-
     function baseN(c) {
       c = parseInt(c, radix);
       return (c < radix ? "" : baseN(Math.floor(c / radix))) +
              ((c = c % radix) > 35 ? String.fromCharCode(c + 29) : c.toString(36));
     }
-
     let out = payload;
     for (let i = count - 1; i >= 0; i--) {
       const k = baseN(i);
@@ -87,58 +89,20 @@ window.DecodePlugins = window.DecodePlugins || {};
     return out;
   }
 
-  // 4) 纯文本静态拉取：把“字符串里的代码”直接抠出来（不执行）
   function staticPull(code) {
-    // atob("...") → "bin"
-    code = code.replace(/atob\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/g, (m, q, b64) => {
-      try {
-        const bin = typeof atob !== "undefined"
-          ? atob(b64)
-          : (typeof Buffer !== "undefined"
-              ? Buffer.from(String(b64), "base64").toString("binary")
-              : b64);
-        return JSON.stringify(bin);
-      } catch { return m; }
-    });
-    // fromCharCode/数组拼接 → 明文
-    code = code.replace(/String\.fromCharCode\s*\(\s*([^)]+?)\s*\)/g, (m, list) => {
-      try {
-        const arr = Function(`"use strict";return [${list}]`)();
-        return Array.isArray(arr) ? arr.map(n=>String.fromCharCode(Number(n)||0)).join("") : m;
-      } catch { return m; }
-    }).replace(/\[\s*([^\]]+?)\s*\]\.join\(\s*(['"])\s*\2\s*\)/g, (m, list) => {
-      try { const arr = Function(`"use strict";return [${list}]`)(); return Array.isArray(arr)? arr.join("") : m; }
-      catch { return m; }
-    });
-
-    // 直接 eval("…")
     let m = code.match(/\beval\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
     if (m) return m[2];
-    // (0,eval)("…")
     m = code.match(/\(\s*0\s*,\s*eval\s*\)\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
     if (m) return m[2];
-    // window['eval']("…")
     m = code.match(/(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/);
     if (m) return m[2];
-    // setTimeout("…",…)
     m = code.match(/set(?:Timeout|Interval)\s*\(\s*([`'"])([\s\S]*?)\1\s*,/i);
     if (m) return m[2];
-    // new Function("…")()
     m = code.match(/\bnew?\s*Function\s*\(\s*([`'"])([\s\S]*?)\1\s*\)\s*\(\s*\)/i);
     if (m) return m[2];
-    // document.write('<script>…</script>')
-    m = code.match(/document\.write\s*\(\s*([`'"])([\s\S]*?)\1\s*\)/i);
-    if (m) {
-      try {
-        const html = JSON.parse(m[1] + m[2] + m[1]);
-        const sm = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-        if (sm) return sm[1];
-      } catch {}
-    }
     return null;
   }
 
-  // 5) 语义替换捕获：把所有 eval 入口改成 __CAP__，拿字符串不执行
   function captureByTransform(code) {
     const replaced = code
       .replace(/\beval\s*\(/g, "(__CAP__)(")
@@ -155,7 +119,6 @@ window.DecodePlugins = window.DecodePlugins || {};
     try { return Function(runner)(); } catch { return null; }
   }
 
-  // 6) 轻沙盒捕获：Hook eval/new Function/setTimeout/document.write
   function captureBySandbox(code) {
     let captured = null;
     const hookEval = (x)=> (captured = x);
@@ -164,39 +127,26 @@ window.DecodePlugins = window.DecodePlugins || {};
       if (args.length === 1 && typeof args[0] === "string") { captured = args[0]; return function () {}; }
       return function(){};
     };
-    const hookWrite = (s) => {
-      const html = String(s);
-      const m = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-      if (m) captured = m[1];
-    };
     const sandbox = {
       eval: hookEval,
       window: { eval: hookEval },
       self: { eval: hookEval },
       globalThis: { eval: hookEval },
-      document: { write: hookWrite },
+      document: { write: () => {} },
       navigator: { userAgent: "Mozilla/5.0" },
       location: {},
       console,
       setTimeout: hookTimeout,
       setInterval: hookTimeout,
       Function: hookFunction,
-      atob: typeof atob !== "undefined"
-        ? atob
-        : (s)=> typeof Buffer!=="undefined" ? Buffer.from(String(s),"base64").toString("binary") : s,
-      btoa: typeof btoa !== "undefined"
-        ? btoa
-        : (s)=> typeof Buffer!=="undefined" ? Buffer.from(String(s),"binary").toString("base64") : s,
     };
     try { Function(...Object.keys(sandbox), `"use strict";try{${code}}catch(e){}`)(...Object.values(sandbox)); } catch {}
     return captured;
   }
 
-  // 7) 单轮：Packer静态 → 文本静态 → 语义替换 → 沙盒
   function unpackOnce(input) {
     let code = String(input);
 
-    // 去掉最外层 IIFE/一元包装（常见）
     const iife =
       code.match(/^\s*[!+~\-]?\s*\(?\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\)\s*;?\s*\(?\s*\)\s*;?\s*$/) ||
       code.match(/^\s*!\s*function\s*\([^)]*\)\s*\{\s*([\s\S]*)\}\s*\(\s*\)\s*;?\s*$/);
@@ -224,7 +174,6 @@ window.DecodePlugins = window.DecodePlugins || {};
     return null;
   }
 
-  // 8) 递归多轮（最多 15 轮）
   function unpackAll(code, maxDepth = 15) {
     let out = String(code);
     for (let i = 0; i < maxDepth; i++) {
@@ -236,10 +185,9 @@ window.DecodePlugins = window.DecodePlugins || {};
     return out;
   }
 
-  // 注册插件：保持对外名称/接口不变
   function detect(code) {
     return (
-      code.includes("eval(") ||
+      /\beval\s*\(/.test(code) ||
       /\(\s*0\s*,\s*eval\s*\)\s*\(/.test(code) ||
       /(?:window|this|self|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(/.test(code) ||
       /set(?:Timeout|Interval)\s*\(\s*['"]/i.test(code) ||
@@ -257,28 +205,7 @@ window.DecodePlugins = window.DecodePlugins || {};
   window.DecodePlugins.eval = { detect, plugin };
 })();
 
-// ========== JSFuck 插件 ==========
-(function () {
-  function looksLikeJSFuck(code) {
-    return /^[\[\]!\+\(\)]+$/.test(code.replace(/\s+/g, ""));
-  }
-  function plugin(code) {
-    try {
-      if (!looksLikeJSFuck(code) && !code.includes("(![]+[])")) return null;
-      const res = eval(code); // JSFuck 本质是 eval
-      return String(res);
-    } catch (e) {
-      console.error("[JSFuck] 解码失败:", e);
-      return null;
-    }
-  }
-  window.DecodePlugins.jsfuck = {
-    detect: code => looksLikeJSFuck(code) || code.includes("(![]+[])"),
-    plugin
-  };
-})();
-
-// 轻量分行（兜底，美化失败也能看）
+/* ================== 轻量分行 & 美化兜底 ================== */
 function simpleFormat(src) {
   try {
     let out = "", indent = 0;
@@ -299,7 +226,6 @@ function simpleFormat(src) {
   } catch { return String(src); }
 }
 
-// 统一美化入口（优先 Prettier，其次兜底）
 function prettyFormat(code) {
   try {
     const hasPrettier = !!window.prettier;
@@ -317,41 +243,37 @@ function prettyFormat(code) {
       });
     }
   } catch {}
-  return simpleFormat(code); // 没有/失败就兜底分行
+  return simpleFormat(code);
 }
 
-// ========== 智能解密调度（先解包→再美化）==========
+/* ================== 智能解密调度 ================== */
 async function smartDecodePipeline(code) {
   let out = String(code);
   let changed = true;
   let rounds = 0;
 
-  // 固定插件顺序，避免 Object.keys 顺序不稳定
-  const ORDER = ["aadecode", "eval", "jsfuck"];
+  // ★ 只跑你要的两个插件；需要 jsfuck 就在数组里加 "jsfuck"
+  const ORDER = ["eval", "aadecode"];
 
   while (changed && rounds < 20) {
     changed = false;
     rounds++;
-
     for (const key of ORDER) {
       const p = window.DecodePlugins[key];
       if (!p || typeof p.detect !== "function" || typeof p.plugin !== "function") continue;
-
       if (p.detect(out)) {
         const res = p.plugin(out);
         if (typeof res === "string" && res && res !== out) {
           out = res;
           changed = true;
-          break; // ★ 成功解出一层，立刻换轮继续剥下一层
+          break; // 成功解出一层，进入下一轮
         }
       }
     }
   }
-
-  // 统一在最后做一次美化（若已加载 Prettier 就用它，否则走 simpleFormat）
   return prettyFormat(out);
 }
 
-// 暴露到全局
+// 暴露
 window.DecodePlugins = window.DecodePlugins || {};
 window.smartDecodePipeline = smartDecodePipeline;
