@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- 兜底换行，避免长行挤成一行；如被外部样式覆盖，下面两个 <pre> 也会用内联样式强制 -->
   <style>
-    /* 保证换行显示 */
-    pre { white-space: pre-wrap; word-break: break-word; }
+    pre{white-space:pre-wrap;word-break:break-word}
   </style>
 </head>
 <body>
@@ -53,13 +53,13 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" /> 自动美化（需 Prettier）</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <!-- 输出解密结果 -->
-      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word"></pre>
+      <!-- 用内联样式强制换行显示 -->
+      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word" placeholder="结果将显示在这里"></pre>
     </div>
 
     <!-- 输出 -->
@@ -70,6 +70,7 @@
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
       </div>
+      <!-- 用内联样式强制换行显示 -->
       <pre id="outputRaw" style="white-space:pre-wrap;word-break:break-word"></pre>
     </div>
   </div>
@@ -78,7 +79,7 @@
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 复制按钮 -->
+  <!-- 复制按钮：内联全局函数，避免依赖 app.js 暴露 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -99,8 +100,9 @@
     }
   </script>
 
-  <!-- 自动展开 \n + 断行 -->
+  <!-- 强钩自动分行补丁：展开 \"\\n\" 为真实换行 + 温和断行（不依赖 MutationObserver / Prettier） -->
   <script>
+    // 展开转义换行
     function expandEscapedNewlines(s){
       if (typeof s !== 'string') return s;
       if (!/\\n|\\r\\n/.test(s)) return s;
@@ -111,6 +113,7 @@
         return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
       }
     }
+    // 温和断行
     function softBreak(s){
       if (typeof s !== 'string') return s;
       if ((s.match(/\n/g)||[]).length >= 5) return s;
@@ -123,18 +126,35 @@
         .replace(/\{\s*(?=\S)/g,'{\n')
         .replace(/\)\s*\{\s*(?=\S)/g,'){\n');
     }
-    function reflowPre(el){
+    // 单次重排
+    function reflowOnce(el){
+      if(!el) return;
       const raw = el.textContent || '';
-      const expanded = expandEscapedNewlines(raw);
-      const out = softBreak(expanded);
+      const out = softBreak(expandEscapedNewlines(raw));
       if (out !== raw) el.textContent = out;
     }
-    const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
-    const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
-    window.addEventListener('load', ()=>{
-      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
-      if(a) _mo1.observe(a,{childList:true,subtree:true,characterData:true});
-      if(b) _mo2.observe(b,{childList:true,subtree:true,characterData:true});
+    // 重写两个 <pre> 的 textContent setter：每次写入自动分行
+    function hookPreReflow(selector){
+      const el = document.querySelector(selector);
+      if (!el) return;
+      const proto = Object.getPrototypeOf(el);
+      const desc = Object.getOwnPropertyDescriptor(proto, 'textContent') ||
+                   Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+      if (!desc || !desc.set) return;
+      Object.defineProperty(el, 'textContent', {
+        get(){ return desc.get.call(this); },
+        set(v){
+          desc.set.call(this, v == null ? '' : String(v)); // 原始写入
+          reflowOnce(this);                                 // 立即重排
+        }
+      });
+    }
+    // 页面就绪：钩住两个输出区并立即重排一次现有内容
+    window.addEventListener('load', () => {
+      hookPreReflow('#codeOut');
+      hookPreReflow('#outputRaw');
+      reflowOnce(document.getElementById('codeOut'));
+      reflowOnce(document.getElementById('outputRaw'));
     });
   </script>
 </body>
