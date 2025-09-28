@@ -3,244 +3,31 @@
   --text:#e6eef7;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--link:#67e8f9;
   --accent:#3b82f6;
 }
-
-*{
-  box-sizing:border-box
-}
-
-body{
-  margin:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-  background:var(--bg);
-  color:var(--text)
-}
-
-a{
-  color:var(--link)
-}
-
-.wrap{
-  max-width:960px;
-  margin:0 auto;
-  padding:18px 14px 80px
-}
-
-h1{
-  margin:10px 0 6px;
-  font-size:20px
-}
-
-.card{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:12px;
-  padding:12px;
-  margin:10px 0
-}
-
-label{
-  font-size:12px;
-  color:var(--muted);
-  margin-right:6px
-}
-
-input,select,textarea{
-  width:100%;
-  background:#0f1a2b;
-  color:var(--text);
-  border:1px solid var(--line2);
-  border-radius:10px;
-  padding:10px;
-  font-size:13px
-}
-
-textarea{
-  min-height:160px;
-  font-family:ui-monospace,Consolas,Menlo,monospace
-}
-
-.row{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin:6px 0
-}
-
-.row>*{
-  flex:1 1 200px
-}
-
-.row.compact>*{
-  flex:initial
-}
-
-button{
-  padding:6px 10px;
-  border-radius:8px;
-  border:1px solid #2b3b54;
-  background:var(--btn);
-  color:var(--text);
-  cursor:pointer;
-  font-weight:600;
-  font-size:13px
-}
-
-button.ok{
-  border-color:var(--ok)
-}
-
-button.warn{
-  border-color:var(--warn)
-}
-
-button.err{
-  border-color:var(--err)
-}
-
-/* 关键修复：pre 元素的代码显示 - 多浏览器兼容 */
-pre{
-  /* 强制换行 - 多浏览器兼容 */
-  white-space: pre-wrap !important;       /* CSS3 标准 */
-  white-space: -moz-pre-wrap !important;  /* Firefox */
-  white-space: -pre-wrap !important;      /* Opera 4-6 */
-  white-space: -o-pre-wrap !important;    /* Opera 7 */
-  word-wrap: break-word !important;       /* IE 5.5+ */
-  word-break: break-word !important;      /* 现代浏览器，温和换行 */
-  overflow-wrap: break-word !important;   /* 现代标准 */
-  
-  background:#0b1020;
-  border:1px solid var(--line2);
-  border-radius:10px;
-  padding:10px;
-  font-size:12px;
-  font-family:ui-monospace,Consolas,Menlo,Monaco,'Courier New',monospace;
-  line-height:1.4;
-  max-height:380px;
-  overflow:auto;
-  tab-size:2;
-  -moz-tab-size:2;
-  
-  /* 防止容器溢出 */
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* 针对代码输出区域的特殊优化 */
-#codeOut, #outputRaw {
-  /* 强制换行 - 关键修复 */
-  white-space: pre-wrap !important;
-  white-space: -moz-pre-wrap !important;
-  white-space: -pre-wrap !important;
-  white-space: -o-pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-word !important; /* 温和换行，不破坏单词 */
-  overflow-wrap: break-word !important;
-  
-  background:#0b1020;
-  border:1px solid var(--line2);
-  border-radius:10px;
-  padding:12px;
-  font-size:12px;
-  font-family:ui-monospace,Consolas,Menlo,Monaco,'Courier New',monospace;
-  line-height:1.5; /* 增加行高提升可读性 */
-  max-height:450px; /* 稍微增加高度 */
-  overflow:auto;
-  tab-size:2;
-  -moz-tab-size:2;
-  color:var(--text);
-  
-  /* 防止内容撑破容器 */
-  max-width: 100%;
-  box-sizing: border-box;
-  width: 100%;
-  
-  /* 确保长字符串能够正确换行 */
-  hyphens: none; /* 禁用连字符 */
-}
-
-/* 空白占位符样式 */
-#codeOut:empty::before, #outputRaw:empty::before {
-  content: attr(placeholder);
-  color: var(--muted);
-  font-style: italic;
-}
-
-/* 滚动条美化 */
-pre::-webkit-scrollbar, #codeOut::-webkit-scrollbar, #outputRaw::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-pre::-webkit-scrollbar-track, #codeOut::-webkit-scrollbar-track, #outputRaw::-webkit-scrollbar-track {
-  background: #0b1020;
-  border-radius: 4px;
-}
-
-pre::-webkit-scrollbar-thumb, #codeOut::-webkit-scrollbar-thumb, #outputRaw::-webkit-scrollbar-thumb {
-  background: var(--line2);
-  border-radius: 4px;
-}
-
-pre::-webkit-scrollbar-thumb:hover, #codeOut::-webkit-scrollbar-thumb:hover, #outputRaw::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
-}
-
-small{
-  color:var(--muted)
-}
-
-.bar-wrap{
-  height:6px;
-  background:#0b1020;
-  border:1px solid var(--line2);
-  border-radius:8px;
-  overflow:hidden;
-  margin-top:6px
-}
-
-.bar{
-  height:100%;
-  width:0%;
-  background:var(--accent);
-  transition:width 5s linear
-}
-
-.options{
-  display:flex;
-  gap:16px;
-  font-size:12px;
-  color:var(--muted);
-  margin-top:6px
-}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+a{color:var(--link)}
+.wrap{max-width:960px;margin:0 auto;padding:18px 14px 80px}
+h1{margin:10px 0 6px;font-size:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+label{font-size:12px;color:var(--muted);margin-right:6px}
+input,select,textarea{width:100%;background:#0f1a2b;color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:13px}
+textarea{min-height:160px;font-family:ui-monospace,Consolas,Menlo,monospace}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.row>*{flex:1 1 200px}
+.row.compact>*{flex:initial}
+button{padding:6px 10px;border-radius:8px;border:1px solid #2b3b54;background:var(--btn);color:var(--text);cursor:pointer;font-weight:600;font-size:13px}
+button.ok{border-color:var(--ok)}
+button.warn{border-color:var(--warn)}
+button.err{border-color:var(--err)}
+pre{white-space:pre-wrap;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:380px;overflow:auto}
+small{color:var(--muted)}
+.bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
+.bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
+.options{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
 
 /* 隐藏原生文件输入（用按钮触发） */
 #file {
   position:absolute !important;
-  width:1px; 
-  height:1px;
-  opacity:0; 
-  pointer-events:none;
-}
-
-/* 选中文本的样式 */
-pre::selection, #codeOut::selection, #outputRaw::selection {
-  background: rgba(59, 130, 246, 0.3);
-}
-
-/* 响应式优化 */
-@media (max-width: 768px) {
-  .wrap {
-    padding: 12px 8px 60px;
-  }
-  
-  pre, #codeOut, #outputRaw {
-    font-size: 11px !important;
-    padding: 8px !important;
-    max-height: 300px !important;
-  }
-  
-  .options {
-    flex-direction: column;
-    gap: 8px;
-  }
+  width:1px; height:1px;
+  opacity:0; pointer-events:none;
 }
