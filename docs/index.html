@@ -73,6 +73,77 @@
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
+  <!-- ① 更稳的复制实现（支持 <pre> 与 <textarea>） -->
+  <script>
+    async function copySel(sel, btn){
+      try{
+        const el = document.querySelector(sel);
+        const t = el ? (el.value ?? el.textContent ?? '') : '';
+        if(!t) throw new Error('没有可复制的内容');
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(t);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        }
+        if(btn){
+          const old=btn.textContent; btn.textContent='✅ 已复制';
+          setTimeout(()=> btn.textContent=old, 1200);
+        }
+      }catch(e){ alert('复制失败：' + e.message); }
+    }
+  </script>
+
+  <!-- ② Prettier 缺插件兜底 + 温和分行（在 ; } ) , 后断行，避开字符串/模板字面量） -->
+  <script>
+    (function(){
+      function lightFormat(src){
+        const s=String(src); let out='', inS=false,inD=false,inB=false, esc=false;
+        let paren=0, brace=0, bracket=0;
+        for(let i=0;i<s.length;i++){
+          const ch=s[i];
+          if(esc){ out+=ch; esc=false; continue; }
+          if(ch==='\\'){ out+=ch; esc=true; continue; }
+          if(!inD && !inB && ch=="'"){ inS=!inS; out+=ch; continue; }
+          if(!inS && !inB && ch=='"'){ inD=!inD; out+=ch; continue; }
+          if(!inS && !inD && ch=='`'){ inB=!inB; out+=ch; continue; }
+          if(inS||inD||inB){ out+=ch; continue; }
+          if(ch==='(') paren++; if(ch===')') paren=Math.max(0,paren-1);
+          if(ch==='{') brace++; if(ch==='}') brace=Math.max(0,brace-1);
+          if(ch==='[') bracket++; if(ch===']') bracket=Math.max(0,bracket-1);
+          if(ch===';'){ out+=';\n'; }
+          else if(ch==='}'){ out+='}\n'; }
+          else if(ch===')'){ out+=')\n'; }
+          else if(ch===','){ out += (paren+brace+bracket<=2) ? ',\n' : ','; }
+          else out+=ch;
+        }
+        return out.replace(/\n{3,}/g,'\n\n');
+      }
+      // Prettier shim：当 standalone/插件未就绪时，用 lightFormat 顶替，避免 “estree” 报错
+      (function(){
+        const needShim =
+          typeof window.prettier==='undefined' ||
+          typeof window.prettier?.format!=='function' ||
+          !window.prettierPlugins;
+        if(needShim){
+          window.prettier = { format(code){ try{return lightFormat(code);}catch{return String(code);} } };
+          window.prettierPlugins = window.prettierPlugins || {};
+          console.log('[shim] Prettier 未就绪，启用轻量分行。');
+        }
+      })();
+      // 自动对两个 <pre> 做可读化处理
+      function reflowPre(el){
+        if(!el) return; const raw=el.textContent||''; if(!raw) return;
+        const out=lightFormat(raw); if(out!==raw) el.textContent=out;
+      }
+      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
+      if(a) new MutationObserver(()=> reflowPre(a)).observe(a,{childList:true,subtree:true,characterData:true});
+      if(b) new MutationObserver(()=> reflowPre(b)).observe(b,{childList:true,subtree:true,characterData:true});
+      window.addEventListener('load', ()=>{ reflowPre(a); reflowPre(b); });
+    })();
+  </script>
+
   <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
   <!--
   <script src="prettier.min.js"></script>
