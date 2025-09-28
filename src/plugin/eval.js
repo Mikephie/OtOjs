@@ -37,6 +37,23 @@ function softBreak(s) {
     .replace(/\)\s*;\s*(?!\n)/g, ');\n')
 }
 
+/* -------------------- 关键补丁：提取 eval 之前的头部 -------------------- */
+/**
+ * 有些混淆会把“横幅注释/三行说明/变量声明”放在 eval 之前。
+ * 我们把它切出来再在成功解包后拼回，避免“前面三行丢失”。
+ */
+function extractHeaderBeforeEval(code) {
+  if (typeof code !== 'string') return { header: '', body: code }
+  // 尽量稳健：匹配常见写法 eval( / window.eval( / globalThis.eval(
+  const re = /\b(?:window\.|globalThis\.)?eval\s*\(/g
+  const m = re.exec(code)
+  if (!m) return { header: '', body: code }
+  const idx = m.index
+  const header = code.slice(0, idx).trimEnd()
+  const body = code.slice(idx)
+  return { header, body }
+}
+
 /* -------------------- Packer 识别与解包 -------------------- */
 /**
  * Dean Edwards Packer解包参数提取
@@ -46,7 +63,6 @@ function softBreak(s) {
 function unpackDeanEdwardsPacker(code) {
   const packerPattern =
     /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{[\s\S]*?\}\s*\(\s*'([\s\S]*?)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([\s\S]*?)'\s*\.split\s*\(\s*'([^']+)'\s*\)\s*,\s*(\d+)\s*,\s*\{\s*\}\s*\)\s*\)/
-
   const m = code.match(packerPattern)
   if (!m) return null
   return {
@@ -65,19 +81,16 @@ function unpackDeanEdwardsPacker(code) {
  */
 function executeDeanEdwardsUnpacker(params) {
   const { payload, radix, count, words } = params
-
   const decode = function (c) {
     c = parseInt(c, radix)
     return (c < radix ? '' : decode(Math.floor(c / radix))) +
       ((c = c % radix) > 35 ? String.fromCharCode(c + 29) : c.toString(36))
   }
-
   const dict = {}
   for (let i = 0; i < count; i++) {
     const key = decode(i)
     dict[key] = words[i] || key
   }
-
   let out = payload
   for (let i = count - 1; i >= 0; i--) {
     const key = decode(i)
@@ -100,15 +113,18 @@ function unpack(code) {
     if (typeof code !== 'string' || !code.includes('eval')) return null
     const startTime = Date.now()
 
+    // 关键：先切出 header，后续所有成功返回都要把 header 拼回
+    const { header, body } = extractHeaderBeforeEval(code)
+    const glue = header ? (header.endsWith('\n') ? '' : '\n') : ''
+
     /* 1) Dean Edwards Packer */
     try {
-      const params = unpackDeanEdwardsPacker(code)
+      const params = unpackDeanEdwardsPacker(body)
       if (params) {
         let result = executeDeanEdwardsUnpacker(params)
         if (result && result.includes('eval')) result = unpack(result) || result
-        const end = Date.now()
-        // console.log(`[eval] Packer 解密成功: ${end - startTime}ms`)
-        return expandEscapedNewlines(result)
+        const finalText = expandEscapedNewlines(result)
+        return header ? (header + glue + finalText) : finalText
       }
     } catch { /* 继续其它方法 */ }
 
@@ -121,12 +137,11 @@ function unpack(code) {
           String, parseInt, RegExp, console
         }
         vmMod.createContext(sandbox)
-        vmMod.runInContext(code, sandbox, { timeout: 5000 })
+        vmMod.runInContext(body, sandbox, { timeout: 5000 })
         if (result) {
           if (typeof result === 'string' && result.includes('eval')) result = unpack(result) || result
-          const end = Date.now()
-          // console.log(`[eval] VM 解密成功: ${end - startTime}ms`)
-          return expandEscapedNewlines(result)
+          const finalText = expandEscapedNewlines(result)
+          return header ? (header + glue + finalText) : finalText
         }
       } catch { /* 继续 */ }
     }
@@ -134,7 +149,7 @@ function unpack(code) {
     /* 3) Function 构造器：将 eval 替换为捕获函数 */
     try {
       let captured = null
-      const modified = code.replace(/\beval\s*\(/g, '(function(__x){captured=__x;return __x;})(')
+      const modified = body.replace(/\beval\s*\(/g, '(function(__x){captured=__x;return __x;})(')
       const fn = new Function('captured', 'String', 'parseInt', 'RegExp', `
         "use strict";
         ${modified}
@@ -143,15 +158,14 @@ function unpack(code) {
       let result = fn(null, String, parseInt, RegExp)
       if (result) {
         if (typeof result === 'string' && result.includes('eval')) result = unpack(result) || result
-        const end = Date.now()
-        // console.log(`[eval] Function 捕获成功: ${end - startTime}ms`)
-        return expandEscapedNewlines(result)
+        const finalText = expandEscapedNewlines(result)
+        return header ? (header + glue + finalText) : finalText
       }
     } catch { /* 继续 */ }
 
     /* 4) Babel AST：抓 eval(<call|string>) */
     try {
-      const ast = parse(code, { errorRecovery: true, sourceType: 'script' })
+      const ast = parse(body, { errorRecovery: true, sourceType: 'script' })
       let result = null
       traverse(ast, {
         CallExpression(path) {
@@ -173,9 +187,8 @@ function unpack(code) {
       })
       if (result) {
         if (typeof result === 'string' && result.includes('eval')) result = unpack(result) || result
-        const end = Date.now()
-        // console.log(`[eval] AST 抽取成功: ${end - startTime}ms`)
-        return expandEscapedNewlines(result)
+        const finalText = expandEscapedNewlines(result)
+        return header ? (header + glue + finalText) : finalText
       }
     } catch { /* 继续 */ }
 
