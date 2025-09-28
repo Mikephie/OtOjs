@@ -6,9 +6,11 @@
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
+    /* 兜底：结果区域一定可读 */
+    pre{
+      white-space: pre-wrap;       /* 保留换行并允许折行 */
+      word-break: break-word;      /* 超长 token 也能断 */
+      overflow-wrap: anywhere;
     }
   </style>
 </head>
@@ -60,10 +62,12 @@
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word"></pre>
+
+      <!-- 结果面板（强制换行/折行） -->
+      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word" placeholder="结果将显示在这里"></pre>
     </div>
 
-    <!-- 输出 -->
+    <!-- 输出（Raw） -->
     <div class="card">
       <div class="row compact">
         <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
@@ -75,70 +79,75 @@
     </div>
   </div>
 
-  <!-- 先插件，再主逻辑 -->
-  <script defer src="decode-all.js"></script>
-  <script defer src="app.js"></script>
+  <!-- 现有逻辑：保持顺序 -->
+  <script src="decode-all.js"></script>
+  <script src="app.js"></script>
 
-  <!-- 复制按钮 -->
-  <script defer>
+  <!-- 复制按钮（不依赖 app.js 暴露） -->
+  <script>
     async function copySel(sel, btn){
       try{
-        const el=document.querySelector(sel);
-        const t=el?(el.value??el.textContent??''):'';
-        if(navigator.clipboard?.writeText){
+        const el = document.querySelector(sel);
+        const t = el ? (el.value ?? el.textContent ?? '') : '';
+        if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(t);
         } else {
-          const ta=document.createElement('textarea');
-          ta.value=t; document.body.appendChild(ta);
+          const ta = document.createElement('textarea');
+          ta.value = t; document.body.appendChild(ta);
           ta.select(); document.execCommand('copy'); ta.remove();
         }
-        const old=btn.textContent;
-        btn.textContent='✅ 已复制';
-        setTimeout(()=>btn.textContent=old,1200);
+        const old = btn.textContent; btn.textContent = '✅ 已复制';
+        setTimeout(()=> btn.textContent = old, 1200);
       }catch(e){
-        alert('复制失败：'+e.message);
+        alert('复制失败：' + e.message);
       }
     }
   </script>
 
-  <!-- 分行补丁 -->
-  <script defer>
+  <!-- 仅负责“可读展示”：展开转义换行 + 温和断行（不影响秒解） -->
+  <script>
+    // 1) 把 \"\\n\" 这类转义变成真实换行/缩进
     function expandEscapedNewlines(s){
-      if(typeof s!=='string') return s;
-      if(!/\\n|\\r\\n/.test(s)) return s;
-      try{
-        const w='"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"';
-        return JSON.parse(w);
-      }catch{
+      if (typeof s !== 'string') return s;
+      // 有显式转义才处理，避免正常内容被二次改写
+      if (!/\\n|\\r\\n|\\t/.test(s)) return s;
+      try {
+        const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+        return JSON.parse(wrapped); // 最稳的展开方式
+      } catch {
         return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
       }
     }
+
+    // 2) 温和断行：只有在整体几乎一行时才做，尽量不改变语义
     function softBreak(s){
-      if(typeof s!=='string') return s;
-      if((s.match(/\n/g)||[]).length>=5) return s;
-      return s.replace(/;\s*(?!\n)/g,';\n').replace(/\}\s*(?!\n)/g,'}\n').replace(/\)\s*;\s*(?!\n)/g,');\n');
+      if (typeof s !== 'string') return s;
+      const lines = (s.match(/\n/g) || []).length;
+      if (lines >= 5) return s; // 原本就有足够换行，不动
+      return s
+        .replace(/;\s*(?!\n)/g, ';\n')
+        .replace(/\}\s*(?!\n)/g, '}\n')
+        .replace(/\)\s*;\s*(?!\n)/g, ');\n');
     }
-    function reflowOnce(el){
-      if(!el) return;
-      const raw=el.textContent||'';
-      const out=softBreak(expandEscapedNewlines(raw));
-      if(out!==raw) el.textContent=out;
+
+    // 3) 针对结果 <pre> 做“显示层”重排（不改原字符串；再次赋值用 textContent）
+    function reflowPre(el){
+      if (!el) return;
+      const raw = el.textContent || '';
+      const withNL = expandEscapedNewlines(raw);
+      const pretty = softBreak(withNL);
+      if (pretty !== raw) el.textContent = pretty;
     }
-    function hookPre(selector){
-      const el=document.querySelector(selector);
-      if(!el) return;
-      const desc=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
-      if(!desc||!desc.set) return;
-      Object.defineProperty(el,'textContent',{
-        get(){return desc.get.call(this)},
-        set(v){desc.set.call(this,v==null?'':String(v)); reflowOnce(this);}
-      });
-    }
-    window.addEventListener('DOMContentLoaded',()=>{
-      hookPre('#codeOut');
-      hookPre('#outputRaw');
-      reflowOnce(document.getElementById('codeOut'));
-      reflowOnce(document.getElementById('outputRaw'));
+
+    // 4) 监听两个 <pre> 的内容变化 —— 每次 app.js 写入时自动重排
+    const mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
+    const mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
+    window.addEventListener('load', ()=>{
+      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
+      if (a) mo1.observe(a,{childList:true,subtree:true,characterData:true});
+      if (b) mo2.observe(b,{childList:true,subtree:true,characterData:true});
+      // 初次渲染也跑一次（避免已有内容不分行）
+      reflowPre(a); reflowPre(b);
     });
   </script>
 </body>
