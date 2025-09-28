@@ -1,5 +1,5 @@
 /**
- * 在 babel_asttool.js 的基础上修改而来
+ * 在 babel_asttool.js 的基础上修改而来 —— 修复“解密后缺少最前面三行”
  */
 import { parse } from '@babel/parser'
 import _generate from '@babel/generator'
@@ -15,12 +15,26 @@ import parseControlFlowStorage from '../visitor/parse-control-flow-storage.js'
 import pruneIfBranch from '../visitor/prune-if-branch.js'
 import splitSequence from '../visitor/split-sequence.js'
 
+/* -------------------- 虚拟全局执行环境 -------------------- */
 const isolate = new ivm.Isolate()
 const globalContext = isolate.createContextSync()
 function virtualGlobalEval(jsStr) {
   return globalContext.evalSync(String(jsStr))
 }
 
+/* -------------------- 新增：提取头部前三行并保留 -------------------- */
+function extractHeader(ast) {
+  // 过滤掉空语句，截取前3条非空语句（常见是：签名/预处理/解密函数）
+  const body = ast.program.body.filter(n => !t.isEmptyStatement(n))
+  const headerNodes = body.slice(0, 3)
+  if (headerNodes.length === 0) return ''
+  return generator(
+    t.program(headerNodes),
+    { comments: true, jsescOption: { minimal: true } }
+  ).code
+}
+
+/* -------------------- 全局解密 -------------------- */
 function decodeGlobal(ast) {
   // 清理空语句
   let i = 0
@@ -59,29 +73,21 @@ function decodeGlobal(ast) {
   let content_code = ast.program.body.slice(3)
   // 运行解密语句
   ast.program.body = decrypt_code
-  let { code } = generator(ast, {
-    compact: true,
-  })
+  let { code } = generator(ast, { compact: true })
   virtualGlobalEval(code)
   // 遍历内容语句
   function funToStr(path) {
     let node = path.node
-    if (!t.isIdentifier(node.callee, { name: decrypt_val })) {
-      return
-    }
+    if (!t.isIdentifier(node.callee, { name: decrypt_val })) return
     let tmp = path.toString()
     let value = virtualGlobalEval(tmp)
-    // console.log(`还原前：${tmp} 还原后：${value}`)
     path.replaceWith(t.valueToNode(value))
   }
   function memToStr(path) {
     let node = path.node
-    if (!t.isIdentifier(node.object, { name: decrypt_val })) {
-      return
-    }
+    if (!t.isIdentifier(node.object, { name: decrypt_val })) return
     let tmp = path.toString()
     let value = virtualGlobalEval(tmp)
-    // console.log(`还原前：${tmp} 还原后：${value}`)
     path.replaceWith(t.valueToNode(value))
   }
   ast.program.body = content_code
@@ -92,21 +98,15 @@ function decodeGlobal(ast) {
   return ast
 }
 
+/* -------------------- 扁平控制流清理 -------------------- */
 function cleanSwitchCode(path) {
   // 扁平控制：
   // 会使用一个恒为true的while语句包裹一个switch语句
-  // switch语句的执行顺序又while语句上方的字符串决定
-  // 首先碰断是否符合这种情况
+  // switch语句的执行顺序由while语句上方的字符串决定
   const node = path.node
-  if (!(t.isBooleanLiteral(node.test) || t.isUnaryExpression(node.test))) {
-    return
-  }
-  if (!(node.test.prefix || node.test.value)) {
-    return
-  }
-  if (!t.isBlockStatement(node.body)) {
-    return
-  }
+  if (!(t.isBooleanLiteral(node.test) || t.isUnaryExpression(node.test))) return
+  if (!(node.test.prefix || node.test.value)) return
+  if (!t.isBlockStatement(node.body)) return
   const body = node.body.body
   if (
     !t.isSwitchStatement(body[0]) ||
@@ -148,15 +148,8 @@ function cleanSwitchCode(path) {
       }
       for (let i = 0; i < targetBody.length; ++i) {
         const s = targetBody[i]
-        if (t.isContinueStatement(s)) {
-          valid = false
-          break
-        }
-        if (t.isReturnStatement(s)) {
-          valid = false
-          resultBody.push(s)
-          break
-        }
+        if (t.isContinueStatement(s)) { valid = false; break }
+        if (t.isReturnStatement(s)) { valid = false; resultBody.push(s); break }
         if (t.isBreakStatement(s)) {
           console.log(`switch中出现意外的break: ${arrName}[${argName}]`)
         } else {
@@ -170,6 +163,7 @@ function cleanSwitchCode(path) {
   path.replaceInline(resultBody)
 }
 
+/* -------------------- 死代码/常量/循环清理 -------------------- */
 function cleanDeadCode(ast) {
   traverse(ast, calculateConstantExp)
   traverse(ast, pruneIfBranch)
@@ -177,6 +171,7 @@ function cleanDeadCode(ast) {
   return ast
 }
 
+/* -------------------- 模式匹配工具 -------------------- */
 function checkPattern(code, pattern) {
   let i = 0
   let j = 0
@@ -201,26 +196,18 @@ const deleteSelfDefendingCode = {
   VariableDeclarator(path) {
     const { id, init } = path.node
     const selfName = id.name
-    if (!t.isCallExpression(init)) {
-      return
-    }
-    if (!t.isIdentifier(init.callee)) {
-      return
-    }
+    if (!t.isCallExpression(init)) return
+    if (!t.isIdentifier(init.callee)) return
     const callName = init.callee.name
     const args = init.arguments
     if (
       args.length != 2 ||
       !t.isThisExpression(args[0]) ||
       !t.isFunctionExpression(args[1])
-    ) {
-      return
-    }
+    ) return
     const block = generator(args[1]).code
     const pattern = `RegExp()return.test(.toString())RegExp()return.test(.toString())\u0435\u0435`
-    if (!checkPattern(block, pattern)) {
-      return
-    }
+    if (!checkPattern(block, pattern)) return
     const refs = path.scope.bindings[selfName].referencePaths
     for (let ref of refs) {
       if (ref.key == 'callee') {
@@ -257,9 +244,7 @@ const deleteDebugProtectionCode = {
       body.body.length !== 2 ||
       !t.isFunctionDeclaration(body.body[0]) ||
       !t.isTryStatement(body.body[1])
-    ) {
-      return
-    }
+    ) return
     const debugName = id.name
     const ret = params[0].name
     const subNode = body.body[0]
@@ -267,22 +252,16 @@ const deleteDebugProtectionCode = {
       !t.isIdentifier(subNode.id) ||
       subNode.params.length !== 1 ||
       !t.isIdentifier(subNode.params[0])
-    ) {
-      return
-    }
+    ) return
     const subName = subNode.id.name
     const counter = subNode.params[0].name
     const code = generator(body).code
     const pattern = `function${subName}(${counter}){${counter}debug${subName}(++${counter})}try{if(${ret})return${subName}${subName}(0)}catch(){}`
-    if (!checkPattern(code, pattern)) {
-      return
-    }
+    if (!checkPattern(code, pattern)) return
     const scope1 = path.parentPath.scope
     const refs = scope1.bindings[debugName].referencePaths
     for (let ref of refs) {
-      if (ref.findParent((path) => path.removed)) {
-        continue
-      }
+      if (ref.findParent((path) => path.removed)) continue
       let parent = ref.getFunctionParent()
       if (parent.key == 0) {
         // DebugProtectionFunctionInterval
@@ -311,73 +290,43 @@ const deleteConsoleOutputCode = {
   VariableDeclarator(path) {
     const { id, init } = path.node
     const selfName = id.name
-    if (!t.isCallExpression(init)) {
-      return
-    }
-    if (!t.isIdentifier(init.callee)) {
-      return
-    }
+    if (!t.isCallExpression(init)) return
+    if (!t.isIdentifier(init.callee)) return
     const callName = init.callee.name
     const args = init.arguments
     if (
       args.length != 2 ||
       !t.isThisExpression(args[0]) ||
       !t.isFunctionExpression(args[1])
-    ) {
-      return
-    }
+    ) return
     const body = args[1].body.body
-    if (body.length !== 3) {
-      return
-    }
+    if (body.length !== 3) return
     if (
       !t.isVariableDeclaration(body[0]) ||
       !t.isVariableDeclaration(body[1]) ||
       !t.isIfStatement(body[2])
-    ) {
-      return
-    }
+    ) return
     const feature = [
       [],
       ['window', 'process', 'require', 'global'],
-      [
-        'console',
-        'log',
-        'warn',
-        'debug',
-        'info',
-        'error',
-        'exception',
-        'trace',
-      ],
+      ['console','log','warn','debug','info','error','exception','trace'],
     ]
     let valid = true
     for (let i = 1; i < 3; ++i) {
       const { code } = generator(body[i])
-      feature[i].map((key) => {
-        if (code.indexOf(key) == -1) {
-          valid = false
-        }
-      })
+      feature[i].map((key) => { if (code.indexOf(key) == -1) valid = false })
     }
-    if (!valid) {
-      return
-    }
+    if (!valid) return
     const refs = path.scope.bindings[selfName].referencePaths
     for (let ref of refs) {
-      if (ref.key == 'callee') {
-        ref.parentPath.remove()
-        break
-      }
+      if (ref.key == 'callee') { ref.parentPath.remove(); break }
     }
     path.remove()
     console.info(`Remove ConsoleOutputFunc: ${selfName}`)
     const scope = path.scope.getBinding(callName).scope
     scope.crawl()
     const bind = scope.bindings[callName]
-    if (bind.referenced) {
-      console.error(`Call func ${callName} unexpected ref!`)
-    }
+    if (bind.referenced) { console.error(`Call func ${callName} unexpected ref!`) }
     bind.path.remove()
     console.info(`Remove CallFunc: ${callName}`)
   },
@@ -386,18 +335,15 @@ const deleteConsoleOutputCode = {
 const deleteVersionCheck = {
   StringLiteral(path) {
     const msg = '删除版本号，js会定期弹窗，还请支持我们的工作'
-    if (path.node.value !== msg) {
-      return
-    }
+    if (path.node.value !== msg) return
     let fnPath = path.getFunctionParent().parentPath
-    if (!fnPath.isCallExpression()) {
-      return
-    }
+    if (!fnPath.isCallExpression()) return
     fnPath.remove()
     console.log('Remove VersionCheck')
   },
 }
 
+/* -------------------- 解除环境限制 -------------------- */
 function unlockEnv(ast) {
   // 查找并删除`自卫模式`函数
   traverse(ast, deleteSelfDefendingCode)
@@ -410,30 +356,21 @@ function unlockEnv(ast) {
   return ast
 }
 
+/* -------------------- 代码净化 -------------------- */
 function purifyFunction(path) {
   const node = path.node
-  if (!t.isIdentifier(node.left) || !t.isFunctionExpression(node.right)) {
-    return
-  }
+  if (!t.isIdentifier(node.left) || !t.isFunctionExpression(node.right)) return
   const name = node.left.name
-  if (node.right.body.body.length !== 1) {
-    return
-  }
+  if (node.right.body.body.length !== 1) return
   let retStmt = node.right.body.body[0]
-  if (!t.isReturnStatement(retStmt)) {
-    return
-  }
-  if (!t.isBinaryExpression(retStmt.argument, { operator: '+' })) {
-    return
-  }
+  if (!t.isReturnStatement(retStmt)) return
+  if (!t.isBinaryExpression(retStmt.argument, { operator: '+' })) return
   try {
     const fnPath = path.getFunctionParent() || path.scope.path
     fnPath.traverse({
       CallExpression: function (_path) {
         const _node = _path.node.callee
-        if (!t.isIdentifier(_node, { name: name })) {
-          return
-        }
+        if (!t.isIdentifier(_node, { name })) return
         let args = _path.node.arguments
         _path.replaceWith(t.binaryExpression('+', args[0], args[1]))
       },
@@ -451,41 +388,26 @@ function purifyCode(ast) {
   traverse(ast, { AssignmentExpression: purifyFunction })
   // 计算常量表达式
   traverse(ast, calculateConstantExp)
-  // 替换索引器
+  // 替换索引器 a['x'] → a.x
   function FormatMember(path) {
-    // _0x19882c['removeCookie']['toString']()
-    //  |
-    //  |
-    //  |
-    //  v
-    // _0x19882c.removeCookie.toString()
     let curNode = path.node
-    if (!t.isStringLiteral(curNode.property)) {
-      return
-    }
-    if (curNode.computed === undefined || !curNode.computed === true) {
-      return
-    }
-    if (!/^[a-zA-Z_$][0-9a-zA-Z_$]*$/.test(curNode.property.value)) {
-      return
-    }
+    if (!t.isStringLiteral(curNode.property)) return
+    if (curNode.computed === undefined || !curNode.computed === true) return
+    if (!/^[a-zA-Z_$][0-9a-zA-Z_$]*$/.test(curNode.property.value)) return
     curNode.property = t.identifier(curNode.property.value)
     curNode.computed = false
   }
   traverse(ast, { MemberExpression: FormatMember })
-  // 分割表达式
+  // 分割逗号表达式
   traverse(ast, splitSequence)
   // 删除空语句
-  traverse(ast, {
-    EmptyStatement: (path) => {
-      path.remove()
-    },
-  })
+  traverse(ast, { EmptyStatement: (path) => path.remove() })
   // 删除未使用的变量
   traverse(ast, deleteUnusedVar)
   return ast
 }
 
+/* -------------------- 主入口 -------------------- */
 export default function (code) {
   let ret = PluginEval.unpack(code)
   let global_eval = false
@@ -493,27 +415,29 @@ export default function (code) {
     global_eval = true
     code = ret
   }
+
+  // 初次 parse
   let ast = parse(code)
+
+  // 关键：立即提取头部前三行（此时 AST 仍完整）
+  const headerText = extractHeader(ast) || ''
+
   // 清理二进制显示内容
-  traverse(ast, {
-    StringLiteral: ({ node }) => {
-      delete node.extra
-    },
-  })
-  traverse(ast, {
-    NumericLiteral: ({ node }) => {
-      delete node.extra
-    },
-  })
+  traverse(ast, { StringLiteral: ({ node }) => { delete node.extra } })
+  traverse(ast, { NumericLiteral: ({ node }) => { delete node.extra } })
+
   console.log('处理全局加密...')
   ast = decodeGlobal(ast)
   if (!ast) {
     return null
   }
+
   console.log('处理代码块加密...')
   traverse(ast, parseControlFlowStorage)
+
   console.log('清理死代码...')
   ast = cleanDeadCode(ast)
+
   // 刷新代码
   ast = parse(
     generator(ast, {
@@ -521,17 +445,32 @@ export default function (code) {
       jsescOption: { minimal: true },
     }).code
   )
+
   console.log('提高代码可读性...')
   ast = purifyCode(ast)
+
   console.log('解除环境限制...')
   ast = unlockEnv(ast)
+
   console.log('净化完成')
-  code = generator(ast, {
+
+  // 生成最终代码
+  let out = generator(ast, {
     comments: false,
     jsescOption: { minimal: true },
   }).code
-  if (global_eval) {
-    code = PluginEval.pack(code)
+
+  // 把“最前面三行”拼回到顶部（可执行地拼回）
+  if (headerText) {
+    out = (headerText.endsWith('\n') ? headerText : headerText + '\n') + out
   }
-  return code
+  // 如果你想只保留为注释（不执行），改为：
+  // if (headerText) {
+  //   out = `/* ==== ORIGINAL HEADER (kept) ==== \n${headerText}\n==== END HEADER ==== */\n` + out
+  // }
+
+  if (global_eval) {
+    out = PluginEval.pack(out)
+  }
+  return out
 }
