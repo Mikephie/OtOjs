@@ -76,7 +76,7 @@
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 复制按钮：内联全局函数 -->
+  <!-- 复制按钮 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -97,30 +97,38 @@
     }
   </script>
 
-  <!-- 照 Eval 网站的粗暴分行 -->
+  <!-- 自动换行/分行逻辑 -->
   <script>
-    function forceSplitCode(elId){
-      const el = document.getElementById(elId);
-      if(!el) return;
-      let code = el.textContent || '';
-      code = code
-        .replace(/;/g, ";\n")
-        .replace(/{/g, "{\n")
-        .replace(/}/g, "}\n")
-        .replace(/,/g, ",\n")
-        .replace(/\n{3,}/g, "\n\n");
-      el.textContent = code;
+    function expandEscapedNewlines(s){
+      if (typeof s !== 'string') return s;
+      if (!/\\n|\\r\\n/.test(s)) return s;
+      try {
+        const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+        return JSON.parse(wrapped);
+      } catch {
+        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
+      }
     }
-
+    function forceBreak(s){
+      if (typeof s !== 'string') return s;
+      return s
+        .replace(/;\s*(?!\n)/g,';\n')
+        .replace(/\}\s*(?!\n)/g,'}\n')
+        .replace(/\)\s*;\s*(?!\n)/g,');\n');
+    }
+    function reflowPre(el){
+      const raw = el.textContent || '';
+      let out = expandEscapedNewlines(raw);
+      out = forceBreak(out);
+      if (out !== raw) el.textContent = out;
+    }
+    const mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
+    const mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
     window.addEventListener('load', ()=>{
-      forceSplitCode("codeOut");
-      forceSplitCode("outputRaw");
+      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
+      if(a) mo1.observe(a,{childList:true,subtree:true,characterData:true});
+      if(b) mo2.observe(b,{childList:true,subtree:true,characterData:true});
     });
-
-    const mo1=new MutationObserver(()=>forceSplitCode("codeOut"));
-    const mo2=new MutationObserver(()=>forceSplitCode("outputRaw"));
-    mo1.observe(document.getElementById('codeOut'),{childList:true,subtree:true,characterData:true});
-    mo2.observe(document.getElementById('outputRaw'),{childList:true,subtree:true,characterData:true});
   </script>
 </body>
 </html>
