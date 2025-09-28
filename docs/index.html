@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- 兜底：强制换行，避免长行一整块 -->
+  <!-- 强制换行，避免长行一整块 -->
   <style>
     pre{white-space:pre-wrap;word-break:break-word}
   </style>
@@ -77,59 +77,69 @@
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 再加载 wrapper（你的现有路径） -->
+  <!-- 再加载 wrapper（覆盖同名插件，必须在 decode-all/app.js 之后） -->
   <script src="main/src/wrapper/aadecode-wrapper.js"></script>
   <script src="main/src/wrapper/eval-wrapper.js"></script>
 
-  <!-- 桥接/覆盖：让 smartDecodePipeline 使用 wrapper 的 detect/plugin -->
+  <!-- 只用 eval + aadecode：重写 smartDecodePipeline，前端秒解 -->
   <script>
-  (function () {
-    // 确保容器存在
-    window.DecodePlugins = window.DecodePlugins || {};
-
-    // 兼容三种可能的暴露方式：
-    // 1) window.AADecodeWrapper / window.EvalWrapper = {detect,plugin}
-    // 2) wrapper 自己挂到了 window.DecodePlugins.aadecode / .eval
-    // 3) 其它命名：尝试回退到全局 detect/plugin
-    function pickWrapper(name, globalObjName){
-      // 方式1：显式对象
-      if (window[globalObjName] && window[globalObjName].detect && window[globalObjName].plugin) {
-        return window[globalObjName];
+    (function () {
+      // 简单分行兜底（不依赖 Prettier，避免报错/卡死）
+      function simpleFormat(src) {
+        try {
+          let out = "", indent = 0;
+          const lines = String(src)
+            .replace(/\r/g, "")
+            .replace(/;/g, ";\n")
+            .replace(/\{/g, "{\n")
+            .replace(/\}/g, "\n}\n")
+            .split("\n");
+          for (let raw of lines) {
+            let line = raw.trim();
+            if (!line) continue;
+            if (line.startsWith("}")) indent = Math.max(0, indent - 1);
+            out += "  ".repeat(indent) + line + "\n";
+            if (line.endsWith("{")) indent++;
+          }
+          return out.trim() + "\n";
+        } catch { return String(src); }
       }
-      // 方式2：wrapper 已经把同名插件挂到 DecodePlugins
-      if (window.DecodePlugins[name] && window.DecodePlugins[name]._source === 'wrapper') {
-        return window.DecodePlugins[name];
-      }
-      if (window.DecodePlugins[name] && window.DecodePlugins[name].detect && window.DecodePlugins[name].plugin) {
-        // 如果 decode-all.js 先注册了，这里不动；等会儿被覆盖
-        return window.DecodePlugins[name];
-      }
-      // 方式3：宽松兼容（不推荐，但兜底）
-      if (window.detect && window.plugin) {
-        return { detect: window.detect, plugin: window.plugin };
-      }
-      return null;
-    }
 
-    var AA = pickWrapper('aadecode', 'AADecodeWrapper');
-    if (AA && AA.detect && AA.plugin) {
-      window.DecodePlugins.aadecode = { detect: AA.detect, plugin: AA.plugin, _source: 'wrapper' };
-      console.log('[OtOjs] aadecode wrapper registered');
-    }
+      // 用 wrapper 覆盖：只跑 ["eval","aadecode"]
+      window.smartDecodePipeline = async function (code) {
+        const ORDER = ["eval", "aadecode"]; // 只启用这两个
+        let out = String(code);
+        let changed = true;
+        let rounds = 0;
 
-    var EV = pickWrapper('eval', 'EvalWrapper');
-    if (EV && EV.detect && EV.plugin) {
-      window.DecodePlugins.eval = { detect: EV.detect, plugin: EV.plugin, _source: 'wrapper' };
-      console.log('[OtOjs] eval/packer wrapper registered');
-    }
+        while (changed && rounds < 20) {
+          changed = false;
+          rounds++;
+          for (const key of ORDER) {
+            const p = window.DecodePlugins && window.DecodePlugins[key];
+            if (!p || typeof p.detect !== "function" || typeof p.plugin !== "function") continue;
+            try {
+              if (p.detect(out)) {
+                const res = p.plugin(out);
+                if (typeof res === "string" && res && res !== out) {
+                  out = res;
+                  changed = true;
+                  break; // 解出一层，继续下一轮
+                }
+              }
+            } catch (e) {
+              // 出错不中断其他插件
+            }
+          }
+        }
 
-    // 为了“只要 evalpacker”，确保插件顺序只包含 eval + aadecode
-    // 如果你的 app.js 里有 smartDecodePipeline(ORDER)，也能直接读到更新后的插件实现
-    window.__OTO_ORDER__ = ['eval', 'aadecode']; // 可被 app.js 读取（可选）
-  })();
+        // 最后统一做一次兜底分行（不依赖 Prettier）
+        return simpleFormat(out);
+      };
+    })();
   </script>
 
-  <!-- 复制按钮（独立，不依赖 app.js 暴露） -->
+  <!-- 复制按钮（独立，不依赖 app.js） -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -151,7 +161,7 @@
     }
   </script>
 
-  <!-- 展开 \"\\n\" 为真实换行 + 温和断行（只影响显示，不影响解密） -->
+  <!-- 展开 \"\\n\" 为真实换行 + 温和断行，保证中间内容可读（只影响展示，不改原始数据） -->
   <script>
     function expandEscapedNewlines(s){
       if (typeof s !== "string") return s;
@@ -177,6 +187,7 @@
       const out = softBreak(expanded);
       if (out !== raw) el.textContent = out;
     }
+    // 自动对两个 <pre> 进行可读性处理（不改变解密逻辑）
     const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
     const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
     window.addEventListener('load', ()=>{
@@ -186,7 +197,7 @@
     });
   </script>
 
-  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
+  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 若有检测将自己使用；此处不强制依赖） -->
   <!--
   <script src="prettier.min.js"></script>
   <script src="parser-babel.min.js"></script>
