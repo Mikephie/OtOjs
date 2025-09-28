@@ -1,91 +1,65 @@
 /**
- * Eval解包工具包装器 - 将Eval解包工具转换为浏览器可用版本
+ * Eval 解包插件包装器 - 前端版本
+ * 捕获 eval 参数，失败返回 null
  */
-// 创建自执行函数来隔离作用域
-(function() {
-  // 模拟Node.js环境
+(function () {
   const module = { exports: {} };
-  const exports = module.exports;
-  
-  // 以下粘贴原始eval-decoder.js插件代码
-  // ====== 开始: 原始eval-decoder.js代码 ======
-  
-  /**
-   * 解包eval加密的代码
-   * @param {string} code - 要解包的代码
-   * @returns {string|null} - 解包后的代码或null（解包失败时）
-   */
+
+  // ====== Eval 原始逻辑 ======
   function plugin(code) {
     try {
-      // 如果不包含eval，直接返回null
-      if (!code.includes('eval(') && !code.includes('eval (')) {
-        return null;
-      }
-      
-      // 替换eval为一个捕获函数
-      let modifiedCode = code.replace(/eval\s*\(/g, '(function(x) { return x; })(');
-      
-      // 尝试执行修改后的代码获取eval的参数
+      if (!code.includes("eval(") && !code.includes("eval (")) return null;
+
+      let modified = code.replace(/eval\s*\(/g, "(function(x){return x;})(");
+
       try {
-        // 创建一个执行环境
         const env = {
           window: {},
           document: {},
           navigator: { userAgent: "Mozilla/5.0" },
-          location: {}
+          location: {},
         };
-        
-        // 执行代码
-        const result = Function('window', 'document', 'navigator', 'location',
-                              `return ${modifiedCode}`)(
-                              env.window, env.document, env.navigator, env.location);
-        
-        // 如果结果是字符串且包含eval，递归解包
-        if (typeof result === 'string') {
-          if (result.includes('eval(')) {
-            return plugin(result);
-          }
-          return result;
+
+        const result = Function("window", "document", "navigator", "location",
+          `return ${modified}`)(
+          env.window, env.document, env.navigator, env.location
+        );
+
+        if (typeof result === "string") {
+          return result.includes("eval(") ? plugin(result) : result;
         }
-        
         return String(result);
-      } catch (err) {
-        console.log("执行替换eval的方法失败，尝试直接替换方法");
-        
-        // 尝试直接替换eval
+      } catch (e) {
+        console.warn("[Eval] 替换执行失败，尝试直接替换:", e);
         try {
-          modifiedCode = code.replace(/eval\s*\(/g, '(');
-          return modifiedCode;
-        } catch (replaceErr) {
-          console.error("直接替换eval方法也失败:", replaceErr);
+          modified = code.replace(/eval\s*\(/g, "(");
+          return modified !== code ? modified : null;
+        } catch {
           return null;
         }
       }
-    } catch (error) {
-      console.error("Eval解包发生错误:", error);
+    } catch (err) {
+      console.error("[Eval] 解包错误:", err);
       return null;
     }
   }
-  
-  // 导出插件接口
-  exports.plugin = function(code) {
-    return plugin(code);
-  };
-  
-  // ====== 结束: 原始eval-decoder.js代码 ======
-  
-  // 将插件注册到全局解密插件库
+
+  module.exports.plugin = plugin;
+  // ====== END ======
+
   window.DecodePlugins = window.DecodePlugins || {};
   window.DecodePlugins.eval = {
-    detect: function(code) {
-      // 检测是否包含eval调用
-      return code.includes('eval(') || code.includes('eval (');
+    detect: (code) => /eval\s*\(/.test(code) || /eval\s*\s*\(/.test(code),
+    plugin: (code) => {
+      try {
+        const result = module.exports.plugin(code);
+        return result !== null ? result : null;
+      } catch (e) {
+        console.error("[Eval] 插件调用失败:", e);
+        return null;
+      }
     },
-    plugin: function(code) {
-      // 使用原始模块的功能
-      return module.exports.plugin(code);
-    }
   };
-  
-  console.log("Eval解包插件已加载");
+
+  console.log("✅ Eval wrapper 已加载");
 })();
