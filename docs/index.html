@@ -5,12 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-  </style>
 </head>
 <body>
   <div class="wrap">
@@ -75,64 +69,18 @@
     </div>
   </div>
 
-  <!-- === 插件包装：AAdecode Wrapper === -->
-  <script>
-  (function(){
-    function aadecode(str){
-      try {
-        // 来自 DCjs 的 aaencode decode 逻辑
-        if(!/ﾟωﾟﾉ=/.test(str) && !/ﾟΘﾟ=/.test(str) && !/ﾟДﾟ=/.test(str)) return null;
-        return eval(str); // AAdecode 特点是直接 eval 返回明文
-      } catch(e){
-        return null;
-      }
-    }
-    window.DecodePlugins = window.DecodePlugins || {};
-    window.DecodePlugins.aadecode = {
-      detect: function(code){
-        return /ﾟωﾟﾉ=|ﾟΘﾟ=|ﾟДﾟ=/.test(code);
-      },
-      plugin: function(code){
-        return aadecode(code) || code;
-      }
-    };
-    console.log("AAdecode 插件已加载");
-  })();
-  </script>
-
-  <!-- === 插件包装：EvalPacker Wrapper === -->
-  <script>
-  (function(){
-    function unpackEval(code){
-      try{
-        if(!/eval\(/.test(code)) return null;
-        // 替换 eval() 为直接返回
-        var modified = code.replace(/eval\s*\(/g, '(function(x){return x})( ');
-        var result = Function('"use strict";return ('+modified+')')();
-        if(typeof result === 'string' && result.includes('eval(')){
-          return unpackEval(result);
-        }
-        return result;
-      }catch(e){
-        return null;
-      }
-    }
-    window.DecodePlugins = window.DecodePlugins || {};
-    window.DecodePlugins.evalpacker = {
-      detect: function(code){
-        return /eval\(/.test(code);
-      },
-      plugin: function(code){
-        return unpackEval(code) || code;
-      }
-    };
-    console.log("EvalPacker 插件已加载");
-  })();
-  </script>
+  <!-- 插件：必须在 decode-all.js 之前加载 -->
+  <script src="src/wrapper/aadecode-wrapper.js"></script>
+  <script src="src/wrapper/eval-wrapper.js"></script>
 
   <!-- 顺序非常重要：先插件，再主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
+  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
+  <!--
+  <script src="prettier.min.js"></script>
+  <script src="parser-babel.min.js"></script>
+  -->
 </body>
 </html>
