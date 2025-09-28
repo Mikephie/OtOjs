@@ -6,10 +6,7 @@
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
+    pre { white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
 <body>
@@ -49,14 +46,12 @@
       <div class="row compact">
         <button class="ok" onclick="submitInput()">提交</button>
         <button class="warn" onclick="startAutoPoll()">轮询</button>
-        <button onclick="beautify()">美化</button>
-        <button onclick="copySel('#codeOut', this)">复制</button>
-        <button onclick="reflowOutput()">分行</button> <!-- 新增分行按钮 -->
+        <button onclick="runEvalUnpack()">本地解密</button>
+        <button onclick="copySel('#codeOut', this)">复制结果</button>
         <button class="err" onclick="clrAll()">清空全部</button>
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
@@ -71,17 +66,19 @@
         <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
-        <button onclick="reflowOutput('#outputRaw')">分行</button> <!-- 新增分行按钮 -->
       </div>
       <pre id="outputRaw"></pre>
     </div>
   </div>
 
-  <!-- 顺序非常重要：先插件，再主逻辑 -->
-  <script src="decode-all.js"></script>
+  <!-- ====== 替换解密逻辑：引入 js_beautify + eval_out.js ====== -->
+  <script src="code_packed.js"></script>
+  <script src="eval_out.js"></script>
+
+  <!-- 保留你原来的 app.js 功能（提交/轮询/GitHub API） -->
   <script src="app.js"></script>
 
-  <!-- 全局函数：复制 -->
+  <!-- 复制函数 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -99,29 +96,6 @@
       }catch(e){
         alert('复制失败：' + e.message);
       }
-    }
-  </script>
-
-  <!-- 分行函数 -->
-  <script>
-    function expandEscapedNewlines(s){
-      if (typeof s !== 'string') return s;
-      return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
-    }
-    function softBreak(s){
-      if (typeof s !== 'string') return s;
-      return s
-        .replace(/;\s*(?!\n)/g,';\n')
-        .replace(/\}\s*(?!\n)/g,'}\n')
-        .replace(/\)\s*;\s*(?!\n)/g,');\n');
-    }
-    function reflowOutput(sel='#codeOut'){
-      const el = document.querySelector(sel);
-      if(!el) return;
-      const raw = el.textContent || '';
-      const expanded = expandEscapedNewlines(raw);
-      const out = softBreak(expanded);
-      if (out !== raw) el.textContent = out;
     }
   </script>
 </body>
