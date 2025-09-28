@@ -212,13 +212,13 @@ async function clearRemoteFiles(){
     setStatus(e.message);
     return;
   }
-  if (!confirm('确认要清空远程 input.js 与 output/output.js 的内容吗？')) return;
+  if (!confirm('确认要清空远程 input.js、output/output.js 与 output/output.deob2.js 的内容吗？')) return;
 
   try{
     await githubUpsert('input.js', '');
     await githubUpsert('output/output.js', '');
     await githubUpsert('output/output.deob2.js', '');
-    setStatus('✅ 远程 input.js 与 output/output.js 已置空');
+    setStatus('✅ 远程 input.js、output/output.js、output/output.deob2.js 已置空');
   }catch(e){
     setStatus('❌ 清空失败：' + e.message);
   }
@@ -346,19 +346,28 @@ window.downloadOutput = downloadOutput;
 
 // ========== Prettier ==========
 async function ensurePrettier() {
+  // 确保 standalone + babel + estree 都已加载，否则会报 “Couldn't find plugin for AST format estree”
   const hasArray = Array.isArray(window.prettierPlugins) && window.prettierPlugins.length > 0;
-  const hasObj = window.prettierPlugins && window.prettierPlugins.babel;
+  const hasObj = window.prettierPlugins && (window.prettierPlugins.babel || window.prettierPlugins.estree);
   if (window.prettier && (hasArray || hasObj)) return;
 
+  // core
   const s1=document.createElement('script');
   s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
   document.body.appendChild(s1);
   await new Promise(r=>s1.onload=r);
 
+  // parser: babel
   const s2=document.createElement('script');
   s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
   document.body.appendChild(s2);
   await new Promise(r=>s2.onload=r);
+
+  // printer: estree（关键）
+  const s3=document.createElement('script');
+  s3.src='https://unpkg.com/prettier@3.2.5/plugins/estree.js';
+  document.body.appendChild(s3);
+  await new Promise(r=>s3.onload=r);
 }
 async function beautify(){
   let s=$('#codeOut').textContent||$('#codeIn').value||'';
@@ -367,9 +376,10 @@ async function beautify(){
     await ensurePrettier();
     let plugins=[];
     if(Array.isArray(window.prettierPlugins)){
-      plugins=window.prettierPlugins;
-    }else if(window.prettierPlugins && window.prettierPlugins.babel){
-      plugins=[window.prettierPlugins.babel];
+      plugins=window.prettierPlugins; // 数组注入场景
+    }else if(window.prettierPlugins){
+      if(window.prettierPlugins.babel)  plugins.push(window.prettierPlugins.babel);
+      if(window.prettierPlugins.estree) plugins.push(window.prettierPlugins.estree);
     }
     const out=await window.prettier.format(s,{parser:'babel',plugins});
     $('#codeOut').textContent=out;
