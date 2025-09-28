@@ -1,4 +1,7 @@
 (function () {
+  let names = "Spin the Wheel";
+  let productName = "com.Spin.The.Wheel.Random.Picker.decision.maker";
+  let productType = "com.Spin.The.Wheel.Random.Picker.decision.maker.lifetime.";
   let appVersion = "23";
   let notifyState = true;
   let ua = false;
