@@ -6,10 +6,10 @@
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* 兜底：结果区域一定可读 */
+    /* 保证结果区域一定可读 */
     pre{
-      white-space: pre-wrap;       /* 保留换行并允许折行 */
-      word-break: break-word;      /* 超长 token 也能断 */
+      white-space: pre-wrap;
+      word-break: break-word;
       overflow-wrap: anywhere;
     }
   </style>
@@ -63,7 +63,7 @@
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
 
-      <!-- 结果面板（强制换行/折行） -->
+      <!-- 结果面板 -->
       <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word" placeholder="结果将显示在这里"></pre>
     </div>
 
@@ -79,11 +79,11 @@
     </div>
   </div>
 
-  <!-- 现有逻辑：保持顺序 -->
+  <!-- 保持原有顺序 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 复制按钮（不依赖 app.js 暴露） -->
+  <!-- 复制按钮（移动端兜底） -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -104,49 +104,161 @@
     }
   </script>
 
-  <!-- 仅负责“可读展示”：展开转义换行 + 温和断行（不影响秒解） -->
+  <!-- 显示层“简易美化器”：展开 \n，并按 { } ; , 缩进分行（避开字符串/注释/正则） -->
   <script>
-    // 1) 把 \"\\n\" 这类转义变成真实换行/缩进
-    function expandEscapedNewlines(s){
+    // 把 \" \\n 这些转义展开为真实字符
+    function expandEscaped(s){
       if (typeof s !== 'string') return s;
-      // 有显式转义才处理，避免正常内容被二次改写
-      if (!/\\n|\\r\\n|\\t/.test(s)) return s;
+      if (!/\\[nrt"\\]/.test(s)) return s;
       try {
         const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
-        return JSON.parse(wrapped); // 最稳的展开方式
+        return JSON.parse(wrapped);
       } catch {
-        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
+        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\r/g,'\r').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
       }
     }
 
-    // 2) 温和断行：只有在整体几乎一行时才做，尽量不改变语义
-    function softBreak(s){
-      if (typeof s !== 'string') return s;
-      const lines = (s.match(/\n/g) || []).length;
-      if (lines >= 5) return s; // 原本就有足够换行，不动
-      return s
-        .replace(/;\s*(?!\n)/g, ';\n')
-        .replace(/\}\s*(?!\n)/g, '}\n')
-        .replace(/\)\s*;\s*(?!\n)/g, ');\n');
+    // 轻量格式化：仅做“可读”分行/缩进，不做语法重排
+    function simplePretty(src){
+      const s = String(src);
+      const n = s.length;
+      let out = '';
+      let indent = 0, i = 0;
+
+      const IND = '  '; // 两空格缩进
+      let inStr = false, strQ = '', esc = false;
+      let inSL = false, inML = false;
+      let inReg = false;
+      let lastNonSpace = '';
+
+      function add(c){ out += c; if (!/\s/.test(c)) lastNonSpace = c; }
+
+      while (i < n){
+        let c = s[i], nxt = s[i+1];
+
+        // 单行注释
+        if (!inStr && !inML && !inSL && !inReg && c === '/' && nxt === '/'){
+          inSL = true; add(c); i++; add(nxt); i++; continue;
+        }
+        if (inSL){
+          add(c);
+          if (c === '\n'){ inSL = false; }
+          i++; continue;
+        }
+
+        // 多行注释
+        if (!inStr && !inML && !inReg && c === '/' && nxt === '*'){
+          inML = true; add(c); i++; add(nxt); i++; continue;
+        }
+        if (inML){
+          add(c);
+          if (c === '*' && nxt === '/'){ i++; add('/'); inML = false; }
+          i++; continue;
+        }
+
+        // 字符串
+        if (!inStr && !inReg && (c === '"' || c === "'" || c === '`')){
+          inStr = true; strQ = c; esc = false; add(c); i++; continue;
+        }
+        if (inStr){
+          add(c);
+          if (esc){ esc = false; }
+          else if (c === '\\'){ esc = true; }
+          else if (c === strQ){ inStr = false; }
+          i++; continue;
+        }
+
+        // 正则字面量（非常简化：在可作为运算符/起始后出现 / 则视为正则）
+        const canStartRegex = /[({[=:+\-!*?,;<>%^&|~]\s*$/.test(out) || out === '';
+        if (!inReg && c === '/' && nxt && nxt !== '/' && nxt !== '*'){
+          if (canStartRegex){ inReg = true; add(c); i++; continue; }
+        }
+        if (inReg){
+          add(c);
+          if (c === '\\'){ // 跳过转义
+            if (i+1 < n){ add(s[i+1]); i += 2; continue; }
+          }
+          if (c === '/'){ // 读修饰符
+            i++;
+            while (i < n && /[a-z]/i.test(s[i])) { add(s[i]); i++; }
+            inReg = false; continue;
+          }
+          i++; continue;
+        }
+
+        // 结构化分行/缩进（非字符串/注释/正则环境）
+        if (c === '{'){
+          add('{');
+          indent++;
+          out += '\n' + IND.repeat(indent);
+          i++; continue;
+        }
+        if (c === '}'){
+          indent = Math.max(0, indent - 1);
+          // 如果前面不是换行，先换行再补右括号
+          if (!/\n\s*$/.test(out)) out += '\n';
+          out += IND.repeat(indent) + '}';
+          // 若下一个是逗号/分号，延后处理；否则换行
+          if (s[i+1] !== ',' && s[i+1] !== ';') out += '\n' + IND.repeat(indent);
+          i++; continue;
+        }
+        if (c === ';'){
+          add(';');
+          out += '\n' + IND.repeat(indent);
+          i++; continue;
+        }
+        if (c === ','){
+          add(',');
+          // 在对象/数组内更友好的断行
+          out += '\n' + IND.repeat(indent);
+          i++; continue;
+        }
+        if (c === ')'){
+          add(')');
+          // 常见模式："){" 交给下一轮的 "{"
+          i++; continue;
+        }
+
+        // 关键字后适度加空格
+        if (/\s/.test(c)){
+          // 压缩连续空白为单个空格/保持换行
+          if (c === '\n'){
+            out += '\n' + IND.repeat(indent);
+          }else{
+            if (!/\s$/.test(out)) out += ' ';
+          }
+          i++; continue;
+        }
+
+        add(c);
+        i++;
+      }
+
+      // 清理多余空行
+      out = out.replace(/\n{3,}/g, '\n\n');
+      return out.trimEnd();
     }
 
-    // 3) 针对结果 <pre> 做“显示层”重排（不改原字符串；再次赋值用 textContent）
+    // 统一“显示层”处理：展开转义 → 分行缩进
+    function prettyForDisplay(raw){
+      const a = expandEscaped(String(raw));
+      return simplePretty(a);
+    }
+
+    // 每当 app.js 写入结果时，重排显示（不影响原始字符串/复制/下载）
     function reflowPre(el){
       if (!el) return;
       const raw = el.textContent || '';
-      const withNL = expandEscapedNewlines(raw);
-      const pretty = softBreak(withNL);
+      const pretty = prettyForDisplay(raw);
       if (pretty !== raw) el.textContent = pretty;
     }
 
-    // 4) 监听两个 <pre> 的内容变化 —— 每次 app.js 写入时自动重排
     const mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
     const mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
     window.addEventListener('load', ()=>{
       const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
       if (a) mo1.observe(a,{childList:true,subtree:true,characterData:true});
       if (b) mo2.observe(b,{childList:true,subtree:true,characterData:true});
-      // 初次渲染也跑一次（避免已有内容不分行）
       reflowPre(a); reflowPre(b);
     });
   </script>
