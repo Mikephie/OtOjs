@@ -77,9 +77,57 @@
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 再加载 wrapper（覆盖同名插件：优先使用 aadecode + evalpacker wrapper 实现） -->
+  <!-- 再加载 wrapper（你的现有路径） -->
   <script src="main/src/wrapper/aadecode-wrapper.js"></script>
   <script src="main/src/wrapper/eval-wrapper.js"></script>
+
+  <!-- 桥接/覆盖：让 smartDecodePipeline 使用 wrapper 的 detect/plugin -->
+  <script>
+  (function () {
+    // 确保容器存在
+    window.DecodePlugins = window.DecodePlugins || {};
+
+    // 兼容三种可能的暴露方式：
+    // 1) window.AADecodeWrapper / window.EvalWrapper = {detect,plugin}
+    // 2) wrapper 自己挂到了 window.DecodePlugins.aadecode / .eval
+    // 3) 其它命名：尝试回退到全局 detect/plugin
+    function pickWrapper(name, globalObjName){
+      // 方式1：显式对象
+      if (window[globalObjName] && window[globalObjName].detect && window[globalObjName].plugin) {
+        return window[globalObjName];
+      }
+      // 方式2：wrapper 已经把同名插件挂到 DecodePlugins
+      if (window.DecodePlugins[name] && window.DecodePlugins[name]._source === 'wrapper') {
+        return window.DecodePlugins[name];
+      }
+      if (window.DecodePlugins[name] && window.DecodePlugins[name].detect && window.DecodePlugins[name].plugin) {
+        // 如果 decode-all.js 先注册了，这里不动；等会儿被覆盖
+        return window.DecodePlugins[name];
+      }
+      // 方式3：宽松兼容（不推荐，但兜底）
+      if (window.detect && window.plugin) {
+        return { detect: window.detect, plugin: window.plugin };
+      }
+      return null;
+    }
+
+    var AA = pickWrapper('aadecode', 'AADecodeWrapper');
+    if (AA && AA.detect && AA.plugin) {
+      window.DecodePlugins.aadecode = { detect: AA.detect, plugin: AA.plugin, _source: 'wrapper' };
+      console.log('[OtOjs] aadecode wrapper registered');
+    }
+
+    var EV = pickWrapper('eval', 'EvalWrapper');
+    if (EV && EV.detect && EV.plugin) {
+      window.DecodePlugins.eval = { detect: EV.detect, plugin: EV.plugin, _source: 'wrapper' };
+      console.log('[OtOjs] eval/packer wrapper registered');
+    }
+
+    // 为了“只要 evalpacker”，确保插件顺序只包含 eval + aadecode
+    // 如果你的 app.js 里有 smartDecodePipeline(ORDER)，也能直接读到更新后的插件实现
+    window.__OTO_ORDER__ = ['eval', 'aadecode']; // 可被 app.js 读取（可选）
+  })();
+  </script>
 
   <!-- 复制按钮（独立，不依赖 app.js 暴露） -->
   <script>
@@ -103,7 +151,7 @@
     }
   </script>
 
-  <!-- 展开 \"\\n\" 为真实换行 + 温和断行，保证中间内容可读（不影响解密流程） -->
+  <!-- 展开 \"\\n\" 为真实换行 + 温和断行（只影响显示，不影响解密） -->
   <script>
     function expandEscapedNewlines(s){
       if (typeof s !== "string") return s;
@@ -129,7 +177,6 @@
       const out = softBreak(expanded);
       if (out !== raw) el.textContent = out;
     }
-    // 自动对两个 <pre> 进行可读性处理（不改变原始解密逻辑）
     const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
     const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
     window.addEventListener('load', ()=>{
