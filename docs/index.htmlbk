@@ -69,14 +69,48 @@
     </div>
   </div>
 
-  <!-- 顺序非常重要：先插件，再主逻辑 -->
+  <!-- 插件 & 主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
-  <!--
-  <script src="prettier.min.js"></script>
-  <script src="parser-babel.min.js"></script>
-  -->
+  <!-- 修复 ① 复制按钮 -->
+  <script>
+    async function copySel(sel, btn){
+      try{
+        const el = document.querySelector(sel);
+        const t = el ? (el.value ?? el.textContent ?? '') : '';
+        if(!t) throw new Error('没有可复制的内容');
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(t);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        }
+        if(btn){
+          const old=btn.textContent; btn.textContent='✅ 已复制';
+          setTimeout(()=> btn.textContent=old, 1200);
+        }
+      }catch(e){
+        alert('复制失败：' + e.message);
+      }
+    }
+  </script>
+
+  <!-- 修复 ② Prettier estree 报错兜底 -->
+  <script>
+    (function(){
+      const needNoop =
+        typeof window.prettier==='undefined' ||
+        typeof window.prettier.format!=='function' ||
+        !window.prettierPlugins;
+      if(needNoop){
+        window.prettier = window.prettier || {};
+        window.prettier.format = function(code){ return String(code||''); };
+        window.prettierPlugins = window.prettierPlugins || {};
+        console.log('[noop] Prettier 缺少插件 → 启用兜底（仅原样返回，不报错）');
+      }
+    })();
+  </script>
 </body>
 </html>
