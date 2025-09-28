@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- 兜底：强制换行，避免长行一整块 -->
-  <style>
-    pre{white-space:pre-wrap;word-break:break-word}
-  </style>
 </head>
 <body>
   <div class="wrap">
@@ -73,71 +69,9 @@
     </div>
   </div>
 
-  <!-- 先加载你原有逻辑（保持不变） -->
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
-
-  <!-- 再加载 wrapper（覆盖同名插件：优先使用 aadecode + evalpacker wrapper 实现） -->
-  <script src="main/src/wrapper/aadecode-wrapper.js"></script>
-  <script src="main/src/wrapper/eval-wrapper.js"></script>
-
-  <!-- 复制按钮（独立，不依赖 app.js 暴露） -->
-  <script>
-    async function copySel(sel, btn){
-      try{
-        const el = document.querySelector(sel);
-        const t = el ? (el.value ?? el.textContent ?? "") : "";
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(t);
-        } else {
-          const ta = document.createElement("textarea");
-          ta.value = t; document.body.appendChild(ta);
-          ta.select(); document.execCommand("copy"); ta.remove();
-        }
-        const old = btn.textContent;
-        btn.textContent = "✅ 已复制";
-        setTimeout(()=> btn.textContent = old, 1200);
-      }catch(e){
-        alert("复制失败：" + e.message);
-      }
-    }
-  </script>
-
-  <!-- 展开 \"\\n\" 为真实换行 + 温和断行，保证中间内容可读（不影响解密流程） -->
-  <script>
-    function expandEscapedNewlines(s){
-      if (typeof s !== "string") return s;
-      if (!/\\n|\\r\\n/.test(s)) return s;
-      try {
-        const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
-        return JSON.parse(wrapped);
-      } catch {
-        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
-      }
-    }
-    function softBreak(s){
-      if (typeof s !== "string") return s;
-      if ((s.match(/\n/g)||[]).length >= 5) return s;
-      return s
-        .replace(/;\s*(?!\n)/g,';\n')
-        .replace(/\}\s*(?!\n)/g,'}\n')
-        .replace(/\)\s*;\s*(?!\n)/g,');\n');
-    }
-    function reflowPre(el){
-      const raw = el.textContent || '';
-      const expanded = expandEscapedNewlines(raw);
-      const out = softBreak(expanded);
-      if (out !== raw) el.textContent = out;
-    }
-    // 自动对两个 <pre> 进行可读性处理（不改变原始解密逻辑）
-    const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
-    const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
-    window.addEventListener('load', ()=>{
-      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
-      if(a) _mo1.observe(a,{childList:true,subtree:true,characterData:true});
-      if(b) _mo2.observe(b,{childList:true,subtree:true,characterData:true});
-    });
-  </script>
 
   <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
   <!--
