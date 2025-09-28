@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- 强制换行，避免长行一整块 -->
+  <!-- 兜底：强制换行，避免长行一整块 -->
   <style>
     pre{white-space:pre-wrap;word-break:break-word}
   </style>
@@ -73,92 +73,15 @@
     </div>
   </div>
 
-  <!-- 先加载你原有逻辑 -->
+  <!-- 先加载你原有逻辑（保持不变） -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 再加载 wrapper（覆盖同名插件） -->
+  <!-- 再加载 wrapper（覆盖同名插件：优先使用 aadecode + evalpacker wrapper 实现） -->
   <script src="main/src/wrapper/aadecode-wrapper.js"></script>
   <script src="main/src/wrapper/eval-wrapper.js"></script>
 
-  <!-- 强制只用 eval + aadecode，并冻结管道，避免被覆盖 -->
-  <script>
-  (function () {
-    // 兜底：两个 wrapper 若缺失，直接挂个空实现防止报错
-    window.DecodePlugins = window.DecodePlugins || {};
-    if (!window.DecodePlugins.eval) {
-      window.DecodePlugins.eval = { detect: ()=>false, plugin: s=>null };
-    }
-    if (!window.DecodePlugins.aadecode) {
-      window.DecodePlugins.aadecode = { detect: ()=>false, plugin: s=>null };
-    }
-
-    // 白名单：仅保留 eval / aadecode 两个插件
-    Object.keys(window.DecodePlugins).forEach(k=>{
-      if (k!=="eval" && k!=="aadecode") delete window.DecodePlugins[k];
-    });
-
-    // 轻量分行兜底（不依赖 Prettier）
-    function simpleFormat(src) {
-      try {
-        let out = "", indent = 0;
-        const lines = String(src)
-          .replace(/\r/g, "")
-          .replace(/;/g, ";\n")
-          .replace(/\{/g, "{\n")
-          .replace(/\}/g, "\n}\n")
-          .split("\n");
-        for (let raw of lines) {
-          let line = raw.trim();
-          if (!line) continue;
-          if (line.startsWith("}")) indent = Math.max(0, indent - 1);
-          out += "  ".repeat(indent) + line + "\n";
-          if (line.endsWith("{")) indent++;
-        }
-        return out.trim() + "\n";
-      } catch { return String(src); }
-    }
-
-    // 新管道（只跑 eval -> aadecode，多轮剥皮，有限次避免卡死）
-    function pipeline(code) {
-      const ORDER = ["eval","aadecode"];
-      let out = String(code);
-      let changed = true, rounds = 0;
-      while (changed && rounds < 15) {
-        changed = false; rounds++;
-        for (const key of ORDER) {
-          const p = window.DecodePlugins[key];
-          if (!p || typeof p.detect!=="function" || typeof p.plugin!=="function") continue;
-          try {
-            if (p.detect(out)) {
-              const res = p.plugin(out);
-              if (typeof res === "string" && res && res !== out) {
-                out = res;
-                changed = true;
-                break; // 成功一次，进入下一轮
-              }
-            }
-          } catch(_) {}
-        }
-      }
-      return simpleFormat(out);
-    }
-
-    // 强制覆盖并冻结，防止 app.js 之后再改
-    try {
-      Object.defineProperty(window, 'smartDecodePipeline', {
-        configurable: true,
-        writable: false,
-        value: pipeline
-      });
-    } catch {
-      // 某些环境不允许冻结就直接赋值
-      window.smartDecodePipeline = pipeline;
-    }
-  })();
-  </script>
-
-  <!-- 复制按钮（独立，不依赖 app.js） -->
+  <!-- 复制按钮（独立，不依赖 app.js 暴露） -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -180,7 +103,7 @@
     }
   </script>
 
-  <!-- 展示层：把 \"\\n\" 展开成真换行，仅影响显示 -->
+  <!-- 展开 \"\\n\" 为真实换行 + 温和断行，保证中间内容可读（不影响解密流程） -->
   <script>
     function expandEscapedNewlines(s){
       if (typeof s !== "string") return s;
@@ -206,6 +129,7 @@
       const out = softBreak(expanded);
       if (out !== raw) el.textContent = out;
     }
+    // 自动对两个 <pre> 进行可读性处理（不改变原始解密逻辑）
     const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
     const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
     window.addEventListener('load', ()=>{
@@ -215,7 +139,7 @@
     });
   </script>
 
-  <!-- 可选：如需本地 Prettier，自行按需引入（此页面不依赖） -->
+  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
   <!--
   <script src="prettier.min.js"></script>
   <script src="parser-babel.min.js"></script>
