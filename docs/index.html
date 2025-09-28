@@ -69,11 +69,11 @@
     </div>
   </div>
 
-  <!-- 顺序非常重要：先插件，再主逻辑 -->
+  <!-- 插件 & 主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- ① 复制按钮（仅修复复制，不改其它逻辑） -->
+  <!-- 修复 ① 复制按钮 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -97,29 +97,20 @@
     }
   </script>
 
-  <!-- ② Prettier 缺少 estree 插件时的无侵入兜底（保持原文，不修改内容） -->
+  <!-- 修复 ② Prettier estree 报错兜底 -->
   <script>
     (function(){
-      // 若用户勾选“自动美化（Prettier）”但 standalone 包没带 estree/babel 插件，
-      // window.prettier.format 会抛错。这里提供“原样返回”的兜底，避免打断秒解。
       const needNoop =
         typeof window.prettier==='undefined' ||
         typeof window.prettier.format!=='function' ||
         !window.prettierPlugins;
       if(needNoop){
         window.prettier = window.prettier || {};
-        const orig = window.prettier.format;
-        window.prettier.format = function(code){ try{ return String(code); }catch{ return ''+code; } };
+        window.prettier.format = function(code){ return String(code||''); };
         window.prettierPlugins = window.prettierPlugins || {};
-        console.log('[noop] Prettier 插件缺失，已启用无改动兜底。');
+        console.log('[noop] Prettier 缺少插件 → 启用兜底（仅原样返回，不报错）');
       }
     })();
   </script>
-
-  <!-- 可选：本地化 Prettier（如启用本地文件，app.js 会自动检测并使用，不再走 CDN） -->
-  <!--
-  <script src="prettier.min.js"></script>
-  <script src="parser-babel.min.js"></script>
-  -->
 </body>
 </html>
