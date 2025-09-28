@@ -1,0 +1,208 @@
+:root {
+  --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
+  --text:#e6eef7;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--link:#67e8f9;
+  --accent:#3b82f6;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  background:var(--bg);
+  color:var(--text)
+}
+
+a{color:var(--link)}
+
+.wrap{
+  max-width:960px;
+  margin:0 auto;
+  padding:18px 14px 80px
+}
+
+h1{
+  margin:10px 0 6px;
+  font-size:20px
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  margin:10px 0
+}
+
+label{
+  font-size:12px;
+  color:var(--muted);
+  margin-right:6px
+}
+
+input,select,textarea{
+  width:100%;
+  background:#0f1a2b;
+  color:var(--text);
+  border:1px solid var(--line2);
+  border-radius:10px;
+  padding:10px;
+  font-size:13px
+}
+
+textarea{
+  min-height:160px;
+  font-family:ui-monospace,Consolas,Menlo,monospace
+}
+
+.row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:6px 0
+}
+
+.row>*{
+  flex:1 1 200px
+}
+
+.row.compact>*{
+  flex:initial
+}
+
+button{
+  padding:6px 10px;
+  border-radius:8px;
+  border:1px solid #2b3b54;
+  background:var(--btn);
+  color:var(--text);
+  cursor:pointer;
+  font-weight:600;
+  font-size:13px
+}
+
+button.ok{border-color:var(--ok)}
+button.warn{border-color:var(--warn)}
+button.err{border-color:var(--err)}
+
+/* 关键修复：pre 元素的代码显示 */
+pre{
+  white-space:pre-wrap;
+  word-wrap:break-word;
+  word-break:break-all;
+  background:#0b1020;
+  border:1px solid var(--line2);
+  border-radius:10px;
+  padding:10px;
+  font-size:12px;
+  font-family:ui-monospace,Consolas,Menlo,Monaco,'Courier New',monospace;
+  line-height:1.4;
+  max-height:380px;
+  overflow:auto;
+  tab-size:2;
+  -moz-tab-size:2;
+}
+
+/* 针对代码输出区域的特殊优化 */
+#codeOut, #outputRaw {
+  white-space:pre-wrap;
+  word-wrap:break-word;
+  word-break:break-word; /* 改为 break-word 而不是 break-all，更温和 */
+  background:#0b1020;
+  border:1px solid var(--line2);
+  border-radius:10px;
+  padding:12px;
+  font-size:12px;
+  font-family:ui-monospace,Consolas,Menlo,Monaco,'Courier New',monospace;
+  line-height:1.5;
+  max-height:450px; /* 稍微增加高度 */
+  overflow:auto;
+  tab-size:2;
+  -moz-tab-size:2;
+  color:var(--text);
+}
+
+/* 空白占位符样式 */
+#codeOut:empty::before, #outputRaw:empty::before {
+  content: attr(placeholder);
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* 滚动条美化 */
+pre::-webkit-scrollbar, #codeOut::-webkit-scrollbar, #outputRaw::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+pre::-webkit-scrollbar-track, #codeOut::-webkit-scrollbar-track, #outputRaw::-webkit-scrollbar-track {
+  background: #0b1020;
+  border-radius: 4px;
+}
+
+pre::-webkit-scrollbar-thumb, #codeOut::-webkit-scrollbar-thumb, #outputRaw::-webkit-scrollbar-thumb {
+  background: var(--line2);
+  border-radius: 4px;
+}
+
+pre::-webkit-scrollbar-thumb:hover, #codeOut::-webkit-scrollbar-thumb:hover, #outputRaw::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+small{color:var(--muted)}
+
+.bar-wrap{
+  height:6px;
+  background:#0b1020;
+  border:1px solid var(--line2);
+  border-radius:8px;
+  overflow:hidden;
+  margin-top:6px
+}
+
+.bar{
+  height:100%;
+  width:0%;
+  background:var(--accent);
+  transition:width 5s linear
+}
+
+.options{
+  display:flex;
+  gap:16px;
+  font-size:12px;
+  color:var(--muted);
+  margin-top:6px
+}
+
+/* 隐藏原生文件输入（用按钮触发） */
+#file {
+  position:absolute !important;
+  width:1px; 
+  height:1px;
+  opacity:0; 
+  pointer-events:none;
+}
+
+/* 选中文本的样式 */
+pre::selection, #codeOut::selection, #outputRaw::selection {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .wrap {
+    padding: 12px 8px 60px;
+  }
+  
+  pre, #codeOut, #outputRaw {
+    font-size: 11px;
+    padding: 8px;
+    max-height: 300px;
+  }
+  
+  .options {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
