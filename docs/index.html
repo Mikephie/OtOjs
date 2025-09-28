@@ -3,21 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OtOjs · Eval/Packer 解密前端</title>
+  <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    body{background:#0b0f14;color:#e6eef7;font-family:sans-serif;margin:0;padding:20px}
-    .wrap{max-width:960px;margin:auto}
-    .card{background:#0f1621;border:1px solid #223046;border-radius:10px;padding:12px;margin:10px 0}
-    textarea,pre,input{width:100%;background:#0b1020;color:#e6eef7;border:1px solid #223046;border-radius:8px;padding:8px}
-    button{margin:4px;padding:8px 12px;border-radius:8px;border:1px solid #2b3b54;background:#152033;color:#e6eef7;cursor:pointer}
-    button.ok{border-color:#10b981} button.warn{border-color:#f59e0b} button.err{border-color:#ef4444}
-    pre{white-space:pre-wrap;word-break:break-word}
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>OtOjs · Eval/Packer 解密前端</h1>
+    <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
 
     <!-- 基础配置 -->
     <div class="card">
@@ -43,18 +40,26 @@
       <div class="row compact">
         <input type="file" id="file" accept=".js,.txt,.json" />
         <button onclick="pick()">文件</button>
-        <input id="remoteUrl" placeholder="https:// 原始脚本 URL" />
+        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
         <button onclick="loadRemote()">远程</button>
         <button onclick="pasteFromClipboard()">粘贴</button>
         <button class="err" onclick="clrIn()">清空</button>
       </div>
       <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
       <div class="row compact">
-        <button class="ok" onclick="runLocalDecode()">解密</button>
+        <button class="ok" onclick="submitInput()">提交</button>
+        <button class="warn" onclick="startAutoPoll()">轮询</button>
         <button onclick="beautify()">美化</button>
         <button onclick="copySel('#codeOut', this)">复制</button>
         <button class="err" onclick="clrAll()">清空全部</button>
       </div>
+      <div class="options">
+        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
+      </div>
+      <div id="status"><small>状态：就绪</small></div>
+      <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
       <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
 
@@ -70,85 +75,64 @@
     </div>
   </div>
 
-<script>
-/* ========== 工具函数，全挂到 window，避免按钮失效 ========== */
-window.clrIn = function(){ document.querySelector('#codeIn').value=''; }
-window.clrAll = function(){ 
-  document.querySelector('#codeIn').value=''; 
-  document.querySelector('#codeOut').textContent=''; 
-  document.querySelector('#outputRaw').textContent='';
-}
-window.copySel = async function(sel, btn){
-  const t=document.querySelector(sel).textContent;
-  if(!t) return;
-  await navigator.clipboard.writeText(t);
-  const old=btn.textContent; btn.textContent='✅ 已复制';
-  setTimeout(()=>btn.textContent=old,1200);
-}
-window.pasteFromClipboard = async function(){
-  const text = await navigator.clipboard.readText();
-  document.querySelector('#codeIn').value = text;
-}
-window.pick = function(){
-  document.getElementById('file').click();
-}
-document.getElementById('file').addEventListener('change', async e=>{
-  const f=e.target.files[0]; if(!f) return;
-  const txt=await f.text();
-  document.querySelector('#codeIn').value=txt;
-});
-window.loadRemote = async function(){
-  const url=document.getElementById('remoteUrl').value.trim();
-  if(!url) return alert('请输入 URL');
-  const res=await fetch(url.replace('/blob/','/raw/'));
-  const txt=await res.text();
-  document.querySelector('#codeIn').value=txt;
-}
-window.downloadOutput = function(){
-  const blob=new Blob([document.querySelector('#outputRaw').textContent],{type:"text/plain"});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download="output.js";a.click();
-}
+  <!-- === 插件包装：AAdecode Wrapper === -->
+  <script>
+  (function(){
+    function aadecode(str){
+      try {
+        // 来自 DCjs 的 aaencode decode 逻辑
+        if(!/ﾟωﾟﾉ=/.test(str) && !/ﾟΘﾟ=/.test(str) && !/ﾟДﾟ=/.test(str)) return null;
+        return eval(str); // AAdecode 特点是直接 eval 返回明文
+      } catch(e){
+        return null;
+      }
+    }
+    window.DecodePlugins = window.DecodePlugins || {};
+    window.DecodePlugins.aadecode = {
+      detect: function(code){
+        return /ﾟωﾟﾉ=|ﾟΘﾟ=|ﾟДﾟ=/.test(code);
+      },
+      plugin: function(code){
+        return aadecode(code) || code;
+      }
+    };
+    console.log("AAdecode 插件已加载");
+  })();
+  </script>
 
-/* ========== Eval/Packer 解码器 ========== */
-function parsePacker(code){
-  const re=/eval\(function\(p,a,c,k,e,(?:r|d)\)\{.*\}\((['"])(.*?)\1,(\d+),(\d+),(['"])(.*?)\5\.split\(['"]\|['"]\),\d*,\{\}\)\)/s;
-  const m=code.match(re);
-  if(!m) return null;
-  const payload=m[2], radix=parseInt(m[3]), count=parseInt(m[4]), words=m[6].split('|');
-  function baseN(c){return (c<radix?'':baseN(parseInt(c/radix)))+((c=c%radix)>35?String.fromCharCode(c+29):c.toString(36));}
-  let out=payload;
-  for(let i=count-1;i>=0;i--){
-    const key=baseN(i);
-    if(words[i]) out=out.replace(new RegExp('\\b'+key+'\\b','g'),words[i]);
-  }
-  return out;
-}
+  <!-- === 插件包装：EvalPacker Wrapper === -->
+  <script>
+  (function(){
+    function unpackEval(code){
+      try{
+        if(!/eval\(/.test(code)) return null;
+        // 替换 eval() 为直接返回
+        var modified = code.replace(/eval\s*\(/g, '(function(x){return x})( ');
+        var result = Function('"use strict";return ('+modified+')')();
+        if(typeof result === 'string' && result.includes('eval(')){
+          return unpackEval(result);
+        }
+        return result;
+      }catch(e){
+        return null;
+      }
+    }
+    window.DecodePlugins = window.DecodePlugins || {};
+    window.DecodePlugins.evalpacker = {
+      detect: function(code){
+        return /eval\(/.test(code);
+      },
+      plugin: function(code){
+        return unpackEval(code) || code;
+      }
+    };
+    console.log("EvalPacker 插件已加载");
+  })();
+  </script>
 
-/* ========== 解密按钮逻辑 ========== */
-window.runLocalDecode = function(){
-  let code=document.querySelector('#codeIn').value;
-  let decoded=parsePacker(code);
-  if(decoded){ document.querySelector('#codeOut').textContent=decoded; return; }
-  const m=code.match(/eval\((['"`])([\s\S]*?)\1\)/);
-  if(m) document.querySelector('#codeOut').textContent=m[2];
-  else document.querySelector('#codeOut').textContent='未识别到 packer/eval';
-}
-window.beautify = function(){
-  let raw=document.querySelector('#codeOut').textContent;
-  if(!raw) return;
-  try{
-    raw = raw.replace(/;\s*(?!\n)/g,';\n').replace(/\}\s*(?!\n)/g,'}\n');
-    document.querySelector('#codeOut').textContent=raw;
-  }catch(e){alert('美化失败: '+e.message);}
-}
-window.loadOutputRaw = async function(path){
-  try{
-    const url=`https://raw.githubusercontent.com/${document.getElementById('repo').value}/${document.getElementById('branch').value}/${path}`;
-    const res=await fetch(url);
-    const txt=await res.text();
-    document.querySelector('#outputRaw').textContent=txt;
-  }catch(e){alert('拉取失败: '+e.message);}
-}
-</script>
+  <!-- 顺序非常重要：先插件，再主逻辑 -->
+  <script src="decode-all.js"></script>
+  <script src="app.js"></script>
+
 </body>
 </html>
