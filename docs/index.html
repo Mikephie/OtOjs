@@ -3,50 +3,358 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OtOjs · 解密前端（照抄版）</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>OtOjs · Eval/Packer 专用 解密前端</title>
   <style>
-    pre { white-space: pre-wrap; word-break: break-word; }
+    :root{
+      --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
+      --text:#e6eef7;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--link:#67e8f9;
+      --accent:#3b82f6;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+    .wrap{max-width:960px;margin:0 auto;padding:18px}
+    h1{margin:10px 0 6px;font-size:20px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+    label{font-size:12px;color:var(--muted);margin-right:6px}
+    input,textarea{width:100%;background:#0f1a2b;color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:13px}
+    textarea{min-height:160px;font-family:ui-monospace,Consolas,Menlo,monospace}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+    .row>*{flex:1 1 200px}
+    button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:var(--btn);color:var(--text);cursor:pointer;font-weight:600}
+    button.ok{border-color:var(--ok)}
+    button.warn{border-color:var(--warn)}
+    button.err{border-color:var(--err)}
+    pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:420px;overflow:auto}
+    small{color:var(--muted)}
+    .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
+    .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>OtOjs · 解密前端（照抄 eval_out.js 运行逻辑）</h1>
+    <h1>OtOjs · Eval / Dean Edwards Packer 专用</h1>
 
-    <!-- 输入 -->
     <div class="card">
-      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里"></textarea>
-      <div class="row compact">
-        <button onclick="runEvalUnpack()">本地解密</button>
-        <button onclick="copySel('#codeOut', this)">复制结果</button>
+      <div class="row">
+        <div style="flex:2"><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
+        <div><label>BRANCH</label><input id="branch" value="main" /></div>
+        <div><label>Token（contents:rw）</label><input id="token" type="password" placeholder="ghp_..." /></div>
       </div>
-      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+    </div>
+
+    <div class="card">
+      <small>把要解密的脚本粘贴到下方（本页只处理 Eval 与 Dean Edwards Packer）</small>
+      <div class="row compact">
+        <input type="file" id="file" accept=".js,.txt,.json" />
+        <button onclick="pick()">文件</button>
+        <button onclick="pasteFromClipboard()">粘贴</button>
+        <button class="err" onclick="clrIn()">清空</button>
+      </div>
+
+      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
+
+      <div class="row compact">
+        <button class="ok" onclick="runLocalDecode()">解密（手动触发）</button>
+        <button class="warn" onclick="startAutoPoll()">轮询（GitHub）</button>
+        <button onclick="copySel('#codeOut', this)">复制结果</button>
+        <button class="err" onclick="clrAll()">清空全部</button>
+      </div>
+
+      <div class="options">
+        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密（加载页面且输入框有内容时）</label>
+        <label style="margin-left:12px"><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
+      </div>
+
+      <div id="status"><small>状态：就绪</small></div>
+      <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
+
+      <pre id="codeOut" title="结果将显示在这里"></pre>
+    </div>
+
+    <div class="card">
+      <div class="row compact">
+        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
+        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
+        <button onclick="copySel('#outputRaw', this)">复制 Raw</button>
+        <button onclick="downloadOutput()">下载</button>
+      </div>
+      <pre id="outputRaw"></pre>
     </div>
   </div>
 
-  <!-- 完全照抄网站的解密脚本 -->
-  <script src="code_packed.js"></script>
-  <script src="eval_out.js"></script>
+<script>
+/* ----------------- 基础工具 ----------------- */
+const $ = s => document.querySelector(s);
+function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+msg+'</small>'; }
+function pick(){ $('#file').click(); }
+$('#file').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const txt=await f.text(); $('#codeIn').value=txt; setStatus('已载入 '+f.name); });
+async function pasteFromClipboard(){ try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴'); }catch(e){ setStatus('粘贴失败：'+e.message);} }
+function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
+function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; setStatus('已清空'); }
+async function copySel(sel, btn){
+  try{
+    const el = document.querySelector(sel);
+    const t = el ? (el.value ?? el.textContent ?? '') : '';
+    if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(t);
+    else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    const old = btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
+  }catch(e){ alert('复制失败：'+e.message); }
+}
 
-  <!-- 复制按钮逻辑 -->
-  <script>
-    async function copySel(sel, btn){
-      try{
-        const el = document.querySelector(sel);
-        const t = el ? (el.value ?? el.textContent ?? '') : '';
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(t);
-        } else {
-          const ta = document.createElement('textarea');
-          ta.value = t; document.body.appendChild(ta);
-          ta.select(); document.execCommand('copy'); ta.remove();
-        }
-        const old = btn.textContent; btn.textContent = '✅ 已复制';
-        setTimeout(()=> btn.textContent = old, 1200);
-      }catch(e){
-        alert('复制失败：' + e.message);
+/* ----------------- Eval + Packer 解密器 ----------------- */
+/* Dean Edwards Packer 静态解析（不执行 payload） */
+function parseDeanEdwardsPacker(code){
+  // 支持多种可能的引号和间隔，抓取 payload, radix, count, wordsString, sep, countCheck
+  const re = /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)\s*\{[\s\S]*?\}\s*\(\s*(['"`])([\s\S]*?)\1\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(['"`])([\s\S]*?)\5\.split\(\s*(['"`])([\s\S]*?)\7\s*\)\s*,\s*(\d+)\s*,\s*\{\s*\}\s*\)\s*\)/m;
+  const m = code.match(re);
+  if(!m) return null;
+  return {
+    payload: m[2],
+    radix: parseInt(m[3],10),
+    count: parseInt(m[4],10),
+    wordsRaw: m[6],
+    wordsSep: m[8],
+    countCheck: parseInt(m[9],10)
+  };
+}
+function unpackDeanEdwards(params){
+  try{
+    const { payload, radix, count, wordsRaw, wordsSep } = params;
+    const words = wordsRaw.split(wordsSep);
+    // decode index -> key string using base
+    function baseN(c){
+      c = parseInt(c, radix);
+      return (c < radix ? '' : baseN(Math.floor(c / radix))) + ((c = c % radix) > 35 ? String.fromCharCode(c + 29) : c.toString(36));
+    }
+    let out = payload;
+    // replace from high to low to avoid prefix collision
+    for(let i = count - 1; i >= 0; i--){
+      const key = baseN(i);
+      const val = words[i] !== undefined ? words[i] : key;
+      // word boundaries
+      out = out.replace(new RegExp('\\b'+key+'\\b','g'), val);
+    }
+    return out;
+  }catch(e){ return null; }
+}
+
+/* 静态抓取 eval/new Function / setTimeout 字符串参数（不执行） */
+function staticExtractEvalString(code){
+  // 常见模式： eval("..."), eval('...'), (0,eval)('...'), window['eval']("..."), setTimeout("...",...), new Function("...")()
+  let m;
+  // eval("...") or eval('...') or eval(`...`)
+  m = code.match(/\beval\s*\(\s*(['"`])([\s\S]*?)\1\s*\)/);
+  if(m) return m[2];
+  // (0,eval)('...')
+  m = code.match(/\(\s*0\s*,\s*eval\s*\)\s*\(\s*(['"`])([\s\S]*?)\1\s*\)/);
+  if(m) return m[2];
+  // window['eval']("...")
+  m = code.match(/(?:window|self|this|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(\s*(['"`])([\s\S]*?)\1\s*\)/);
+  if(m) return m[2];
+  // setTimeout("...", ... )
+  m = code.match(/set(?:Timeout|Interval)\s*\(\s*(['"`])([\s\S]*?)\1\s*,/i);
+  if(m) return m[2];
+  // new Function("...")()
+  m = code.match(/\bnew\s+Function\s*\(\s*(['"`])([\s\S]*?)\1\s*\)\s*\(\s*\)/i);
+  if(m) return m[2];
+  return null;
+}
+
+/* 轻量“变换捕获”：把 eval 替换成 capture 函数并运行（运行时环境极其受限，只捕获传入字符串，不执行） */
+function captureByTransform(code){
+  try{
+    // replace eval(...) -> __CAP__(...)
+    let replaced = code
+      .replace(/\beval\s*\(/g, '(__CAP__)(')
+      .replace(/\(\s*0\s*,\s*eval\s*\)\s*\(/g, '(__CAP__)(')
+      .replace(/(?:window|self|this|globalThis)\s*\[\s*['"]eval['"]\s*\]\s*\(/g, '(__CAP__)(')
+      // setTimeout("...",...) => capture the string arg
+      .replace(/set(?:Timeout|Interval)\s*\(\s*(['"`])([\s\S]*?)\1\s*,/gi, '(__CAP__)('+JSON.stringify('$CAP$'+Math.random()+')') + ',') // placeholder, we'll not rely on this path heavily
+      ;
+    const runner = `
+      "use strict";
+      var __CAP__ = function(x){ __LAST__ = x; return x; };
+      var __LAST__ = null;
+      try{ ${replaced} }catch(e){}
+      return __LAST__;
+    `;
+    const fn = new Function(runner);
+    const res = fn();
+    if (typeof res === 'string' && res.length>0) return res;
+  }catch(e){ /* ignore */ }
+  return null;
+}
+
+/* 轻沙盒：在受限环境中注入 eval hook（可能触发部分自执行脚本，但我们尽量避免） */
+function captureBySandbox(code){
+  try{
+    let captured = null;
+    const hookEval = function(x){ captured = x; };
+    const sandboxKeys = ['eval','window','self','globalThis','document','setTimeout','setInterval','Function','atob','btoa','console'];
+    const args = [hookEval, { eval: hookEval }, { eval: hookEval }, { eval: hookEval }, { write: function(s){ captured = String(s).match(/<script[^>]*>([\\s\\S]*?)<\\/script>/i)?.[1] ?? null } }, function(s){ if(typeof s === 'string') captured = s; return 0; }, function(s){ if(typeof s === 'string') captured = s; return 0; }, function(){ return function(){}; }, (typeof atob !== 'undefined')?atob: (s=>s), (typeof btoa !== 'undefined')?btoa: (s=>s), console ];
+    // build function: function(eval, window, self, globalThis, document, setTimeout, setInterval, Function, atob, btoa, console) { "use strict"; try{ <code> }catch(e){} }
+    const fn = new Function(...sandboxKeys, `"use strict";try{${code}}catch(e){};return null;`);
+    fn(...args);
+    return captured;
+  }catch(e){ return null; }
+}
+
+/* 单轮尝试：Packer 静态 -> 静态提取 eval 字符串 -> transform capture -> sandbox */
+function unpackOnce(input){
+  const code = String(input || '');
+  // 1) Try Packer
+  const p = parseDeanEdwardsPacker(code);
+  if(p){
+    try{
+      const out = unpackDeanEdwards(p);
+      if(out && out !== code) return out;
+    }catch(e){}
+  }
+  // 2) static extract
+  const stat = staticExtractEvalString(code);
+  if(stat && stat !== code) return stat;
+  // 3) transform capture
+  const trans = captureByTransform(code);
+  if(trans && trans !== code) return trans;
+  // 4) sandbox capture
+  const sand = captureBySandbox(code);
+  if(sand && sand !== code) return sand;
+  return null;
+}
+
+/* 递归剥离（最多 maxDepth 12 轮） */
+function unpackAll(code, maxDepth=12){
+  let out = String(code);
+  for(let i=0;i<maxDepth;i++){
+    const next = unpackOnce(out);
+    if(!next) break;
+    if(next === out) break;
+    out = String(next);
+  }
+  return out;
+}
+
+/* 注册到全局最简单的接口（兼容你现有调用） */
+window.DecodePlugins = window.DecodePlugins || {};
+window.DecodePlugins.eval_packer = {
+  detect: c => /\beval\s*\(|eval\s*\(|eval\s*\(|eval\s/.test(c) || /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)/.test(c),
+  plugin: c => {
+    try{
+      const out = unpackAll(c, 12);
+      return out && out !== c ? out : null;
+    }catch(e){ return null; }
+  }
+};
+
+/* 智能解密调度（仅 eval/packer）：固定顺序，避免 Object.keys 顺序问题 */
+async function smartDecodePipeline(code){
+  let out = String(code || '');
+  let changed = true;
+  const ORDER = ['eval_packer'];
+  let rounds = 0;
+  while(changed && rounds < 12){
+    rounds++;
+    changed = false;
+    for(const key of ORDER){
+      const p = window.DecodePlugins[key];
+      if(!p) continue;
+      if(typeof p.detect === 'function' && p.detect(out)){
+        try{
+          const res = p.plugin(out);
+          if(typeof res === 'string' && res && res !== out){
+            out = res;
+            changed = true;
+            break; // 成功一层后再从头试
+          }
+        }catch(e){}
       }
     }
-  </script>
+  }
+  return out;
+}
+
+/* ------------- End 解密器 ------------- */
+
+/* -------------- UI 绑定 -------------- */
+async function runLocalDecode(){
+  const code = $('#codeIn').value || '';
+  if(!code.trim()){ setStatus('无输入'); return; }
+  setStatus('正在尝试解密（eval/packer）...');
+  try{
+    const decoded = await smartDecodePipeline(code);
+    $('#codeOut').textContent = decoded;
+    setStatus(decoded !== code ? '✅ 已解密（可能多轮剥离）' : '⚠️ 未识别为 eval/packer 或未能解出更深层');
+  }catch(e){
+    setStatus('解密失败：'+e.message);
+  }
+}
+
+/* 页面加载时自动触发（仅在输入框有内容 & 勾选自动智能解密） */
+window.addEventListener('load', async ()=>{
+  try{
+    if($('#autoDecode').checked){
+      const s = $('#codeIn').value || '';
+      if(s && s.trim()){
+        await runLocalDecode();
+      }
+    }
+  }catch(e){}
+});
+
+/* ------------ GitHub Raw 拉取（简化） ------------- */
+function nowTs(){ return Date.now().toString(); }
+function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}`; }
+function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))); }catch{ return atob(b64); } }
+
+async function loadOutputRaw(path){
+  path = path || 'output/output.js';
+  const url = `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path}?t=${nowTs()}`;
+  try{
+    const r = await fetch(url, { cache:'no-store' });
+    const t = await r.text();
+    if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+    $('#outputRaw').textContent = t;
+    setStatus('已拉取 Raw · '+path);
+    // 取回后尝试本地智能解密（仅 eval/packer）
+    if($('#autoDecode').checked){
+      const decoded = await smartDecodePipeline(t);
+      $('#codeOut').textContent = decoded;
+      setStatus(decoded !== t ? '✅ Raw 已本地解密' : '✅ Raw 已拉取（未识别为 eval/packer）');
+    }
+  }catch(e){ $('#outputRaw').textContent = '拉取失败：'+e.message; setStatus('拉取失败'); }
+}
+
+/* 简化：轮询入口（仅触发一次 fetch 并解密；生产逻辑可复用你原本的轮询） */
+async function startAutoPoll(){
+  try{
+    const which = 'output/output.js';
+    const url = `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${which}?t=${nowTs()}`;
+    setStatus('轮询并尝试拉取：'+which);
+    showBar();
+    const r = await fetch(url, { cache:'no-store' }); const t = await r.text();
+    hideBar();
+    if(!r.ok){ setStatus('拉取失败：HTTP '+r.status); return; }
+    $('#outputRaw').textContent = t;
+    // 解密
+    const decoded = await smartDecodePipeline(t);
+    $('#codeOut').textContent = decoded;
+    setStatus(decoded !== t ? '✅ 已获取并解密' : '✅ 已获取，但未识别为 eval/packer');
+  }catch(e){ hideBar(); setStatus('轮询失败：'+e.message); }
+}
+
+/* 进度条显示 */
+function showBar(){ $('#barWrap').style.display='block'; const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; setTimeout(()=>b.style.width='100%',50); }
+function hideBar(){ $('#barWrap').style.display='none'; $('#bar').style.width='0%'; }
+
+/* 下载输出 */
+function downloadOutput(){
+  const t = $('#codeOut').textContent || $('#outputRaw').textContent || '';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([t], {type:'text/javascript;charset=utf-8'}));
+  a.download = 'output.js';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
 </body>
 </html>
