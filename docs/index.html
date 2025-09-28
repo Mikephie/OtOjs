@@ -46,6 +46,8 @@
         <button onclick="beautify()">美化</button>
         <button onclick="copySel('#codeOut', this)">复制</button>
         <button class="err" onclick="clrAll()">清空全部</button>
+        <!-- 新增强制换行按钮 -->
+        <button onclick="forceCodeWrap()" style="background: var(--accent); border-color: var(--accent); color: white;">🔧 强制换行</button>
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
@@ -72,6 +74,135 @@
   <!-- 插件 & 主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
+
+  <!-- 终极修复脚本 - 强制代码换行 -->
+  <script>
+    // 终极代码显示修复方案
+    (function() {
+        'use strict';
+        
+        // 强制应用换行样式的函数
+        function forceWrapStyles(element) {
+            if (!element) return;
+            
+            // 强制设置换行相关的CSS样式
+            const styles = {
+                'white-space': 'pre-wrap',
+                'word-wrap': 'break-word',
+                'word-break': 'break-word',
+                'overflow-wrap': 'break-word',
+                'max-width': '100%',
+                'box-sizing': 'border-box',
+                'overflow': 'auto'
+            };
+            
+            Object.assign(element.style, styles);
+            
+            // 添加重要性标记
+            for (let prop in styles) {
+                element.style.setProperty(prop, styles[prop], 'important');
+            }
+        }
+        
+        // 智能换行处理函数
+        function smartWrapCode(text) {
+            if (!text || typeof text !== 'string') return text;
+            
+            // 检查是否是压缩的混淆代码（一行很长）
+            if (text.length > 1000 && text.split('\n').length < 5) {
+                // 在JavaScript关键位置添加换行
+                let processed = text
+                    // 在分号后添加换行
+                    .replace(/;(?![^(]*\))/g, ';\n')
+                    // 在大括号后添加换行
+                    .replace(/\{/g, '{\n')
+                    .replace(/\}/g, '\n}\n')
+                    // 在逗号后添加换行（对于长参数列表）
+                    .replace(/,(?=\s*[a-zA-Z_$])/g, ',\n')
+                    // 在关键字前添加换行
+                    .replace(/(function\s*\(|eval\s*\(|return\s+|var\s+|let\s+|const\s+)/g, '\n$1')
+                    // 清理多余的换行
+                    .replace(/\n{3,}/g, '\n\n')
+                    .replace(/^\n+/, '')
+                    .replace(/\n+$/, '');
+                    
+                return processed;
+            }
+            
+            return text;
+        }
+        
+        // 手动触发换行的全局函数
+        window.forceCodeWrap = function() {
+            const codeOut = document.getElementById('codeOut');
+            const outputRaw = document.getElementById('outputRaw');
+            
+            [codeOut, outputRaw].forEach(element => {
+                if (element) {
+                    forceWrapStyles(element);
+                    
+                    if (element.textContent) {
+                        const wrapped = smartWrapCode(element.textContent);
+                        element.textContent = wrapped;
+                        console.log('已强制换行处理:', element.id);
+                    }
+                }
+            });
+            
+            // 更新状态显示
+            const status = document.getElementById('status');
+            if (status) {
+                status.innerHTML = '<small>状态：已强制换行处理 ✅</small>';
+            }
+        };
+        
+        // DOM加载完成后初始化
+        function init() {
+            const codeOut = document.getElementById('codeOut');
+            const outputRaw = document.getElementById('outputRaw');
+            
+            [codeOut, outputRaw].forEach(element => {
+                if (element) {
+                    forceWrapStyles(element);
+                    
+                    // 监听内容变化
+                    if (window.MutationObserver) {
+                        const observer = new MutationObserver(() => {
+                            forceWrapStyles(element);
+                        });
+                        
+                        observer.observe(element, {
+                            childList: true,
+                            subtree: true,
+                            characterData: true
+                        });
+                    }
+                }
+            });
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        
+        // 定期检查样式
+        setInterval(() => {
+            ['codeOut', 'outputRaw'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element && element.textContent) {
+                    const style = window.getComputedStyle(element);
+                    if (style.whiteSpace !== 'pre-wrap') {
+                        forceWrapStyles(element);
+                    }
+                }
+            });
+        }, 3000);
+        
+        console.log('🔧 强制换行脚本已加载，如果代码不换行请点击"🔧 强制换行"按钮');
+    })();
+  </script>
 
   <!-- 修复 ① 复制按钮 -->
   <script>
