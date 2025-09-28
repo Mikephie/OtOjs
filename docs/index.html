@@ -6,6 +6,7 @@
   <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
   <link rel="stylesheet" href="style.css" />
   <style>
+    /* 保证换行显示 */
     pre { white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
@@ -52,12 +53,13 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
-        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（需 Prettier）</label>
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
       <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+      <!-- 输出解密结果 -->
+      <pre id="codeOut" style="white-space:pre-wrap;word-break:break-word"></pre>
     </div>
 
     <!-- 输出 -->
@@ -68,7 +70,7 @@
         <button onclick="copySel('#outputRaw', this)">复制结果</button>
         <button onclick="downloadOutput()">下载</button>
       </div>
-      <pre id="outputRaw"></pre>
+      <pre id="outputRaw" style="white-space:pre-wrap;word-break:break-word"></pre>
     </div>
   </div>
 
@@ -76,7 +78,7 @@
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 复制按钮全局函数 -->
+  <!-- 复制按钮 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -97,22 +99,43 @@
     }
   </script>
 
-  <!-- 修复 autoDecode 输入来源 -->
+  <!-- 自动展开 \n + 断行 -->
   <script>
-    async function autoDecodeIfNeeded(){
-      if(!document.querySelector('#autoDecode').checked) return;
-      if (typeof window.smartDecodePipeline !== 'function') {
-        document.querySelector('#status').innerHTML = '<small>状态：智能解密插件未加载</small>';
-        return;
-      }
-      let code = document.querySelector('#codeIn').value || ''; // ✅ 只用原始输入，不再用 #codeOut
-      if(!code.trim()) return;
-      const decoded = await smartDecodePipeline(code);
-      if(decoded){
-        document.querySelector('#codeOut').textContent = decoded;
-        if(document.querySelector('#autoBeautify').checked) try{ await beautify(); }catch{}
+    function expandEscapedNewlines(s){
+      if (typeof s !== 'string') return s;
+      if (!/\\n|\\r\\n/.test(s)) return s;
+      try {
+        const wrapped = '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+        return JSON.parse(wrapped);
+      } catch {
+        return s.replace(/\\r\\n/g,'\n').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
       }
     }
+    function softBreak(s){
+      if (typeof s !== 'string') return s;
+      if ((s.match(/\n/g)||[]).length >= 5) return s;
+      return s
+        .replace(/;\s*(?!\n)/g,';\n')
+        .replace(/\}\s*(?!\n)/g,'}\n')
+        .replace(/\)\s*;\s*(?!\n)/g,');\n')
+        .replace(/,\s*(?=(?:["'`\w$]))/g,',\n')
+        .replace(/\}\s*,\s*(?=[\]\}])/g,'},\n')
+        .replace(/\{\s*(?=\S)/g,'{\n')
+        .replace(/\)\s*\{\s*(?=\S)/g,'){\n');
+    }
+    function reflowPre(el){
+      const raw = el.textContent || '';
+      const expanded = expandEscapedNewlines(raw);
+      const out = softBreak(expanded);
+      if (out !== raw) el.textContent = out;
+    }
+    const _mo1 = new MutationObserver(()=> reflowPre(document.getElementById('codeOut')));
+    const _mo2 = new MutationObserver(()=> reflowPre(document.getElementById('outputRaw')));
+    window.addEventListener('load', ()=>{
+      const a=document.getElementById('codeOut'), b=document.getElementById('outputRaw');
+      if(a) _mo1.observe(a,{childList:true,subtree:true,characterData:true});
+      if(b) _mo2.observe(b,{childList:true,subtree:true,characterData:true});
+    });
   </script>
 </body>
 </html>
