@@ -1,0 +1,12 @@
+{
+  "name": "PrettyUp- Al Body Editor Video",
+  "appId": "1544211932",
+  "bundleId": "com.floatcamellia.prettyup",
+  "subscriptions": [
+    {
+      "id": 1,
+      "productId": "com.floatcamellia.prettyup.onetimepurchase"
+    }
+  ],
+  "updatedAt": "2025-08-17T21:43:08.536Z"
+}
