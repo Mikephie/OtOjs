@@ -1,33 +1,222 @@
 :root {
-  --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
-  --text:#e6eef7;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--link:#67e8f9;
-  --accent:#3b82f6;
+  /* 高科技/赛博朋克风格颜色 */
+  --bg: #0d0614; /* 深紫黑背景 */
+  --card: #180a24; /* 卡片背景，略亮 */
+  --muted: #a672d6; /* 柔和的紫色文本 */
+  --line: #3b185c; /* 边框/分隔线 */
+  --line2: #4e1f76; /* 略亮的边框 */
+  
+  --text: #e0e0ff; /* 主文本：亮白带一点紫色 */
+  --btn: #2a1040; /* 按钮背景 */
+  --ok: #00ffaa; /* 成功：赛博绿 */
+  --warn: #ff9900; /* 警告：鲜橙 */
+  --err: #ff4d6e; /* 错误：品红/红 */
+  --link: #00ffff; /* 链接：亮青色 */
+  
+  --accent: #ff00cc; /* 主强调色：亮品红/洋红 */
+  --glow-color: rgba(255, 0, 204, 0.4); /* 用于光晕效果 */
 }
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
-a{color:var(--link)}
-.wrap{max-width:960px;margin:0 auto;padding:18px 14px 80px}
-h1{margin:10px 0 6px;font-size:20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
-label{font-size:12px;color:var(--muted);margin-right:6px}
-input,select,textarea{width:100%;background:#0f1a2b;color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:13px}
-textarea{min-height:160px;font-family:ui-monospace,Consolas,Menlo,monospace}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
-.row>*{flex:1 1 200px}
-.row.compact>*{flex:initial}
-button{padding:6px 10px;border-radius:8px;border:1px solid #2b3b54;background:var(--btn);color:var(--text);cursor:pointer;font-weight:600;font-size:13px}
-button.ok{border-color:var(--ok)}
-button.warn{border-color:var(--warn)}
-button.err{border-color:var(--err)}
-pre{white-space:pre-wrap;background:#0b1020;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:12px;max-height:380px;overflow:auto}
-small{color:var(--muted)}
-.bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
-.bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
-.options{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+* {
+  box-sizing: border-box;
+}
+
+/* 全局动画：模拟呼吸光或扫描线，用于高科技感 */
+@keyframes breathing-glow {
+  0% { box-shadow: 0 0 5px var(--glow-color); }
+  50% { box-shadow: 0 0 10px var(--glow-color), 0 0 15px var(--glow-color); }
+  100% { box-shadow: 0 0 5px var(--glow-color); }
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: var(--bg);
+  color: var(--text);
+  /* animation: breathing-glow 15s infinite alternate; /* 可选：给 body 添加微弱呼吸光 */
+}
+
+a {
+  color: var(--link);
+  text-shadow: 0 0 5px var(--link); /* 链接发光 */
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 18px 14px 80px;
+}
+
+h1 {
+  margin: 10px 0 6px;
+  font-size: 24px; /* 略微放大标题 */
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent), 0 0 15px rgba(255, 0, 204, 0.3); /* 标题发光 */
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px; /* 增大内边距 */
+  margin: 15px 0;
+  box-shadow: 0 0 10px var(--glow-color); /* 卡片光晕 */
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px var(--glow-color);
+}
+
+label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+input, select, textarea {
+  width: 100%;
+  background: #1f0c2f; /* 输入框更深 */
+  color: var(--text);
+  border: 1px solid var(--line2);
+  border-radius: 8px; /* 略微圆润 */
+  padding: 12px;
+  font-size: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+input:focus, textarea:focus {
+  border-color: var(--link);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5); /* 聚焦时青色发光 */
+  outline: none;
+}
+
+textarea {
+  min-height: 180px; /* 略微增大输入框 */
+  font-family: ui-monospace, Consolas, Menlo, monospace;
+}
+
+.row {
+  display: flex;
+  gap: 12px; /* 增大间距 */
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.row > * {
+  flex: 1 1 200px;
+}
+
+.row.compact > * {
+  flex: initial;
+}
+
+button {
+  padding: 10px 15px; /* 增大按钮 */
+  border-radius: 8px;
+  border: 1px solid #2b3b54;
+  background: var(--btn);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+button:hover {
+  background: #3a1555;
+  box-shadow: 0 0 10px rgba(255, 0, 204, 0.5); /* 悬停发光 */
+}
+
+button.ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+button.ok:hover {
+  background: rgba(0, 255, 170, 0.1);
+  box-shadow: 0 0 12px var(--ok);
+}
+
+button.warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+button.warn:hover {
+  background: rgba(255, 153, 0, 0.1);
+  box-shadow: 0 0 12px var(--warn);
+}
+
+button.err {
+  border-color: var(--err);
+  color: var(--err);
+}
+button.err:hover {
+  background: rgba(255, 77, 110, 0.1);
+  box-shadow: 0 0 12px var(--err);
+}
+
+pre {
+  white-space: pre-wrap;
+  background: #0b0614; /* 代码框背景 */
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  padding: 15px;
+  font-size: 13px;
+  max-height: 400px;
+  overflow: auto;
+  box-shadow: inset 0 0 5px rgba(0, 255, 255, 0.2); /* 内部微弱青色光 */
+}
+
+small {
+  color: var(--muted);
+}
+
+.bar-wrap {
+  height: 8px; /* 略微加高 */
+  background: #0b0614;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+  position: relative; /* 用于条纹动画 */
+}
+
+/* 60 秒动态动画：进度条不断循环 */
+@keyframes loading-loop {
+  0% { width: 0%; background-color: var(--accent); }
+  50% { width: 100%; background-color: var(--link); }
+  100% { width: 0%; background-color: var(--accent); }
+}
+
+.bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--link)); /* 渐变色 */
+  transition: none; /* 取消原有的过渡 */
+  /* 应用 60 秒循环动画，并让它无限次播放 */
+  animation: loading-loop 60s linear infinite; 
+}
+
+.options {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.options label input[type="checkbox"] {
+  width: auto;
+}
 
 /* 隐藏原生文件输入（用按钮触发） */
 #file {
-  position:absolute !important;
-  width:1px; height:1px;
-  opacity:0; pointer-events:none;
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 状态文本颜色 */
+#status small {
+  color: var(--ok); /* 状态文本用赛博绿 */
+  font-weight: bold;
+  text-shadow: 0 0 3px var(--ok);
 }
