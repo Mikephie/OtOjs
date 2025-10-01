@@ -10,7 +10,6 @@
   <div class="wrap">
     <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
 
-    <!-- 基础配置 -->
     <div class="card">
       <div class="row">
         <div style="flex:2">
@@ -28,7 +27,6 @@
       </div>
     </div>
 
-    <!-- 输入 -->
     <div class="card">
       <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
       <div class="row compact">
@@ -46,7 +44,6 @@
         <button onclick="beautify()">美化</button>
         <button onclick="copySel('#codeOut', this)">复制</button>
         <button class="err" onclick="clrAll()">清空全部</button>
-        <!-- 新增：清空远程两个文件（input.js 与 output/output.js） -->
         <button id="clearRepoBtn" class="warn">清空远程 input/output</button>
       </div>
       <div class="options">
@@ -55,11 +52,10 @@
         <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
       </div>
       <div id="status"><small>状态：就绪</small></div>
-      <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
+      <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div> 
       <pre id="codeOut" placeholder="结果将显示在这里"></pre>
     </div>
 
-    <!-- 输出 -->
     <div class="card">
       <div class="row compact">
         <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
@@ -71,11 +67,9 @@
     </div>
   </div>
 
-  <!-- 插件 & 主逻辑 -->
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
-  <!-- 修复 ① 复制按钮 -->
   <script>
     async function copySel(sel, btn){
       try{
@@ -99,7 +93,6 @@
     }
   </script>
 
-  <!-- 修复 ② Prettier estree 报错兜底 -->
   <script>
     (function(){
       const needNoop =
