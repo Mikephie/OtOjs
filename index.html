@@ -1,645 +1,151 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OtOjs · 解密前端（智能解密 + 后台恢复 + Raw 面板 + 设置持久化）</title>
-<style>
-  :root{
-    --bg:#0b0f14;--card:#0f1621;--muted:#9db1c7;--line:#1f2937;--line2:#223046;
-    --text:#e6eef7;--btn:#152033;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;--link:#67e8f9;
-    --accent:#3b82f6;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
-  a{color:var(--link)}
-  .wrap{max-width:960px;margin:0 auto;padding:18px 14px 80px}
-  h1{margin:10px 0 6px;font-size:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
-  label{font-size:12px;color:var(--muted);margin-right:6px}
-  input,select,textarea{width:100%;background:#0f1a2b;color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:13px}
-  textarea{min-height:160px;font-family:ui-monospace,Consolas,Menlo,monospace}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
-  .row>*{flex:1 1 200px}
-  button{padding:10px 12px;border-radius:10px;border:1px solid #2b3b54;background:var(--btn);color:var(--text);cursor:pointer;font-weight:600}
-  button.ok{border-color:var(--ok)}
-  button.warn{border-color:var(--warn)}
-  button.err{border-color:var(--err)}
-  /* 核心：折行显示 */
-  pre{
-    white-space: pre-wrap;      /* 允许自动折行 */
-    word-break: break-word;     /* 超长 token 也换行 */
-    background:#0b1020;border:1px solid var(--line2);
-    border-radius:10px;padding:10px;font-size:12px;
-    max-height:380px;overflow:auto
-  }
-  small{color:var(--muted)}
-  .bar-wrap{height:6px;background:#0b1020;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-top:6px}
-  .bar{height:100%;width:0%;background:var(--accent);transition:width 5s linear}
-
-  /* 一排小按钮 */
-  .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
-  .btncard{min-width:0;padding:10px 6px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .btncard:hover{background:rgba(255,255,255,.12)}
-  .btnicon{font-size:16px}
-  .btntxt{font-size:11px;font-weight:600;margin-top:2px}
-
-  /* 远程弹窗（悬浮） */
-  .remote-pop{position:fixed;left:0;top:0;width:min(92vw,360px);background:#0f1621;border:1px solid var(--line2);border-radius:12px;padding:10px;box-shadow:0 12px 28px rgba(0,0,0,.35);display:none;z-index:9999}
-  .remote-pop.show{display:block}
-  .remote-pop .pop-row{display:flex;gap:8px;margin-top:6px}
-  .remote-pop input[type="url"]{flex:1 1 auto;min-width:0;background:#0f1a2b;border:1px solid var(--line2);border-radius:10px;padding:10px;color:var(--text);font-size:13px}
-  .remote-pop .pop-btn{padding:8px 12px;border-radius:10px;border:1px solid #2b3b54;background:var(--btn);color:var(--text)}
-  .remote-pop .pop-btn.ok{border-color:var(--ok)}
-  .remote-pop .pop-btn.cancel{border-color:var(--err)}
-
-  /* 折叠 */
-  details.setting{margin-top:8px}
-  details.setting summary{cursor:pointer;color:var(--muted);user-select:none}
-  details.setting summary::-webkit-details-marker{display:none}
-  details.setting summary::before{content:"▸ "}
-  details.setting[open] summary::before{content:"▾ "}
-
-  /* 简洁开关：复选框 + 文案 */
-  .switch{margin-right:12px;font-size:12px}
-
-  /* Raw 面板 */
-  #outputRaw{white-space:pre-wrap;word-break:break-word;max-height:240px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div class="wrap">
-  <h1>OtOjs · 解密前端</h1>
+  <div class="wrap">
+    <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
 
-  <div class="card">
-    <!-- 外层：REPO / BRANCH / Token -->
-    <div class="row">
-      <div><label>REPO</label><input id="repo" value="Mikephie/OtOjs" /></div>
-      <div><label>BRANCH</label><input id="branch" value="main" /></div>
-      <div>
-        <label>Token（contents:rw）</label>
-        <input id="token" type="password" placeholder="ghp_..." />
-        <div style="margin-top:6px">
-          <label class="switch"><input id="rememberToken" type="checkbox" />记住 Token（存本机 localStorage）</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- 其他设置全部折叠 -->
-    <details class="setting">
-      <summary>高级设置</summary>
-      <div class="row" style="margin-top:8px">
-        <div><label>input.js 路径</label><input id="pathIn" value="input.js" /></div>
-        <div><label>提交信息</label><input id="commitMsg" value="update: input.js via UI" /></div>
-        <div>
-          <label>要拉取哪个输出文件？</label>
-          <select id="whichOut">
-            <option value="output/output.js">第①次产物：output/output.js</option>
-            <option value="output/output.deob2.js">第②次产物：output/output.deob2.js</option>
-          </select>
-        </div>
-      </div>
+    <div class="card">
       <div class="row">
-        <div><label>轮询间隔（秒）</label><input id="pollSec" type="number" value="5" /></div>
-        <div><label>最大等待（秒）</label><input id="maxWait" type="number" value="150" /></div>
+        <div style="flex:2">
+          <label>REPO</label>
+          <input id="repo" value="Mikephie/OtOjs" />
+        </div>
+        <div>
+          <label>BRANCH</label>
+          <input id="branch" value="main" />
+        </div>
+        <div>
+          <label>Token（contents:rw）</label>
+          <input id="token" type="password" placeholder="ghp_..." />
+        </div>
       </div>
-      <div style="margin-top:6px">
-        <label class="switch"><input id="autoResume" type="checkbox" checked />后台恢复拉取</label>
-        <label class="switch"><input id="autoSmart" type="checkbox" checked />自动智能解密（Packer→Eval→AA）</label>
-        <label class="switch"><input id="autoBeautify" type="checkbox" checked />自动美化（Prettier）</label>
-        <label class="switch"><input id="keepHeader" type="checkbox" />保留前缀（AADecode）</label>
+    </div>
+
+    <div class="card">
+      <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
+      <div class="row compact">
+        <input type="file" id="file" accept=".js,.txt,.json" />
+        <button onclick="pick()">文件</button>
+        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
+        <button onclick="loadRemote()">远程</button>
+        <button onclick="pasteFromClipboard()">粘贴</button>
+        <button class="err" onclick="clrIn()">清空</button>
       </div>
-      <small>提交后可后台执行；页面回到前台会自动恢复拉取并尝试本地智能解密。</small>
-    </details>
+      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
+      <div class="row compact">
+        <button class="ok" onclick="submitInput()">提交</button>
+        <button class="warn" onclick="startAutoPoll()">轮询</button>
+        <button onclick="beautify()">美化</button>
+        <button onclick="copySel('#codeOut', this)">复制</button>
+        <button class="err" onclick="clrAll()">清空全部</button>
+        <button id="clearRepoBtn" class="warn">清空远程 input/output</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
+      </div>
+      
+      <div id="status">
+        <small>状态：就绪</small>
+        <span id="countdown" style="margin-left: 10px; font-weight: bold; color: var(--warn);"></span>
+      </div>
+      
+      <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div> 
+      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+    </div>
+
+    <div class="card">
+      <div class="row compact">
+        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
+        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
+        <button onclick="copySel('#outputRaw', this)">复制结果</button>
+        <button onclick="downloadOutput()">下载</button>
+      </div>
+      <pre id="outputRaw"></pre>
+    </div>
   </div>
 
-  <div class="card">
-    <small>把待解密脚本放到 <b>input.js</b> → 工作流自动跑 → 本地自动识别是否能前端解密</small>
+  <script src="decode-all.js"></script>
+  <script src="app.js"></script>
 
-    <!-- 隐藏文件 input -->
-    <input type="file" id="file" accept=".js,.txt,.json" hidden />
-
-    <!-- 小按钮区 -->
-    <div class="btnbar">
-      <label for="file" class="btncard"><span class="btnicon">📁</span><span class="btntxt">文件</span></label>
-      <div class="btncard" id="btn-remote"><span class="btnicon">🌐</span><span class="btntxt">远程</span></div>
-      <button class="btncard" id="btn-paste" type="button"><span class="btnicon">📋</span><span class="btntxt">粘贴</span></button>
-      <button class="btncard" id="btn-clean" type="button"><span class="btnicon">🧹</span><span class="btntxt">格式</span></button>
-      <button class="btncard" id="btn-clear" type="button"><span class="btnicon">🗑️</span><span class="btntxt">清空</span></button>
-    </div>
-
-    <!-- 远程弹窗 -->
-    <div class="remote-pop" id="remote-pop">
-      <input id="remoteUrlInline" type="url" placeholder="https:// 原始脚本 URL（支持 github/blob → raw）" />
-      <div class="pop-row">
-        <button class="pop-btn ok" id="remote-confirm">拉取</button>
-        <button class="pop-btn cancel" id="remote-cancel">取消</button>
-      </div>
-    </div>
-    <input id="remoteUrl" type="url" style="display:none" />
-
-    <textarea id="codeIn" placeholder="把待解密的 JS 粘贴到这里，或用上方导入"></textarea>
-
-    <div class="row">
-      <button class="ok" onclick="submitInput()">① 提交到 input.js (PUT)</button>
-      <button class="warn" onclick="startAutoPoll()">② 开始自动轮询（根据选择的输出文件）</button>
-      <button onclick="copySel('#codeOut', this)">复制结果</button>
-      <button class="err" onclick="clrAll()">清空输入与结果</button>
-    </div>
-
-    <div id="status"><small>状态：就绪</small></div>
-    <div class="bar-wrap" id="barWrap" style="display:none"><div class="bar" id="bar"></div></div>
-    <pre id="codeOut" placeholder="结果将显示在这里"></pre>
-  </div>
-
-  <!-- Raw 面板 -->
-  <div class="card" id="panel-raw">
-    <div class="row" style="align-items:center">
-      <div style="flex:2 1 auto">
-        <small id="rawMeta" style="color:#9db1c7">Raw：尚未拉取</small>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button id="btn-raw" onclick="loadOutputRaw()">拉取 Raw</button>
-        <button onclick="downloadOutput()">下载结果</button>
-        <a id="rawLink" href="javascript:;" target="_blank" style="align-self:center;color:#67e8f9">打开 Raw</a>
-      </div>
-    </div>
-    <pre id="outputRaw" placeholder="Raw 内容将显示在这里"></pre>
-  </div>
-</div>
-
-<!-- ========= 基础工具 ========= -->
-<script>
-const $=s=>document.querySelector(s);
-function setStatus(msg){ $('#status').innerHTML = '<small>状态：'+ msg +'</small>'; }
-function showBar(){ $('#barWrap').style.display='block'; const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.background='var(--accent)'; setTimeout(()=>b.style.width='100%',50); }
-function okBar(){ $('#bar').style.background='var(--ok)'; }
-function warnBar(){ $('#bar').style.background='var(--warn)'; }
-function hideBar(){ $('#barWrap').style.display='none'; }
-function ghHeaders(){
-  const t=$('#token').value.trim();
-  if(!t){ throw new Error('缺少 Token（需要 contents: read & write）'); }
-  return {'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','If-None-Match':''};
-}
-function repoBase(){ return `https://api.github.com/repos/${$('#repo').value.trim()}` }
-function nowTs(){ return Date.now().toString() }
-function b64ToUtf8(b64){ try{ return decodeURIComponent(escape(atob(b64))) }catch{ return atob(b64) } }
-async function copySel(sel,btn){
-  try{ const el=$(sel); const t=el?(el.value??el.textContent??''):'';
-    await navigator.clipboard.writeText(t);
-    const old=btn.textContent; btn.textContent='✅ 已复制'; setTimeout(()=>btn.textContent=old,1200);
-  }catch(e){ setStatus('复制失败：'+e.message); }
-}
-</script>
-
-<!-- ========= Prettier ========= -->
-<script>
-async function ensurePrettier(){
-  if(window.prettier&&window.prettierPlugins&&window.prettierPlugins.babel) return;
-  const s1=document.createElement('script'); s1.src='https://unpkg.com/prettier@3.2.5/standalone.js';
-  const s2=document.createElement('script'); s2.src='https://unpkg.com/prettier@3.2.5/plugins/babel.js';
-  document.body.appendChild(s1); await new Promise(r=>s1.onload=r);
-  document.body.appendChild(s2); await new Promise(r=>s2.onload=r);
-}
-async function maybeBeautify(s){
-  if (!$('#autoBeautify').checked) return s;
-  try { await ensurePrettier(); return prettier.format(String(s), { parser:'babel', plugins:[prettierPlugins.babel] }); }
-  catch { return s; }
-}
-async function beautify(){
-  let s=$('#codeOut').textContent||$('#codeIn').value||'';
-  if(!s){ setStatus('无待美化内容'); return }
-  const out=await maybeBeautify(s);
-  $('#codeOut').textContent=out;
-  setStatus('已用 Prettier 美化');
-}
-</script>
-
-<!-- ========= 输入源：文件 / 远程 / 粘贴 / 清空 ========= -->
-<script>
-$('#file').addEventListener('change', async (e)=>{
-  const f=e.target.files?.[0]; if(!f) return;
-  const txt=await f.text(); $('#codeIn').value=txt;
-  setStatus('已载入本地文件：'+f.name+' · '+txt.length+' 字符');
-  trySmartDecodeAndShow(txt,'输入');
-});
-
-async function loadRemote(){
-  let u=$('#remoteUrl').value.trim(); if(!u){ setStatus('请输入 URL'); return }
-  if(/https?:\/\/github\.com\/.+\/blob\//.test(u)){
-    u=u.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
-  }
-  try{
-    const r=await fetch(u+'?t='+nowTs(),{cache:'no-store'}); const t=await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText+' '+t.slice(0,200));
-    $('#codeIn').value=t; setStatus('远程已加载 · '+t.length+' 字符');
-    trySmartDecodeAndShow(t,'输入');
-  }catch(e){ setStatus('远程加载失败：'+e.message); }
-}
-async function pasteFromClipboard(){
-  try{ const t=await navigator.clipboard.readText(); $('#codeIn').value=t; setStatus('已从剪贴板粘贴 · '+t.length+' 字符'); trySmartDecodeAndShow(t,'输入'); }
-  catch(e){ setStatus('粘贴失败：'+e.message); }
-}
-function clrIn(){ $('#codeIn').value=''; setStatus('已清空输入'); }
-function clrAll(){ $('#codeIn').value=''; $('#codeOut').textContent=''; $('#outputRaw').textContent=''; hideBar(); setStatus('已清空输入与结果'); }
-
-/* 远程弹窗交互 */
-(function(){
-  const btn = $('#btn-remote'), pop = $('#remote-pop'), inputInline = $('#remoteUrlInline'), inputHidden = $('#remoteUrl');
-  function place(){ const r = btn.getBoundingClientRect(); const w = Math.min(360, Math.max(260, r.width*2)); pop.style.width=w+'px'; let left=r.left+r.width/2-w/2; left=Math.max(8, Math.min(left, innerWidth-w-8)); pop.style.left=left+'px'; pop.style.top=(r.bottom+8)+'px'; }
-  function open(){ place(); pop.classList.add('show'); setTimeout(()=>inputInline?.focus(),0); }
-  function close(){ pop.classList.remove('show'); }
-  btn.addEventListener('click', e=>{ e.preventDefault(); pop.classList.contains('show')? close(): open(); });
-  $('#remote-cancel').addEventListener('click', e=>{ e.preventDefault(); close(); });
-  async function go(){ const u=(inputInline.value||'').trim(); if(!u){ setStatus('请输入 URL'); inputInline.focus(); return;} inputHidden.value=u; close(); try{ await loadRemote(); }catch{} }
-  $('#remote-confirm').addEventListener('click', e=>{ e.preventDefault(); go(); });
-  inputInline.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); go(); }});
-  document.addEventListener('click', e=>{ if(!btn.contains(e.target) && !pop.contains(e.target)) close(); });
-  $('#btn-paste').addEventListener('click', e=>{ e.preventDefault(); pasteFromClipboard(); });
-  $('#btn-clean').addEventListener('click', e=>{ e.preventDefault(); beautify(); });
-  $('#btn-clear').addEventListener('click', e=>{ e.preventDefault(); clrIn(); });
-})();
-</script>
-
-<!-- ========= Raw 面板函数 ========= -->
-<script>
-function rawUrl(path){
-  return `https://raw.githubusercontent.com/${$('#repo').value.trim()}/${$('#branch').value.trim()}/${path||$('#whichOut').value}?t=${Date.now()}`;
-}
-async function loadOutputRaw(path){
-  const url = rawUrl(path);
-  try{
-    const r = await fetch(url,{cache:'no-store'});
-    const t = await r.text();
-    if(!r.ok) throw new Error(r.status+' '+r.statusText);
-    $('#outputRaw').textContent = t;
-    $('#rawLink').href = url;
-    $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${$('#whichOut').value}</span> · ${t.length} 字符`;
-    setStatus('已拉取 Raw');
-  }catch(e){
-    $('#outputRaw').textContent = '拉取失败：'+e.message+'\n'+url;
-    $('#rawLink').href = url;
-    $('#rawMeta').textContent = 'Raw：拉取失败';
-  }
-}
-function downloadOutput(){
-  const t = $('#codeOut').textContent || $('#outputRaw').textContent || '';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([t],{type:'text/javascript;charset=utf-8'}));
-  const which = ($('#whichOut').value||'output/output.js').split('/').pop();
-  a.download = which;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-</script>
-
-<!-- ========= “展开转义换行 + 软断行” ========= -->
-<script>
-// 把 \" \\n \\t 这类转义还原为真实字符（JSON 安全展开）
-function expandEscapedNewlines(s){
-  if (typeof s !== 'string') return s;
-  const hasEscaped = (s.match(/\\n/g)||[]).length > (s.match(/\n/g)||[]).length;
-  if (!hasEscaped) return s;
-  try {
-    const tmp = '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
-    return JSON.parse(tmp);
-  } catch {
-    return s
-      .replace(/\\r\\n/g, '\n')
-      .replace(/\\n/g, '\n')
-      .replace(/\\t/g, '\t')
-      .replace(/\\r/g, '\r');
-  }
-}
-// 可选：对“全在一行”的 JS 做温和断行，避免 Prettier 前完全一行难读
-function softBreak(js){
-  if (typeof js !== 'string') return js;
-  if ((js.match(/\n/g)||[]).length >= 5) return js; // 已有足够换行则不处理
-  return js
-    .replace(/;\s*(?!\n)/g, ';\n')
-    .replace(/\}\s*(?!\n)/g, '}\n')
-    .replace(/\)\s*;\s*(?!\n)/g, ');\n');
-}
-</script>
-
-<!-- ========= GitHub 提交 & 轮询（含后台恢复） ========= -->
-<script>
-// 提交前“秒解预览”：先智能解密 → 展开换行 → 软断行 →（可选）美化
-function previewLocalImmediately(code){
-  const dec0 = trySmartDecode(code);
-  const dec1 = expandEscapedNewlines(dec0);
-  const dec  = softBreak(dec1);
-  $('#codeOut').textContent = dec;
-  setStatus('🟢 本地预览（已提交，等待远端产物覆盖）');
-  // 异步美化（不阻塞 PUT）
-  (async()=>{ 
-    const pretty = await maybeBeautify(dec);
-    if(pretty!==dec){
-      $('#codeOut').textContent = pretty;
-      setStatus('🟢 本地预览（已美化）');
-    }
-  })();
-}
-
-async function submitInput(){
-  const path=$('#pathIn').value.trim()||'input.js';
-  const api=`${repoBase()}/contents/${path}`;
-  const code=$('#codeIn').value;
-  if(!code){ setStatus('没有可上传的内容'); return }
-
-  // ★ 立刻本地秒解并展示（含展开换行）
-  previewLocalImmediately(code);
-
-  try{
-    let sha='';
-    const head=await fetch(`${api}?ref=${$('#branch').value.trim()}&t=${nowTs()}`,{headers:ghHeaders(),cache:'no-store'});
-    if(head.ok){ const j=await head.json(); sha=j.sha||''; }
-    const body={
-      message: $('#commitMsg').value.trim()||'update via UI',
-      content: btoa(unescape(encodeURIComponent(code))),
-      branch: $('#branch').value.trim(),
-      sha: sha||undefined
-    };
-    const res=await fetch(api,{ method:'PUT', headers:{ 'Content-Type':'application/json', ...ghHeaders() }, cache:'no-store', body: JSON.stringify(body) });
-    const txt=await res.text();
-    if(!res.ok) throw new Error(res.status+' '+res.statusText+' → '+txt.slice(0,200));
-
-    if ($('#autoResume').checked) {
-      saveJobForAutoResume({
-        repo: $('#repo').value.trim(),
-        branch: $('#branch').value.trim(),
-        whichOut: $('#whichOut').value,
-        pollSec: Math.max(2, parseInt($('#pollSec').value||'5',10)),
-        maxWait: Math.max(10, parseInt($('#maxWait').value||'150',10))
-      });
-      setStatus('提交成功 · Actions 后台执行中（可离开页面，回来自动拉取 + 智能解密）');
-    } else {
-      setStatus('提交成功 · 如需拉取请手动点击“开始自动轮询”');
-    }
-  }catch(e){ setStatus('提交失败：'+e.message); }
-}
-
-let pollingTimer=null, barTimer=null;
-async function startAutoPoll(){
-  try{ ghHeaders(); }catch(e){ setStatus(e.message); return }
-  if(pollingTimer){ clearInterval(pollingTimer); pollingTimer=null; }
-  if(barTimer){ clearInterval(barTimer); barTimer=null; }
-
-  const which=$('#whichOut').value;
-  const branch=$('#branch').value.trim();
-  const api=`${repoBase()}/contents/${which}?ref=${branch}`;
-  const short=Math.max(2, parseInt($('#pollSec').value||'5',10))*1000;
-  const long=Math.min(30000, short*3);
-  const maxWait=Math.max(10, parseInt($('#maxWait').value||'150',10))*1000;
-
-  let lastSha=''; let waited=0;
-  setStatus('正在轮询：'+which); showBar();
-  barTimer=setInterval(()=>{ const b=$('#bar'); b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; },5000);
-
-  async function tick(){
-    const interval=document.hidden? long : short;
-    const done=await tryFetch();
-    if(done){ clearInterval(pollingTimer); pollingTimer=null; clearInterval(barTimer); barTimer=null; okBar(); return; }
-    waited+=interval;
-    if(waited>=maxWait){
-      clearInterval(pollingTimer); pollingTimer=null;
-      clearInterval(barTimer); barTimer=null;
-      warnBar();
-      setStatus('⌛ 超时：仍未获取到 '+which);
-    }
-  }
-  await tick();
-  pollingTimer=setInterval(tick, short);
-
-  async function tryFetch(){
-    try{
-      const r=await fetch(api+'&t='+nowTs(),{headers:ghHeaders(),cache:'no-store'});
-      const raw=await r.text();
-      if(!r.ok){ setStatus('等待中… '+which+'（HTTP '+r.status+'）'); return false; }
-      const j=JSON.parse(raw);
-      const sha=j.sha||'';
-      if(sha && sha===lastSha){ setStatus('等待中… '+which+'（未更新）'); return false; }
-      const b64=(j.content||'').replace(/\n/g,'');
-      const out=j.content?b64ToUtf8(b64):'';
-      if(out && out.trim()){
-        lastSha=sha||nowTs();
-        // 智能解密 + 展开换行 + 软断行 + 美化
-        const dec0 = trySmartDecode(out);
-        const dec1 = expandEscapedNewlines(dec0);
-        const dec  = softBreak(dec1);
-        const final = await maybeBeautify(dec);
-        $('#codeOut').textContent=final;
-        setStatus( dec!==out ? '✅ 已获取并本地智能解密'+(final!==dec?'（已美化）':'') : '✅ 已获取到最新 '+which );
-        // 同步 Raw 面板（不额外请求）
-        $('#rawLink').href = rawUrl();
-        $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${which}</span> · ${out.length} 字符`;
-        return true;
-      }else{
-        setStatus('等待中… '+which+'（文件为空或未生成）'); return false;
+  <script>
+    async function copySel(sel, btn){
+      try{
+        const el = document.querySelector(sel);
+        const t = el ? (el.value ?? el.textContent ?? '') : '';
+        if(!t) throw new Error('没有可复制的内容');
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(t);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        }
+        if(btn){
+          const old=btn.textContent; btn.textContent='✅ 已复制';
+          setTimeout(()=> btn.textContent=old, 1200);
+        }
+      }catch(e){
+        alert('复制失败：' + e.message);
       }
-    }catch(e){
-      setStatus('等待中… '+which+'（'+e.message+'）'); return false;
     }
-  }
-}
-</script>
+  </script>
 
-<!-- ========= AADecode / Eval / Packer 插件 ========= -->
-<script>
-// AADecode
-(function () {
-  const module = { exports: {} };
-  function extractHeader(code){
-    const i = code.search(/ﾟωﾟﾉ\s*=|ﾟдﾟ\s*=|ﾟДﾟ\s*=|ﾟΘﾟ\s*=/);
-    if(i>0) return { header: code.substring(0,i).trim(), encodedPart: code.substring(i) };
-    return { header:"", encodedPart: code };
-  }
-  function plugin(code){
-    try{
-      const { header, encodedPart } = extractHeader(code);
-      if(!(/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(encodedPart))) return null;
-      let s = encodedPart.replace(") ('_')","").replace("(ﾟДﾟ) ['_'] (","return ");
-      const out = new Function(s)();
-      const keep = document.querySelector('#keepHeader')?.checked;
-      return keep && header ? `${header}\n\n${out}` : out;
-    }catch(e){ return null; }
-  }
-  module.exports = plugin;
-  window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.aadecode = { detect:c=>/ﾟωﾟﾉ|ﾟДﾟ|ﾟдﾟ|ﾟΘﾟ/.test(c), plugin:c=>{ try{ return module.exports(c) ?? c; }catch{ return c; } } };
-})();
+  <script>
+    (function(){
+      const needNoop =
+        typeof window.prettier==='undefined' ||
+        typeof window.prettier.format!=='function' ||
+        !window.prettierPlugins;
+      if(needNoop){
+        window.prettier = window.prettier || {};
+        window.prettier.format = function(code){ return String(code||''); };
+        window.prettierPlugins = window.prettierPlugins || {};
+        console.log('[noop] Prettier 缺少插件 → 启用兜底（仅原样返回，不报错）');
+      }
+    })();
+  </script>
 
-// Eval
-(function(){
-  function plugin(code){
-    if(!/eval\s*\(/.test(code)) return null;
-    try{
-      const safe = code.replace(/\beval\s*\(/g, '(function(__x){return __x;})(');
-      const out = Function('"use strict";return ('+safe+')')();
-      return (typeof out==='string') ? out : String(out);
-    }catch{ return null; }
-  }
-  window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.eval = { detect:c=>/eval\s*\(/.test(c), plugin:c=>{ try{ return plugin(c) ?? c; }catch{ return c; } } };
-})();
+  <script>
+    // 启动 50 秒倒数计时器，并更新 UI
+    function startCountdown(seconds) {
+      const countdownEl = document.getElementById('countdown');
+      const statusTextEl = document.querySelector('#status small');
+      let time = seconds;
 
-// Packer
-(function () {
-  const P_RE=/^\s*eval\(function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\)\s*\{/;
-  function isPacked(code){ return P_RE.test(code); }
-  function unpackOnce(source){
-    if(!isPacked(source)) return null;
-    const m=source.match(/eval\(function\(p,a,c,k,e,d\)\{[\s\S]*?\}\s*\(\s*(['"`])([\s\S]*?)\1\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(['"`])([\s\S]*?)\5\.split\((['"`])\7\)\s*,/);
-    if(!m) return null;
-    const payload=m[2], radix=parseInt(m[3],10), dictRaw=m[6], sep=m[7]||'|', dict=dictRaw.split(sep);
-    function unescapeStr(s){ return s.replace(/\\([\\'"`])/g,'$1').replace(/\\x([0-9A-Fa-f]{2})/g,(_,h)=>String.fromCharCode(parseInt(h,16))).replace(/\\u([0-9A-Fa-f]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16))); }
-    let p=unescapeStr(payload);
-    function unbase(str){ return parseInt(str,radix); }
-    p=p.replace(/\b\w+\b/g,w=>{ const idx=unbase(w); return Number.isNaN(idx)? w : (dict[idx]??w); });
-    return p;
-  }
-  function unpackRecursive(code,max=8){ let s=code,changed=false; for(let i=0;i<max;i++){ const out=unpackOnce(s); if(out==null) break; s=String(out).trim(); changed=true; } return changed? s : null; }
-  window.DecodePlugins = window.DecodePlugins || {};
-  window.DecodePlugins.packer = { detect:c=>isPacked(c), plugin:c=>{ try{ const out=unpackRecursive(c); return out||c; }catch{ return c; } } };
-})();
-</script>
+      // 确保进度条可见（如果它被外部JS隐藏了）
+      const barWrapEl = document.getElementById('barWrap');
+      if (barWrapEl) barWrapEl.style.display = 'block';
+      
+      // 更新初始状态
+      countdownEl.textContent = `倒数: ${time}s`;
 
-<!-- ========= 智能解密 + 显示 ========= -->
-<script>
-function trySmartDecode(text){
-  if(!$('#autoSmart').checked) return text;
-  let before=String(text),changed=false,rounds=0,maxRounds=8;
-  while(rounds++<maxRounds){
-    let cur=before;
-    try{ if(window.DecodePlugins?.packer?.detect(cur)){ const t=window.DecodePlugins.packer.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
-    try{ if(window.DecodePlugins?.eval?.detect(cur)){ const t=window.DecodePlugins.eval.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
-    try{ if(window.DecodePlugins?.aadecode?.detect(cur)){ const t=window.DecodePlugins.aadecode.plugin(cur); if(typeof t==='string') cur=t; } }catch{}
-    if(cur===before) break; before=cur; changed=true;
-  }
-  return changed ? before : text;
-}
-async function trySmartDecodeAndShow(src,label){
-  if(!$('#autoSmart').checked) return;
-  const dec0 = trySmartDecode(src);
-  const dec1 = expandEscapedNewlines(dec0);
-  const dec  = softBreak(dec1);
-  const pretty = await maybeBeautify(dec);
-  $('#codeOut').textContent = pretty;
-  const changed = (dec0!==src);
-  setStatus(`✅ ${label} · ${changed?'本地智能解密完成':'已载入'}${pretty!==dec?'（已美化）':''}`);
-  $('#rawLink').href = rawUrl();
-}
-</script>
+      const interval = setInterval(() => {
+        time--;
+        if (time >= 0) {
+          countdownEl.textContent = `倒数: ${time}s`;
+        } else {
+          clearInterval(interval);
+          countdownEl.textContent = '计时结束';
+          // 可以在这里重新设置状态文本
+          // statusTextEl.textContent = '状态：就绪';
+        }
+      }, 1000); // 每1秒更新一次
 
-<!-- ========= 后台恢复轮询 ========= -->
-<script>
-function saveJobForAutoResume(job){
-  const data={...job,startedAt:Date.now(),lastSha:'',etag:'',expiry:Date.now()+job.maxWait*1000+5*60*1000};
-  localStorage.setItem('oto_auto_job', JSON.stringify(data));
-}
-function loadJob(){ try{ const raw=localStorage.getItem('oto_auto_job'); if(!raw) return null; const j=JSON.parse(raw); if(!j||!j.expiry||Date.now()>j.expiry){ localStorage.removeItem('oto_auto_job'); return null;} return j; }catch{ return null; } }
-function clearJob(){ localStorage.removeItem('oto_auto_job'); }
+      return interval;
+    }
 
-async function pollOutputOnce(job,state){
-  const api=`https://api.github.com/repos/${job.repo}/contents/${job.whichOut}?ref=${job.branch}&t=${Date.now()}`;
-  const headers={ ...ghHeaders() }; if(state.etag){ headers['If-None-Match']=state.etag; }
-  const res=await fetch(api,{headers,cache:'no-store'});
-  if(res.status===304){ setStatus('等待中…（未改变 304）'); return {done:false}; }
-  const text=await res.text(); if(!res.ok){ setStatus(`等待中…（HTTP ${res.status}）`); return {done:false}; }
-  const etag=res.headers.get('ETag')||state.etag; const j=JSON.parse(text); const sha=j.sha||''; const b64=(j.content||'').replace(/\n/g,''); const raw=j.content?b64ToUtf8(b64):'';
-  if(state.sha && sha===state.sha){ setStatus('等待中…（未更新）'); return {done:false,etag,sha:state.sha}; }
-  if(raw && raw.trim()){
-    const dec0 = trySmartDecode(raw);
-    const dec1 = expandEscapedNewlines(dec0);
-    const dec  = softBreak(dec1);
-    const final = await maybeBeautify(dec);
-    $('#codeOut').textContent = final;
-    setStatus( dec0!==raw ? `✅ 本地智能解密完成${final!==dec?'（已美化）':''}` : `✅ 已获取到最新 ${job.whichOut}` );
-    $('#rawLink').href = rawUrl(job.whichOut);
-    $('#rawMeta').innerHTML = `Raw：<span style="color:#e6eef7">${job.whichOut}</span> · ${raw.length} 字符`;
-    return {done:true, etag, sha};
-  }
-  setStatus('等待中…（文件为空或未生成）'); return {done:false, etag, sha};
-}
-
-async function autoResumeIfNeeded(){
-  const job=loadJob(); if(!job) return;
-  const short=Math.max(2, parseInt(job.pollSec||5,10)), long=Math.min(30, short*3);
-  let waited=0, sha='', etag='';
-  setStatus(`⏳ 正在恢复轮询：${job.whichOut}`); showBar();
-  const b=$('#bar'); const barTimer=setInterval(()=>{ b.style.transition='none'; b.style.width='0%'; void b.offsetWidth; b.style.transition='width 5s linear'; b.style.width='100%'; },5000);
-  async function tick(){
-    const interval=document.hidden? long*1000 : short*1000;
-    const {done, sha:newSha, etag:newEtag}=await pollOutputOnce(job,{sha,etag});
-    if(newSha) sha=newSha; if(newEtag) etag=newEtag;
-    if(done){ okBar(); clearInterval(timer); clearInterval(barTimer); clearJob(); return; }
-    waited+=interval;
-    if(waited>=job.maxWait*1000){ warnBar(); clearInterval(timer); clearInterval(barTimer); setStatus(`⌛ 超时：仍未获取到 ${job.whichOut}`); }
-  }
-  await tick();
-  const timer=setInterval(tick, short*1000);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) tick(); }, {passive:true});
-}
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoResumeIfNeeded(); }, {passive:true});
-window.addEventListener('load', autoResumeIfNeeded);
-</script>
-
-<!-- ========= 设置持久化 ========= -->
-<script>
-const SETTINGS_KEY='oto_settings_v2';
-
-function readSettings(){
-  try{ return JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'); }catch{ return {}; }
-}
-function writeSettings(obj){
-  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj)); }catch{}
-}
-function loadSettingsToUI(){
-  const s=readSettings();
-  if(s.repo) $('#repo').value=s.repo;
-  if(s.branch) $('#branch').value=s.branch;
-  if(s.rememberToken && s.token) $('#token').value=s.token;
-  if(s.rememberToken) $('#rememberToken').checked=true;
-  if(s.pathIn) $('#pathIn').value=s.pathIn;
-  if(s.commitMsg) $('#commitMsg').value=s.commitMsg;
-  if(s.whichOut) $('#whichOut').value=s.whichOut;
-  if(typeof s.pollSec==='number') $('#pollSec').value=s.pollSec;
-  if(typeof s.maxWait==='number') $('#maxWait').value=s.maxWait;
-  if(typeof s.autoResume==='boolean') $('#autoResume').checked=s.autoResume;
-  if(typeof s.autoSmart==='boolean') $('#autoSmart').checked=s.autoSmart;
-  if(typeof s.autoBeautify==='boolean') $('#autoBeautify').checked=s.autoBeautify;
-  if(typeof s.keepHeader==='boolean') $('#keepHeader').checked=s.keepHeader;
-}
-function gatherSettings(){
-  return {
-    repo: $('#repo').value.trim(),
-    branch: $('#branch').value.trim(),
-    rememberToken: $('#rememberToken').checked,
-    token: $('#rememberToken').checked ? $('#token').value.trim() : '',
-    pathIn: $('#pathIn').value.trim(),
-    commitMsg: $('#commitMsg').value.trim(),
-    whichOut: $('#whichOut').value,
-    pollSec: parseInt($('#pollSec').value,10)||5,
-    maxWait: parseInt($('#maxWait').value,10)||150,
-    autoResume: $('#autoResume').checked,
-    autoSmart: $('#autoSmart').checked,
-    autoBeautify: $('#autoBeautify').checked,
-    keepHeader: $('#keepHeader').checked,
-  };
-}
-function bindPersist(){
-  const ids=['repo','branch','token','rememberToken','pathIn','commitMsg','whichOut','pollSec','maxWait','autoResume','autoSmart','autoBeautify','keepHeader'];
-  ids.forEach(id=>{
-    const el=$('#'+id);
-    if(!el) return;
-    const evt = (el.tagName==='SELECT' || el.type==='checkbox') ? 'change' : 'input';
-    el.addEventListener(evt, ()=>writeSettings(gatherSettings()), {passive:true});
-  });
-}
-window.addEventListener('load',()=>{ loadSettingsToUI(); bindPersist(); });
-</script>
-
-<!-- 单个隐藏文件 input（避免重复） -->
-<input type="file" id="file" accept=".js,.txt,.json" hidden />
+    // 在页面加载后立即启动 50 秒倒数，以便您立即看到效果。
+    document.addEventListener('DOMContentLoaded', () => {
+        startCountdown(50);
+    });
+  </script>
 </body>
 </html>
