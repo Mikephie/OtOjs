@@ -189,7 +189,7 @@ small {
   height: 100%;
   width: 0%;
   background: linear-gradient(90deg, var(--accent), var(--link)); /* 渐变色 */
-  transition: none; /* 取消原有的过渡 */
+  transition: none; /* 必须确保取消原有的过渡 */
   /* 应用 60 秒循环动画，并让它无限次播放 */
   animation: loading-loop 60s linear infinite; 
 }
