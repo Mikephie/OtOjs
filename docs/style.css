@@ -32,7 +32,6 @@ body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   background: var(--bg);
   color: var(--text);
-  /* animation: breathing-glow 15s infinite alternate; /* 可选：给 body 添加微弱呼吸光 */
 }
 
 a {
@@ -176,6 +175,8 @@ small {
   overflow: hidden;
   margin-top: 8px;
   position: relative; /* 用于条纹动画 */
+  /* 强制显示进度条容器，覆盖 app.js 中可能的 display:none; */
+  display: block !important; 
 }
 
 /* 50 秒动态动画：进度条不断循环 */
