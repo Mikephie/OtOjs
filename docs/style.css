@@ -175,8 +175,7 @@ small {
   overflow: hidden;
   margin-top: 8px;
   position: relative; /* 用于条纹动画 */
-  /* 强制显示进度条容器，覆盖 app.js 中可能的 display:none; */
-  display: block !important; 
+  display: block !important; /* 强制显示进度条容器 */
 }
 
 /* 50 秒动态动画：进度条不断循环 */
@@ -220,4 +219,13 @@ small {
   color: var(--ok); /* 状态文本用赛博绿 */
   font-weight: bold;
   text-shadow: 0 0 3px var(--ok);
+}
+
+/* 新增：优化倒数数字的显示，让它更像高科技 HUD */
+#countdown {
+  color: var(--accent) !important; /* 使用主强调色 */
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 5px var(--accent);
+  margin-left: 15px !important;
 }
