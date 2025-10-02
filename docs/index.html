@@ -7,35 +7,34 @@
   <link rel="stylesheet" href="style.css" />
 
   <script>
-    // 页面加载后立即启动 50 秒倒数。
-    document.addEventListener('DOMContentLoaded', () => {
-        const seconds = 50;
+    let countdownInterval = null; // 用于存储计时器ID，以便重置
+
+    // 启动 50 秒倒数计时器
+    function startCountdown(seconds = 50) {
+        if (countdownInterval) {
+            clearInterval(countdownInterval); // 如果计时器已经在运行，先停止
+        }
+        
         const countdownEl = document.getElementById('countdown');
         const barWrapEl = document.getElementById('barWrap');
         let time = seconds;
 
-        // 确保进度条容器可见（尽管 CSS 应该已经强制它可见）
         if (barWrapEl) barWrapEl.style.display = 'block';
-        
-        // 确保 countdown 元素存在
-        if (!countdownEl) {
-            console.error("Countdown element (#countdown) not found.");
-            return;
-        }
+        if (!countdownEl) return;
 
-        // 首次更新显示
         countdownEl.textContent = `倒数: ${time}s`;
 
-        const interval = setInterval(() => {
+        countdownInterval = setInterval(() => {
             time--;
             if (time >= 0) {
                 countdownEl.textContent = `倒数: ${time}s`;
             } else {
-                clearInterval(interval);
+                clearInterval(countdownInterval);
                 countdownEl.textContent = '计时结束';
+                countdownInterval = null;
             }
         }, 1000); 
-    });
+    }
   </script>
 
 </head>
@@ -72,8 +71,9 @@
       </div>
       <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
       <div class="row compact">
-        <button class="ok" onclick="submitInput()">提交</button>
-        <button class="warn" onclick="startAutoPoll()">轮询</button>
+        <button class="ok" onclick="submitInput(); startCountdown();">提交</button>
+        <button class="warn" onclick="startAutoPoll(); startCountdown();">轮询</button>
+        
         <button onclick="beautify()">美化</button>
         <button onclick="copySel('#codeOut', this)">复制</button>
         <button class="err" onclick="clrAll()">清空全部</button>
@@ -90,7 +90,7 @@
       </div>
       
       <div id="countdown-wrap">
-        <span id="countdown"></span>
+        <span id="countdown">点击“提交”或“轮询”开始计时</span>
       </div>
       
       <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div> 
