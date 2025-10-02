@@ -176,21 +176,21 @@ small {
 
 .bar-wrap {
   height: 8px;
-  background: #0b1020; /* 进度条背景 */
+  background: #0b1020;
   border: 1px solid var(--line2);
   border-radius: 8px;
   overflow: hidden;
   margin-top: 8px;
-  /* 移除 display: block !important; 让 JS 控制显示/隐藏 */
 }
 
-/* 进度条本身 */
+/* 进度条本身：渐变效果由 CSS 定义，JS 控制宽度 */
 .bar {
   height: 100%;
   width: 0%;
-  background: var(--link); /* 进度条颜色 */
-  /* 移除所有 CSS 动画，交给 JS 控制 */
-  transition: width 0.3s linear; /* 初始平滑过渡，但同步时会被 JS 覆盖 */
+  /* 恢复渐变效果 */
+  background: linear-gradient(90deg, var(--accent), var(--link)); 
+  /* 移除 CSS 动画，让 JS 通过 transition 控制 50s 速度 */
+  transition: width 0.3s linear; 
 }
 
 .options {
