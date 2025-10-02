@@ -72,6 +72,8 @@
     </div>
   </div>
 
+  <script src="countdown.js"></script>
+
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
 
@@ -111,41 +113,6 @@
         console.log('[noop] Prettier 缺少插件 → 启用兜底（仅原样返回，不报错）');
       }
     })();
-  </script>
-
-  <script>
-    // 启动 50 秒倒数计时器，并更新 UI
-    function startCountdown(seconds) {
-      const countdownEl = document.getElementById('countdown');
-      const statusTextEl = document.querySelector('#status small');
-      let time = seconds;
-
-      // 确保进度条可见（如果它被外部JS隐藏了）
-      const barWrapEl = document.getElementById('barWrap');
-      if (barWrapEl) barWrapEl.style.display = 'block';
-      
-      // 更新初始状态
-      countdownEl.textContent = `倒数: ${time}s`;
-
-      const interval = setInterval(() => {
-        time--;
-        if (time >= 0) {
-          countdownEl.textContent = `倒数: ${time}s`;
-        } else {
-          clearInterval(interval);
-          countdownEl.textContent = '计时结束';
-          // 可以在这里重新设置状态文本
-          // statusTextEl.textContent = '状态：就绪';
-        }
-      }, 1000); // 每1秒更新一次
-
-      return interval;
-    }
-
-    // 在页面加载后立即启动 50 秒倒数，以便您立即看到效果。
-    document.addEventListener('DOMContentLoaded', () => {
-        startCountdown(50);
-    });
   </script>
 </body>
 </html>
