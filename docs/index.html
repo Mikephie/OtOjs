@@ -7,34 +7,57 @@
   <link rel="stylesheet" href="style.css" />
 
   <script>
-    let countdownInterval = null; // 用于存储计时器ID，以便重置
+    let countdownInterval; // 用于存储计时器ID，以便全局控制
 
-    // 启动 50 秒倒数计时器
-    function startCountdown(seconds = 50) {
-        if (countdownInterval) {
-            clearInterval(countdownInterval); // 如果计时器已经在运行，先停止
-        }
-        
+    // 启动 50 秒倒数计时器和进度条动画
+    function startCountdown(seconds) {
+        // 先清理任何正在运行的计时器
+        if (countdownInterval) clearInterval(countdownInterval);
+
         const countdownEl = document.getElementById('countdown');
-        const barWrapEl = document.getElementById('barWrap');
+        const bar = document.getElementById('bar');
+        
         let time = seconds;
 
-        if (barWrapEl) barWrapEl.style.display = 'block';
-        if (!countdownEl) return;
-
-        countdownEl.textContent = `倒数: ${time}s`;
+        // --- 1. 进度条动画控制：重置并开始 ---
+        if (bar) {
+            // 移除 CSS 循环动画，改由 JS 控制
+            bar.style.animation = 'none';
+            bar.offsetHeight; // 强制浏览器重绘
+            
+            // 设置初始状态和过渡时间，使进度条与倒数时间一致
+            bar.style.transition = `width ${seconds}s linear`;
+            bar.style.width = '100%'; // 从 100% 倒退
+            bar.style.background = 'linear-gradient(90deg, var(--link), var(--accent))'; // 确保颜色和方向
+        }
+        
+        // --- 2. 数字倒数控制 ---
+        if (countdownEl) {
+            countdownEl.textContent = `倒数: ${time}s`;
+        }
 
         countdownInterval = setInterval(() => {
             time--;
+            
             if (time >= 0) {
-                countdownEl.textContent = `倒数: ${time}s`;
+                if (countdownEl) countdownEl.textContent = `倒数: ${time}s`;
             } else {
                 clearInterval(countdownInterval);
-                countdownEl.textContent = '计时结束';
                 countdownInterval = null;
+
+                if (countdownEl) countdownEl.textContent = '计时结束';
+                if (bar) {
+                    bar.style.width = '0%'; // 确保最后停在 0
+                    bar.style.transition = 'none'; // 移除过渡，避免下次启动闪烁
+                }
             }
         }, 1000); 
     }
+
+    // 在页面加载后立即启动 50 秒倒数。
+    document.addEventListener('DOMContentLoaded', () => {
+        startCountdown(50);
+    });
   </script>
 
 </head>
@@ -63,21 +86,20 @@
       <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
       <div class="row compact">
         <input type="file" id="file" accept=".js,.txt,.json" />
-        <button onclick="pick()">文件</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="pick()">文件</button>
         <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
-        <button onclick="loadRemote()">远程</button>
-        <button onclick="pasteFromClipboard()">粘贴</button>
-        <button class="err" onclick="clrIn()">清空</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="loadRemote()">远程</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="pasteFromClipboard()">粘贴</button>
+        <button class="err" onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="clrIn()">清空</button>
       </div>
       <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
       <div class="row compact">
-        <button class="ok" onclick="submitInput(); startCountdown();">提交</button>
-        <button class="warn" onclick="startAutoPoll(); startCountdown();">轮询</button>
-        
-        <button onclick="beautify()">美化</button>
-        <button onclick="copySel('#codeOut', this)">复制</button>
-        <button class="err" onclick="clrAll()">清空全部</button>
-        <button id="clearRepoBtn" class="warn">清空远程 input/output</button>
+        <button class="ok" onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="submitInput()">提交</button>
+        <button class="warn" onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="startAutoPoll()">轮询</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="beautify()">美化</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="copySel('#codeOut', this)">复制</button>
+        <button class="err" onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="clrAll()">清空全部</button>
+        <button id="clearRepoBtn" class="warn" onmousedown="buttonDown(this)" onmouseup="buttonUp(this)">清空远程 input/output</button>
       </div>
       <div class="options">
         <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
@@ -90,7 +112,7 @@
       </div>
       
       <div id="countdown-wrap">
-        <span id="countdown">点击“提交”或“轮询”开始计时</span>
+        <span id="countdown"></span>
       </div>
       
       <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div> 
@@ -99,10 +121,10 @@
 
     <div class="card">
       <div class="row compact">
-        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
-        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
-        <button onclick="copySel('#outputRaw', this)">复制结果</button>
-        <button onclick="downloadOutput()">下载</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="copySel('#outputRaw', this)">复制结果</button>
+        <button onmousedown="buttonDown(this)" onmouseup="buttonUp(this)" onclick="downloadOutput()">下载</button>
       </div>
       <pre id="outputRaw"></pre>
     </div>
@@ -112,6 +134,15 @@
   <script src="app.js"></script>
 
   <script>
+    // 通用按钮按下效果
+    function buttonDown(btn) {
+        btn.classList.add('active');
+    }
+    function buttonUp(btn) {
+        // 使用 setTimeout 确保效果持续足够短的时间，即使鼠标快速松开
+        setTimeout(() => btn.classList.remove('active'), 100); 
+    }
+
     async function copySel(sel, btn){
       try{
         const el = document.querySelector(sel);
