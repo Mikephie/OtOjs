@@ -1,20 +1,20 @@
 :root {
-  /* 高科技/赛博朋克风格颜色 */
-  --bg: #0d0614; /* 深紫黑背景 */
-  --card: #180a24; /* 卡片背景，略亮 */
-  --muted: #a672d6; /* 柔和的紫色文本 */
-  --line: #3b185c; /* 边框/分隔线 */
-  --line2: #4e1f76; /* 略亮的边框 */
+  /* 新配色：高对比度暗黑模式 (黑红青) */
+  --bg: #000a12; /* 极深蓝黑背景 */
+  --card: #0c1a24; /* 卡片背景 */
+  --muted: #8096a6; /* 柔和的灰色文本 */
+  --line: #2a3c48; /* 边框/分隔线 */
+  --line2: #34485c; /* 略亮的边框 */
   
-  --text: #e0e0ff; /* 主文本：亮白带一点紫色 */
-  --btn: #2a1040; /* 按钮背景 */
-  --ok: #00ffaa; /* 成功：赛博绿 */
-  --warn: #ff9900; /* 警告：鲜橙 */
-  --err: #ff4d6e; /* 错误：品红/红 */
+  --text: #e6f7ff; /* 主文本：亮白带一点青色 */
+  --btn: #1a2c3a; /* 按钮背景 */
+  --ok: #00e0b3; /* 成功：亮青绿 */
+  --warn: #ffcc00; /* 警告：鲜黄 */
+  --err: #ff3859; /* 错误/退出：高对比红 */
   --link: #00ffff; /* 链接：亮青色 */
   
-  --accent: #ff00cc; /* 主强调色：亮品红/洋红 */
-  --glow-color: rgba(255, 0, 204, 0.4); /* 用于光晕效果 */
+  --accent: #ff3859; /* 主强调色：高对比红 (用于退出/清空/高亮) */
+  --glow-color: rgba(255, 56, 89, 0.4); /* 用于光晕效果，红色 */
 }
 * {
   box-sizing: border-box;
@@ -47,23 +47,23 @@ a {
 
 h1 {
   margin: 10px 0 6px;
-  font-size: 24px; /* 略微放大标题 */
-  color: var(--accent);
-  text-shadow: 0 0 8px var(--accent), 0 0 15px rgba(255, 0, 204, 0.3); /* 标题发光 */
+  font-size: 24px;
+  color: var(--link); /* 标题使用青色 */
+  text-shadow: 0 0 8px var(--link), 0 0 15px rgba(0, 255, 255, 0.3); /* 标题发光 */
 }
 
 .card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 18px; /* 增大内边距 */
+  padding: 18px;
   margin: 15px 0;
-  box-shadow: 0 0 10px var(--glow-color); /* 卡片光晕 */
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); /* 卡片青色光晕 */
   transition: transform 0.3s, box-shadow 0.3s;
 }
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 15px var(--glow-color);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
 }
 
 label {
@@ -74,28 +74,28 @@ label {
 
 input, select, textarea {
   width: 100%;
-  background: #1f0c2f; /* 输入框更深 */
+  background: #08121a;
   color: var(--text);
   border: 1px solid var(--line2);
-  border-radius: 8px; /* 略微圆润 */
+  border-radius: 8px;
   padding: 12px;
   font-size: 14px;
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 input:focus, textarea:focus {
   border-color: var(--link);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5); /* 聚焦时青色发光 */
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
   outline: none;
 }
 
 textarea {
-  min-height: 180px; /* 略微增大输入框 */
+  min-height: 180px;
   font-family: ui-monospace, Consolas, Menlo, monospace;
 }
 
 .row {
   display: flex;
-  gap: 12px; /* 增大间距 */
+  gap: 12px;
   flex-wrap: wrap;
   margin: 8px 0;
 }
@@ -109,9 +109,9 @@ textarea {
 }
 
 button {
-  padding: 10px 15px; /* 增大按钮 */
+  padding: 10px 15px;
   border-radius: 8px;
-  border: 1px solid #2b3b54;
+  border: 1px solid var(--line2);
   background: var(--btn);
   color: var(--text);
   cursor: pointer;
@@ -120,8 +120,8 @@ button {
   transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 button:hover {
-  background: #3a1555;
-  box-shadow: 0 0 10px rgba(255, 0, 204, 0.5); /* 悬停发光 */
+  background: #203345;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
 }
 
 button.ok {
@@ -129,7 +129,7 @@ button.ok {
   color: var(--ok);
 }
 button.ok:hover {
-  background: rgba(0, 255, 170, 0.1);
+  background: rgba(0, 224, 179, 0.1);
   box-shadow: 0 0 12px var(--ok);
 }
 
@@ -138,65 +138,65 @@ button.warn {
   color: var(--warn);
 }
 button.warn:hover {
-  background: rgba(255, 153, 0, 0.1);
+  background: rgba(255, 204, 0, 0.1);
   box-shadow: 0 0 12px var(--warn);
 }
 
+/* 强调“退出/清空”按钮 */
 button.err {
-  border-color: var(--err);
-  color: var(--err);
+  border-color: var(--accent); /* 使用主强调色红色 */
+  color: var(--accent);
 }
 button.err:hover {
-  background: rgba(255, 77, 110, 0.1);
-  box-shadow: 0 0 12px var(--err);
+  background: rgba(255, 56, 89, 0.1);
+  box-shadow: 0 0 12px var(--accent);
 }
 
 pre {
   white-space: pre-wrap;
-  background: #0b0614; /* 代码框背景 */
+  background: #050b10;
   border: 1px solid var(--line2);
   border-radius: 10px;
   padding: 15px;
   font-size: 13px;
   max-height: 400px;
   overflow: auto;
-  box-shadow: inset 0 0 5px rgba(0, 255, 255, 0.2); /* 内部微弱青色光 */
+  box-shadow: inset 0 0 5px rgba(0, 255, 255, 0.2);
 }
 
 small {
   color: var(--muted);
 }
 
-/* 新增：倒数数字容器布局，确保在状态栏和进度条之间 */
+/* 倒数数字容器布局 */
 #countdown-wrap {
-    text-align: center; /* 居中显示倒数数字 */
+    text-align: center; 
     margin: 8px 0;
 }
 
 .bar-wrap {
-  height: 8px; /* 略微加高 */
+  height: 8px;
   background: #0b0614;
   border: 1px solid var(--line2);
   border-radius: 8px;
   overflow: hidden;
   margin-top: 8px;
-  position: relative; /* 用于条纹动画 */
-  display: block !important; /* 强制显示进度条容器 */
+  position: relative;
+  display: block !important; 
 }
 
 /* 50 秒动态动画：进度条不断循环 */
 @keyframes loading-loop {
-  0% { width: 0%; background-color: var(--accent); }
+  0% { width: 0%; background-color: var(--ok); } /* 动画开始颜色改为 OK (青绿) */
   50% { width: 100%; background-color: var(--link); }
-  100% { width: 0%; background-color: var(--accent); }
+  100% { width: 0%; background-color: var(--ok); }
 }
 
 .bar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--accent), var(--link)); /* 渐变色 */
-  transition: none; /* 必须确保取消原有的过渡 */
-  /* 应用 50 秒循环动画，并让它无限次播放 */
+  background: linear-gradient(90deg, var(--ok), var(--link));
+  transition: none; 
   animation: loading-loop 50s linear infinite; 
 }
 
@@ -222,15 +222,15 @@ small {
 
 /* 状态文本颜色 */
 #status small {
-  color: var(--ok); /* 状态文本用赛博绿 */
+  color: var(--ok);
   font-weight: bold;
   text-shadow: 0 0 3px var(--ok);
 }
 
-/* 优化倒数数字的显示，让它更像高科技 HUD */
+/* 倒数数字的显示，使用高对比度的红 */
 #countdown {
-  color: var(--accent) !important; /* 使用主强调色 */
-  font-size: 16px; /* 略微增大 */
+  color: var(--accent) !important; 
+  font-size: 16px; 
   letter-spacing: 2px;
-  text-shadow: 0 0 8px var(--accent); /* 更强的发光效果 */
+  text-shadow: 0 0 8px var(--accent); 
 }
