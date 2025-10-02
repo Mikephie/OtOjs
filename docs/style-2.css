@@ -1,0 +1,236 @@
+:root {
+  /* 新配色：高对比度暗黑模式 (黑红青) */
+  --bg: #000a12; /* 极深蓝黑背景 */
+  --card: #0c1a24; /* 卡片背景 */
+  --muted: #8096a6; /* 柔和的灰色文本 */
+  --line: #2a3c48; /* 边框/分隔线 */
+  --line2: #34485c; /* 略亮的边框 */
+  
+  --text: #e6f7ff; /* 主文本：亮白带一点青色 */
+  --btn: #1a2c3a; /* 按钮背景 */
+  --ok: #00e0b3; /* 成功：亮青绿 */
+  --warn: #ffcc00; /* 警告：鲜黄 */
+  --err: #ff3859; /* 错误/退出：高对比红 */
+  --link: #00ffff; /* 链接：亮青色 */
+  
+  --accent: #ff3859; /* 主强调色：高对比红 (用于退出/清空/高亮) */
+  --glow-color: rgba(255, 56, 89, 0.4); /* 用于光晕效果，红色 */
+}
+* {
+  box-sizing: border-box;
+}
+
+/* 全局动画：模拟呼吸光或扫描线，用于高科技感 */
+@keyframes breathing-glow {
+  0% { box-shadow: 0 0 5px var(--glow-color); }
+  50% { box-shadow: 0 0 10px var(--glow-color), 0 0 15px var(--glow-color); }
+  100% { box-shadow: 0 0 5px var(--glow-color); }
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: var(--link);
+  text-shadow: 0 0 5px var(--link); /* 链接发光 */
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 18px 14px 80px;
+}
+
+h1 {
+  margin: 10px 0 6px;
+  font-size: 24px;
+  color: var(--link); /* 标题使用青色 */
+  text-shadow: 0 0 8px var(--link), 0 0 15px rgba(0, 255, 255, 0.3); /* 标题发光 */
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 15px 0;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); /* 卡片青色光晕 */
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+}
+
+label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+input, select, textarea {
+  width: 100%;
+  background: #08121a;
+  color: var(--text);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+input:focus, textarea:focus {
+  border-color: var(--link);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  outline: none;
+}
+
+textarea {
+  min-height: 180px;
+  font-family: ui-monospace, Consolas, Menlo, monospace;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.row > * {
+  flex: 1 1 200px;
+}
+
+.row.compact > * {
+  flex: initial;
+}
+
+button {
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid var(--line2);
+  background: var(--btn);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+button:hover {
+  background: #203345;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+button.ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+button.ok:hover {
+  background: rgba(0, 224, 179, 0.1);
+  box-shadow: 0 0 12px var(--ok);
+}
+
+button.warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+button.warn:hover {
+  background: rgba(255, 204, 0, 0.1);
+  box-shadow: 0 0 12px var(--warn);
+}
+
+/* 强调"退出/清空"按钮 */
+button.err {
+  border-color: var(--accent); /* 使用主强调色红色 */
+  color: var(--accent);
+}
+button.err:hover {
+  background: rgba(255, 56, 89, 0.1);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+pre {
+  white-space: pre-wrap;
+  background: #050b10;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  padding: 15px;
+  font-size: 13px;
+  max-height: 400px;
+  overflow: auto;
+  box-shadow: inset 0 0 5px rgba(0, 255, 255, 0.2);
+}
+
+small {
+  color: var(--muted);
+}
+
+/* 倒数数字容器布局 */
+#countdown-wrap {
+    text-align: center; 
+    margin: 8px 0;
+}
+
+.bar-wrap {
+  height: 8px;
+  background: #0b0614;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+  position: relative;
+  display: block !important; 
+}
+
+/* 50 秒动态动画：进度条不断循环 */
+@keyframes loading-loop {
+  0% { width: 0%; background-color: var(--ok); } /* 动画开始颜色改为 OK (青绿) */
+  50% { width: 100%; background-color: var(--link); }
+  100% { width: 0%; background-color: var(--ok); }
+}
+
+.bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--ok), var(--link));
+  transition: none; 
+  animation: loading-loop 50s linear infinite; 
+}
+
+.options {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.options label input[type="checkbox"] {
+  width: auto;
+}
+
+/* 隐藏原生文件输入（用按钮触发） */
+#file {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 状态文本颜色 */
+#status small {
+  color: var(--ok);
+  font-weight: bold;
+  text-shadow: 0 0 3px var(--ok);
+}
+
+/* 倒数数字的显示，使用高对比度的红 */
+#countdown {
+  color: var(--accent) !important; 
+  font-size: 16px; 
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px var(--accent); 
+}

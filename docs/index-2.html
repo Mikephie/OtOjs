@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OtOjs · 解密前端（自动轮询 + 智能解密）</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <script>
+    let countdownInterval = null; // 用于存储计时器ID，以便重置
+
+    // 启动 50 秒倒数计时器
+    function startCountdown(seconds = 50) {
+        if (countdownInterval) {
+            clearInterval(countdownInterval); // 如果计时器已经在运行，先停止
+        }
+        
+        const countdownEl = document.getElementById('countdown');
+        const barWrapEl = document.getElementById('barWrap');
+        let time = seconds;
+
+        if (barWrapEl) barWrapEl.style.display = 'block';
+        if (!countdownEl) return;
+
+        countdownEl.textContent = `倒数: ${time}s`;
+
+        countdownInterval = setInterval(() => {
+            time--;
+            if (time >= 0) {
+                countdownEl.textContent = `倒数: ${time}s`;
+            } else {
+                clearInterval(countdownInterval);
+                countdownEl.textContent = '计时结束';
+                countdownInterval = null;
+            }
+        }, 1000); 
+    }
+  </script>
+
+</head>
+<body>
+  <div class="wrap">
+    <h1>OtOjs · 解密前端（自动轮询 + 智能解密）</h1>
+
+    <div class="card">
+      <div class="row">
+        <div style="flex:2">
+          <label>REPO</label>
+          <input id="repo" value="Mikephie/OtOjs" />
+        </div>
+        <div>
+          <label>BRANCH</label>
+          <input id="branch" value="main" />
+        </div>
+        <div>
+          <label>Token（contents:rw）</label>
+          <input id="token" type="password" placeholder="ghp_..." />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <small>把待解密脚本放到 <b>input.js</b> → Actions 自动跑 → 拉回输出文件并智能解密</small>
+      <div class="row compact">
+        <input type="file" id="file" accept=".js,.txt,.json" />
+        <button onclick="pick()">文件</button>
+        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
+        <button onclick="loadRemote()">远程</button>
+        <button onclick="pasteFromClipboard()">粘贴</button>
+        <button class="err" onclick="clrIn()">清空</button>
+      </div>
+      <textarea id="codeIn" placeholder="把待解密 JS 粘贴到这里，或用上方导入"></textarea>
+      <div class="row compact">
+        <button class="ok" onclick="submitInput(); startCountdown();">提交</button>
+        <button class="warn" onclick="startAutoPoll(); startCountdown();">轮询</button>
+        
+        <button onclick="beautify()">美化</button>
+        <button onclick="copySel('#codeOut', this)">复制</button>
+        <button class="err" onclick="clrAll()">清空全部</button>
+        <button id="clearRepoBtn" class="warn">清空远程 input/output</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="autoDecode" checked /> 自动智能解密</label>
+        <label><input type="checkbox" id="autoBeautify" /> 自动美化（Prettier）</label>
+        <label><input type="checkbox" id="autoResume" checked /> 后台恢复拉取</label>
+      </div>
+      
+      <div id="status">
+        <small>状态：就绪</small>
+      </div>
+      
+      <div id="countdown-wrap">
+        <span id="countdown">点击"提交"或"轮询"开始计时</span>
+      </div>
+      
+      <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div> 
+      <pre id="codeOut" placeholder="结果将显示在这里"></pre>
+    </div>
+
+    <div class="card">
+      <div class="row compact">
+        <button onclick="loadOutputRaw('output/output.js')">拉取 output.js</button>
+        <button onclick="loadOutputRaw('output/output.deob2.js')">拉取 deob2.js</button>
+        <button onclick="copySel('#outputRaw', this)">复制结果</button>
+        <button onclick="downloadOutput()">下载</button>
+      </div>
+      <pre id="outputRaw"></pre>
+    </div>
+  </div>
+
+  <script src="decode-all.js"></script>
+  <script src="app.js"></script>
+
+  <script>
+    async function copySel(sel, btn){
+      try{
+        const el = document.querySelector(sel);
+        const t = el ? (el.value ?? el.textContent ?? '') : '';
+        if(!t) throw new Error('没有可复制的内容');
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(t);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        }
+        if(btn){
+          const old=btn.textContent; btn.textContent='✅ 已复制';
+          setTimeout(()=> btn.textContent=old, 1200);
+        }
+      }catch(e){
+        alert('复制失败：' + e.message);
+      }
+    }
+  </script>
+
+  <script>
+    (function(){
+      const needNoop =
+        typeof window.prettier==='undefined' ||
+        typeof window.prettier.format!=='function' ||
+        !window.prettierPlugins;
+      if(needNoop){
+        window.prettier = window.prettier || {};
+        window.prettier.format = function(code){ return String(code||''); };
+        window.prettierPlugins = window.prettierPlugins || {};
+        console.log('[noop] Prettier 缺少插件 → 启用兜底（仅原样返回，不报错）');
+      }
+    })();
+  </script>
+</body>
+</html>
