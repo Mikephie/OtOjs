@@ -1,7 +1,7 @@
 :root {
-  /* 新配色：专业蓝绿高科技模式 */
-  --bg: #030d18; /* 极深蓝背景 */
-  --card: #0c1a2c; /* 卡片背景 */
+  /* 新配色：极深暗黑 + 青紫冲击 */
+  --bg: #01060c; /* 极深蓝黑背景 (更暗) */
+  --card: #08101a; /* 卡片背景 (更暗) */
   --muted: #7899b3; /* 柔和的灰色文本 */
   --line: #223a50; /* 边框/分隔线 */
   --line2: #304a60; /* 略亮的边框 */
@@ -13,8 +13,10 @@
   --err: #ff3859; /* 错误/退出：高对比红 */
   --link: #67e8f9; /* 链接：亮青色 */
   
-  --accent: #3b82f6; /* 主强调色：蓝色 */
-  --glow-color: rgba(60, 140, 240, 0.4); /* 用于光晕效果，蓝色 */
+  --accent: #9d50ff; /* 主强调色：鲜艳紫色 (用于倒数数字) */
+  --bar-start: #00ffff; /* 进度条开始色：亮青色 */
+  --bar-end: #9d50ff; /* 进度条结束色：亮紫色 */
+  --glow-color: rgba(103, 232, 249, 0.4); /* 用于卡片光晕，青色 */
 }
 * {
   box-sizing: border-box;
@@ -58,12 +60,12 @@ h1 {
   border-radius: 12px;
   padding: 18px;
   margin: 15px 0;
-  box-shadow: 0 0 10px rgba(60, 140, 240, 0.3);
+  box-shadow: 0 0 10px rgba(103, 232, 249, 0.3); /* 卡片光晕 */
   transition: transform 0.3s, box-shadow 0.3s;
 }
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(60, 140, 240, 0.5);
+  box-shadow: 0 0 15px rgba(103, 232, 249, 0.5);
 }
 
 label {
@@ -121,7 +123,7 @@ button {
 }
 button:hover {
   background: #203550;
-  box-shadow: 0 0 10px rgba(60, 140, 240, 0.3);
+  box-shadow: 0 0 10px rgba(103, 232, 249, 0.3);
 }
 
 button.ok {
@@ -181,16 +183,19 @@ small {
   border-radius: 8px;
   overflow: hidden;
   margin-top: 8px;
+  /* 新增进度条容器发光 */
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2); 
 }
 
 /* 进度条本身：渐变效果由 CSS 定义，JS 控制宽度 */
 .bar {
   height: 100%;
   width: 0%;
-  /* 恢复渐变效果 */
-  background: linear-gradient(90deg, var(--accent), var(--link)); 
-  /* 移除 CSS 动画，让 JS 通过 transition 控制 50s 速度 */
+  /* 恢复更具冲击力的 青色到亮紫 渐变 */
+  background: linear-gradient(90deg, var(--bar-start), var(--bar-end)); 
   transition: width 0.3s linear; 
+  /* 增加进度条的发光效果 */
+  box-shadow: 0 0 10px var(--bar-start);
 }
 
 .options {
@@ -220,10 +225,10 @@ small {
   text-shadow: 0 0 3px var(--ok);
 }
 
-/* 倒数数字的显示，使用高科技青色 */
+/* 倒数数字的显示，使用亮紫色强调色 */
 #countdown {
-  color: var(--link) !important; 
+  color: var(--accent) !important; 
   font-size: 16px; 
   letter-spacing: 2px;
-  text-shadow: 0 0 8px var(--link); 
+  text-shadow: 0 0 8px var(--accent); /* 倒数数字发光 */
 }
