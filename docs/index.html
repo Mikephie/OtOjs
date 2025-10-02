@@ -10,7 +10,7 @@
     let countdownInterval = null; // 用于存储计时器ID
     let totalSeconds = 50;        // 默认倒数时间
 
-    // 启动倒数计时器和进度条同步
+    // 启动倒数计时器和进度条同步（从 100% 倒退到 0%）
     function startCountdown(seconds = totalSeconds) {
         if (countdownInterval) {
             clearInterval(countdownInterval); // 如果计时器已经在运行，先停止
@@ -25,15 +25,15 @@
         if (barWrapEl) barWrapEl.style.display = 'block';
         if (!countdownEl || !barEl) return;
 
-        // 重置进度条
-        barEl.style.transition = 'none';
+        // **关键修复：** 确保进度条从 100% 开始，并设置精确的 50 秒过渡时间
+        barEl.style.transition = 'none'; // 暂停过渡
         barEl.style.width = '100%'; 
-        barEl.style.backgroundColor = 'var(--link)'; // 计时开始时显示满格
-
+        
         countdownEl.textContent = `倒数: ${time}s`;
         
         // 立即启动进度条动画 (从 100% 倒退到 0% 需要 50 秒)
         setTimeout(() => {
+             // 启动 50 秒的平滑过渡，实现倒计时同步
              barEl.style.transition = `width ${seconds}s linear`;
              barEl.style.width = '0%'; 
         }, 50); // 微小的延迟，确保 transition 属性生效
@@ -48,7 +48,7 @@
                 clearInterval(countdownInterval);
                 countdownEl.textContent = '计时结束';
                 countdownInterval = null;
-                // 计时结束后，进度条保持在 0%，直到下次提交
+                // 计时结束后，进度条保持在 0%
             }
         }, 1000); 
     }
