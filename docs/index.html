@@ -97,8 +97,7 @@
       <div class="row compact">
         <input type="file" id="file" accept=".js,.txt,.json" />
         <button onclick="pick()">文件</button>
-        <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" />
-        <button onclick="loadRemote()">远程</button>
+        <button onclick="document.getElementById('remoteDialog').showModal()">远程URL</button>
         <button onclick="pasteFromClipboard()">粘贴</button>
         <button class="err" onclick="clrIn()">清空</button>
       </div>
@@ -109,7 +108,7 @@
         
         <button onclick="beautify()">美化</button>
         <button onclick="copySel('#codeOut', this)">复制</button>
-        <button class="err" onclick="clrAll()">清空全部</button>
+        <button class="err" onclick="clrAll(); document.getElementById('remoteUrl').value = '';">清空全部</button> 
         <button id="clearRepoBtn" class="warn">清空远程 input/output</button>
       </div>
       <div class="options">
@@ -140,6 +139,17 @@
       <pre id="outputRaw"></pre>
     </div>
   </div>
+
+  <dialog id="remoteDialog" class="card" style="max-width: 600px; padding: 20px;">
+    <h2>原始脚本 URL</h2>
+    <input id="remoteUrl" placeholder="https:// 原始脚本 URL（支持 github/blob 自动转 raw）" style="margin-bottom: 15px;" />
+    <div class="row compact" style="gap: 10px; justify-content: flex-end;">
+        <button class="warn" onclick="document.getElementById('remoteUrl').value = '';">清空</button>
+        <button class="ok" onclick="loadRemote(); document.getElementById('remoteDialog').close();">加载并关闭</button>
+        <button onclick="document.getElementById('remoteDialog').close();">取消</button>
+    </div>
+  </dialog>
+
 
   <script src="decode-all.js"></script>
   <script src="app.js"></script>
