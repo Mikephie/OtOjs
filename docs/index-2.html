@@ -7,34 +7,67 @@
   <link rel="stylesheet" href="style.css" />
 
   <script>
-    let countdownInterval = null; // 用于存储计时器ID，以便重置
+    let countdownInterval = null; // 用于存储计时器ID
+    let totalSeconds = 50;        // 默认倒数时间
 
-    // 启动 50 秒倒数计时器
-    function startCountdown(seconds = 50) {
+    // 启动倒数计时器和进度条同步（从 100% 倒退到 0%）
+    function startCountdown(seconds = totalSeconds) {
         if (countdownInterval) {
             clearInterval(countdownInterval); // 如果计时器已经在运行，先停止
         }
         
         const countdownEl = document.getElementById('countdown');
         const barWrapEl = document.getElementById('barWrap');
+        const barEl = document.getElementById('bar');
+        
         let time = seconds;
 
         if (barWrapEl) barWrapEl.style.display = 'block';
-        if (!countdownEl) return;
+        if (!countdownEl || !barEl) return;
 
+        // **关键修复：** 确保进度条从 100% 开始，并设置精确的 50 秒过渡时间
+        barEl.style.transition = 'none'; // 暂停过渡
+        barEl.style.width = '100%'; 
+        
         countdownEl.textContent = `倒数: ${time}s`;
+        
+        // 立即启动进度条动画 (从 100% 倒退到 0% 需要 50 秒)
+        setTimeout(() => {
+             // 启动 50 秒的平滑过渡，实现倒计时同步
+             barEl.style.transition = `width ${seconds}s linear`;
+             barEl.style.width = '0%'; 
+        }, 50); // 微小的延迟，确保 transition 属性生效
 
+        // 启动数字倒数
         countdownInterval = setInterval(() => {
             time--;
+            
             if (time >= 0) {
                 countdownEl.textContent = `倒数: ${time}s`;
             } else {
                 clearInterval(countdownInterval);
                 countdownEl.textContent = '计时结束';
                 countdownInterval = null;
+                // 计时结束后，进度条保持在 0%
             }
         }, 1000); 
     }
+    
+    // 页面加载后设置初始文本
+    document.addEventListener('DOMContentLoaded', () => {
+        const countdownEl = document.getElementById('countdown');
+        if (countdownEl) {
+            countdownEl.textContent = '点击“提交”或“轮询”开始计时';
+        }
+        
+        const barEl = document.getElementById('bar');
+        if (barEl) {
+             // 初始隐藏进度条，等待按钮启动
+             const barWrapEl = document.getElementById('barWrap');
+             if(barWrapEl) barWrapEl.style.display = 'none';
+        }
+    });
+
   </script>
 
 </head>
@@ -90,7 +123,7 @@
       </div>
       
       <div id="countdown-wrap">
-        <span id="countdown">点击"提交"或"轮询"开始计时</span>
+        <span id="countdown"></span>
       </div>
       
       <div class="bar-wrap" id="barWrap"><div class="bar" id="bar"></div></div> 
